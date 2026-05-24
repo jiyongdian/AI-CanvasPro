@@ -363,6 +363,17 @@ const Workspace: React.FC = () => {
       </div>
     );
   }, []); // 空依赖，函数不会重新创建
+  // 滚动位置持久化：离开页面再回来时恢复到之前的分镜位置
+  const listRef = useRef<any>(null);
+  useEffect(() => {
+    if (loading || !projectId) return;
+    const idx = sessionStorage.getItem(`workspace_scroll_item_${projectId}`);
+    if (!idx) return;
+    const go = () => { listRef.current?.scrollToItem(parseInt(idx, 10), 'start'); };
+    const t1 = setTimeout(go, 200);
+    const t2 = setTimeout(go, 500);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [loading, projectId]);
 
   if (loading) {
     return (
@@ -539,17 +550,7 @@ const Workspace: React.FC = () => {
           <AutoSizer
             renderProp={({ height, width }) => (
               <List
-                ref={(listInstance: any) => {
-                  if (!listInstance) return;
-                  // 延迟恢复滚动位置，等虚拟列表完成首次渲染后再滚动
-                  const savedIndex = sessionStorage.getItem(`workspace_scroll_item_${projectId}`);
-                  if (savedIndex) {
-                    const index = parseInt(savedIndex, 10);
-                    requestAnimationFrame(() => {
-                      listInstance.scrollToItem(index, 'start');
-                    });
-                  }
-                }}
+                ref={(li: any) => { if (li) listRef.current = li; }}
                 height={height || 0}
                 width={width || 0}
                 itemCount={project.script.length}
