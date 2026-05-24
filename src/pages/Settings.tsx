@@ -19,35 +19,9 @@ interface ModelsMap {
 const MODELS_KEY = 'custom_models';
 
 const presetModels: ModelsMap = {
-  chat: [
-    'gemini-3-flash-preview',
-    'gemini-2.5-pro',
-    'gpt-4o-mini-2024-07-18',
-    'gpt-4-turbo-2024-04-09',
-    'claude-sonnet-4-20250514',
-  ],
-  image: [
-    'nano-banana-2-4k',
-    'gemini-3-pro-image-preview',
-    'gemini-2.5-flash-image',
-  ],
-  video: [
-    'sora-2',
-    'sora-2-pro',
-    'veo3',
-    'veo3-fast',
-    'veo3-pro',
-    'veo3-pro-frames',
-    'veo3-fast-frames',
-    'veo3.1',
-    'veo3.1-pro',
-    'veo3.1-components',
-    'veo2',
-    'veo2-fast',
-    'veo2-fast-frames',
-    'veo2-fast-components',
-    'veo2-pro',
-  ],
+  chat: [],
+  image: [],
+  video: [],
 };
 
 const loadModels = (): ModelsMap => {
@@ -93,6 +67,7 @@ const Settings: React.FC = () => {
   });
 
   // 自动更新状态
+  const [isTauri, setIsTauri] = useState(false);
   const [appVersion, setAppVersion] = useState('0.1.0');
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
   const [updateChecking, setUpdateChecking] = useState(false);
@@ -103,8 +78,9 @@ const Settings: React.FC = () => {
         const app = await import('@tauri-apps/api/app');
         const v = await app.getVersion();
         setAppVersion(v);
+        setIsTauri(true);
       } catch {
-        // 浏览器环境，使用 package.json 中的版本
+        // 浏览器环境
       }
     })();
   }, []);
@@ -200,7 +176,6 @@ const Settings: React.FC = () => {
 
   const categoryLabels: Record<ModelCategory, string> = { chat: '聊天', image: '图像', video: '视频' };
   const fieldNameMap: Record<ModelCategory, string> = { chat: 'chatModel', image: 'imageModel', video: 'videoModel' };
-  const defaultValueMap: Record<ModelCategory, string> = { chat: 'gemini-3-flash-preview', image: 'nano-banana-2-4k', video: 'sora-2' };
 
   const openManageModal = (category: ModelCategory) => {
     setAddModalCategory(category);
@@ -420,6 +395,7 @@ const Settings: React.FC = () => {
           })}
         </div>
 
+        {isTauri && (
         <div className={styles.downloadSection}>
           <Form.Item label="下载保存位置" className={styles.downloadItem}>
             <div className={styles.downloadPathRow}>
@@ -446,7 +422,9 @@ const Settings: React.FC = () => {
             </div>
           </Form.Item>
         </div>
+        )}
 
+        {isTauri && (
         <div className={styles.updateSection}>
           <div className={styles.sectionTitle}>软件更新</div>
           <div className={styles.updateRow}>
@@ -494,6 +472,7 @@ const Settings: React.FC = () => {
             <div className={styles.updateError}>检查失败：{updateStatus.message}</div>
           )}
         </div>
+        )}
 
         <div className={styles.buttonGroup}>
           <Button

@@ -431,17 +431,30 @@
   background: var(--btn-default-bg) !important;
   border: 1px solid var(--btn-default-border) !important;
   border-radius: 10px !important;
-  box-shadow: 
+  color: var(--body-color) !important;
+  box-shadow:
     0 4px 15px var(--shadow-light),
     inset 0 1px 0 var(--glass-border) !important;
   transition: all 0.25s ease !important;
+}
+
+[data-theme="light"] .downloadPathRow :global(.ant-btn) {
+  background: #4f46e5 !important;
+  border-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .downloadPathRow :global(.ant-btn:hover) {
+  background: #6366f1 !important;
+  border-color: #6366f1 !important;
+  color: #ffffff !important;
 }
 
 .downloadPathRow :global(.ant-btn:hover) {
   transform: translateY(-2px) !important;
   background: var(--btn-default-hover-bg) !important;
   border-color: var(--item-border-color) !important;
-  box-shadow: 
+  box-shadow:
     0 8px 25px var(--shadow-base),
     inset 0 1px 0 var(--glass-border) !important;
 }
