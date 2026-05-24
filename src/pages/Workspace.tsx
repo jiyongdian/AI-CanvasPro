@@ -365,9 +365,9 @@ const Workspace: React.FC = () => {
   }, []); // 空依赖，函数不会重新创建
   // 滚动位置持久化：离开页面再回来时恢复到之前的分镜位置
   const listRef = useRef<any>(null);
-  // 从 sessionStorage 读取上次保存的分镜位置，作为初始滚动偏移
-  const savedScrollOffset = sessionStorage.getItem(`workspace_scroll_item_${projectId}`);
-  const initialScrollOffset = savedScrollOffset ? parseInt(savedScrollOffset, 10) * 450 : 0;
+  // 从 sessionStorage 读取上次保存的精确滚动位置
+  const savedOffset = sessionStorage.getItem(`workspace_scroll_${projectId}`);
+  const initialScrollOffset = savedOffset ? parseInt(savedOffset, 10) : 0;
 
   if (loading) {
     return (
@@ -554,8 +554,7 @@ const Workspace: React.FC = () => {
                 itemKey={(index) => project.script[index]?.id || `scene-${index}`}
                 itemData={listItemData}
                 onScroll={({ scrollOffset }: { scrollOffset: number }) => {
-                  const visibleIndex = Math.floor(scrollOffset / 450);
-                  sessionStorage.setItem(`workspace_scroll_item_${projectId}`, String(visibleIndex));
+                  sessionStorage.setItem(`workspace_scroll_${projectId}`, String(scrollOffset));
                 }}
               >
                 {renderSceneItem}
