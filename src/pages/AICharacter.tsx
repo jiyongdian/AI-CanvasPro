@@ -8,7 +8,7 @@ import { aiService, createTempScene } from '../services/aiService';
 import { preloadImage } from '../utils/imageUtils';
 import { downloadToDir, saveDirHandle } from '../utils/downloadHelper';
 import { saveCharacter, openDatabase, getAllStyles } from '../services/database';
-import { saveMedia } from '../services/mediaService';
+import { saveMedia, getMedia } from '../services/mediaService';
 import { characterListState } from '../store/projectStore';
 import { Character, Style } from '../types';
 import styles from './AICharacter.module.css';
@@ -255,13 +255,26 @@ const AICharacter: React.FC = () => {
 
       // 预加载图片到浏览器缓存，带进度回调
       await preloadImage(imageUrl, (progress) => {
-        setHistory(prev => prev.map(c => 
+        setHistory(prev => prev.map(c =>
           c.id === newCharacter.id ? { ...c, loadingProgress: progress } : c
         ));
       });
 
-      const completedCharacter = { ...newCharacter, imageUrl, status: 'completed' as const };
-      setHistory(prev => prev.map(c => 
+      // 将图片转为 Base64 并永久保存（与角色库/风格库一致）
+      let permanentImage = imageUrl;
+      try {
+        await saveMedia('character', `ai_${newCharacter.id}`, imageUrl);
+        const base64 = await getMedia('character', `ai_${newCharacter.id}`);
+        if (base64) {
+          permanentImage = base64;
+          console.log('[AICharacter] 角色图片已永久保存到本地');
+        }
+      } catch (mediaError) {
+        console.warn('[AICharacter] 图片保存到本地失败，使用远程URL:', mediaError);
+      }
+
+      const completedCharacter = { ...newCharacter, imageUrl: permanentImage, status: 'completed' as const };
+      setHistory(prev => prev.map(c =>
         c.id === newCharacter.id ? completedCharacter : c
       ));
       saveToIndexedDB(completedCharacter);
@@ -317,13 +330,21 @@ const AICharacter: React.FC = () => {
 
       // 预加载图片
       await preloadImage(imageUrl, (progress) => {
-        setHistory(prev => prev.map(c => 
+        setHistory(prev => prev.map(c =>
           c.id === character.id ? { ...c, loadingProgress: progress } : c
         ));
       });
 
-      const completedCharacter = { ...character, imageUrl, status: 'completed' as const };
-      setHistory(prev => prev.map(c => 
+      // 永久保存图片到本地
+      let permanentImage = imageUrl;
+      try {
+        await saveMedia('character', `ai_${character.id}`, imageUrl);
+        const base64 = await getMedia('character', `ai_${character.id}`);
+        if (base64) permanentImage = base64;
+      } catch { /* 降级到远程URL */ }
+
+      const completedCharacter = { ...character, imageUrl: permanentImage, status: 'completed' as const };
+      setHistory(prev => prev.map(c =>
         c.id === character.id ? completedCharacter : c
       ));
       saveToIndexedDB(completedCharacter);
@@ -370,13 +391,21 @@ const AICharacter: React.FC = () => {
 
       // 预加载图片
       await preloadImage(imageUrl, (progress) => {
-        setHistory(prev => prev.map(c => 
+        setHistory(prev => prev.map(c =>
           c.id === character.id ? { ...c, loadingProgress: progress } : c
         ));
       });
 
-      const completedCharacter = { ...character, imageUrl, status: 'completed' as const };
-      setHistory(prev => prev.map(c => 
+      // 永久保存图片到本地
+      let permanentImage = imageUrl;
+      try {
+        await saveMedia('character', `ai_${character.id}`, imageUrl);
+        const base64 = await getMedia('character', `ai_${character.id}`);
+        if (base64) permanentImage = base64;
+      } catch { /* 降级到远程URL */ }
+
+      const completedCharacter = { ...character, imageUrl: permanentImage, status: 'completed' as const };
+      setHistory(prev => prev.map(c =>
         c.id === character.id ? completedCharacter : c
       ));
       saveToIndexedDB(completedCharacter);
@@ -452,34 +481,46 @@ const AICharacter: React.FC = () => {
     try {
       const characterId = uuidv4();
       
-      // 简化逻辑：直接获取图片并转换为 Base64
+      // 获取图片：优先从本地 media store 读取，回退到远程 URL
       let referenceImage = '';
       let referenceImageBlob: Blob | undefined;
       let mediaSaved = false;
-      
+
       try {
-        console.log('[AICharacter] 开始获取图片:', character.imageUrl);
-        const response = await fetch(character.imageUrl);
-        if (response.ok) {
-          const blob = await response.blob();
-          referenceImageBlob = blob;
-          
-          // 将 Blob 转为 Base64
-          referenceImage = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-          
-          // 直接保存 Base64 到媒体服务（最可靠）
+        // 尝试从本地 media store 读取已经永久保存的图片
+        const localBase64 = await getMedia('character', `ai_${character.id}`);
+        if (localBase64) {
+          referenceImage = localBase64;
+          mediaSaved = true;
+          console.log('[AICharacter] 从本地 media store 读取角色图片');
+        } else if (character.imageUrl.startsWith('data:')) {
+          // imageUrl 已经是 Base64，直接使用
+          referenceImage = character.imageUrl;
           await saveMedia('character', characterId, referenceImage);
           mediaSaved = true;
-          console.log('[AICharacter] 角色参考图已保存到媒体服务');
+          console.log('[AICharacter] 直接使用 Base64 保存到角色库');
+        } else {
+          // 回退：从远程 URL 下载
+          console.log('[AICharacter] 从远程URL获取图片:', character.imageUrl);
+          const response = await fetch(character.imageUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            referenceImageBlob = blob;
+
+            referenceImage = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+
+            await saveMedia('character', characterId, referenceImage);
+            mediaSaved = true;
+            console.log('[AICharacter] 角色参考图已保存到媒体服务');
+          }
         }
       } catch (fetchError) {
         console.warn('[AICharacter] 获取图片失败:', fetchError);
-        // 如果获取失败，使用原始 URL（可能在后续使用时再次尝试）
         referenceImage = character.imageUrl;
       }
 
