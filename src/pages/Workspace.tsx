@@ -539,6 +539,16 @@ const Workspace: React.FC = () => {
           <AutoSizer
             renderProp={({ height, width }) => (
               <List
+                ref={(listInstance: any) => {
+                  // 恢复上一次滚动位置
+                  if (listInstance) {
+                    const saved = sessionStorage.getItem(`workspace_scroll_${projectId}`);
+                    if (saved) {
+                      const offset = parseInt(saved, 10);
+                      listInstance.scrollTo(offset);
+                    }
+                  }
+                }}
                 height={height || 0}
                 width={width || 0}
                 itemCount={project.script.length}
@@ -546,6 +556,9 @@ const Workspace: React.FC = () => {
                 overscanCount={2}
                 itemKey={(index) => project.script[index]?.id || `scene-${index}`}
                 itemData={listItemData}
+                onScroll={({ scrollOffset }: { scrollOffset: number }) => {
+                  sessionStorage.setItem(`workspace_scroll_${projectId}`, String(scrollOffset));
+                }}
               >
                 {renderSceneItem}
               </List>
