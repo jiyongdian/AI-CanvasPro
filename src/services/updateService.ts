@@ -1,6 +1,3 @@
-import { check, type Update } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
-
 export type UpdateStatus =
   | { state: 'idle' }
   | { state: 'checking' }
@@ -10,19 +7,45 @@ export type UpdateStatus =
   | { state: 'up-to-date' }
   | { state: 'error'; message: string };
 
-export async function checkForUpdate(): Promise<Update | null> {
-  const update = await check();
+export interface UpdateInfo {
+  version: string;
+  body?: string;
+  date?: string;
+  downloadAndInstall(onEvent: (event: DownloadEvent) => void): Promise<void>;
+}
+
+type DownloadEvent =
+  | { event: 'Started'; data: { contentLength?: number } }
+  | { event: 'Progress'; data: { chunkLength: number } }
+  | { event: 'Finished' };
+
+let tauriUpdater: any = null;
+
+async function getTauriUpdater() {
+  if (tauriUpdater) return tauriUpdater;
+  try {
+    tauriUpdater = await import('@tauri-apps/plugin-updater');
+    return tauriUpdater;
+  } catch {
+    return null;
+  }
+}
+
+export async function checkForUpdate(): Promise<UpdateInfo | null> {
+  const updater = await getTauriUpdater();
+  if (!updater) return null;
+  const update = await updater.check();
   return update;
 }
 
 export async function downloadAndInstallUpdate(
-  update: Update,
+  update: UpdateInfo,
   onProgress?: (progress: number, total?: number) => void,
 ) {
   let contentLength: number | undefined;
   let downloaded = 0;
 
-  await update.downloadAndInstall((event) => {
+  await update.downloadAndInstall((event: DownloadEvent) => {
     switch (event.event) {
       case 'Started':
         contentLength = event.data.contentLength;
@@ -40,5 +63,10 @@ export async function downloadAndInstallUpdate(
     }
   });
 
-  await relaunch();
+  try {
+    const proc = await import('@tauri-apps/plugin-process');
+    await proc.relaunch();
+  } catch {
+    // 浏览器环境或 Tauri 进程不可用
+  }
 }

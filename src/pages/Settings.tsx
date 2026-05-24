@@ -6,7 +6,6 @@ import { aiService } from '../services/aiService';
 import { saveDirHandle, getDirHandle, verifyPermission } from '../utils/downloadHelper';
 import { saveApiConfig, loadApiConfig } from '../services/secureStorage';
 import { checkForUpdate, downloadAndInstallUpdate, type UpdateStatus } from '../services/updateService';
-import { getVersion } from '@tauri-apps/api/app';
 import styles from './Settings.module.css';
 
 type ModelCategory = 'chat' | 'image' | 'video';
@@ -99,7 +98,15 @@ const Settings: React.FC = () => {
   const [updateChecking, setUpdateChecking] = useState(false);
 
   useEffect(() => {
-    getVersion().then(setAppVersion).catch(() => {});
+    (async () => {
+      try {
+        const app = await import('@tauri-apps/api/app');
+        const v = await app.getVersion();
+        setAppVersion(v);
+      } catch {
+        // 浏览器环境，使用 package.json 中的版本
+      }
+    })();
   }, []);
 
   const handleCheckUpdate = async () => {
