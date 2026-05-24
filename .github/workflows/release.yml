@@ -4,6 +4,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     name: Build and Release
@@ -47,7 +50,7 @@ jobs:
 
             请下载对应平台的安装包进行安装。
 
-            **Windows**: 下载 `.msi` 或 `.exe` 安装包。
+            **Windows**: 下载 `.exe` 安装包。
 
             ---
             自动更新已启用，已安装旧版本的用户将在启动时收到更新提示。
