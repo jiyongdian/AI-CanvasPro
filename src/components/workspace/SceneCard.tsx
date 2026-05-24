@@ -844,10 +844,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
         currentPrompt,
         promptMode,
         {
-          actionDescription: scene.actionDescription,
-          dialogue: scene.dialogue,
-          character: scene.character,
-          sceneDescription: scene.description || `分镜 ${index + 1}`,
+          sceneDescription: `分镜 ${index + 1}`,
         },
         // 分析通道 → 弹窗
         (analysisText) => setDirectorAnalysis(analysisText),
