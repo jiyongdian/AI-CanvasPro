@@ -1,0 +1,27 @@
+[package]
+name = "zhexian-comic-studio"
+version = "0.1.0"
+description = "AI漫剧创作桌面应用"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "zhexian_comic_studio_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 快速优化配置（平衡编译速度和运行性能）
+[profile.release]
+opt-level = 3
+lto = "thin"
+panic = "abort"
+strip = true

@@ -1,0 +1,196 @@
+/* ========================================
+   场景管理弹窗 - 高级感深色主题
+   ======================================== */
+
+.sceneManagerModal :global(.ant-modal-body) {
+  padding: 20px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.sceneList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 场景项卡片 */
+.sceneItem {
+  background: var(--panel-bg-gradient);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 18px;
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 4px 15px var(--shadow-light),
+    inset 0 1px 0 var(--glass-border);
+}
+
+.sceneItem:hover {
+  border-color: #22c55e;
+  box-shadow: 
+    0 6px 25px var(--shadow-base),
+    0 0 10px rgba(34, 197, 94, 0.1),
+    inset 0 1px 0 var(--glass-border);
+}
+
+.sceneContent {
+  display: flex;
+  gap: 16px;
+}
+
+.sceneLeft {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sceneHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sceneTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--body-color);
+  text-shadow: 0 1px 3px var(--shadow-light);
+}
+
+.sceneCount {
+  font-size: 12px;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* 提示词输入框 */
+.promptInput {
+  background: var(--input-bg) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: 10px !important;
+  color: var(--body-color) !important;
+  resize: none;
+  box-shadow: inset 0 2px 4px var(--shadow-light) !important;
+  transition: all 0.25s ease !important;
+}
+
+.promptInput:focus {
+  border-color: #22c55e !important;
+  box-shadow: 
+    inset 0 2px 4px var(--shadow-light),
+    0 0 0 3px rgba(34, 197, 94, 0.2),
+    0 0 15px rgba(34, 197, 94, 0.1) !important;
+}
+
+.sceneActions {
+  display: flex;
+  gap: 10px;
+}
+
+/* 生成按钮 */
+.sceneActions :global(.ant-btn-primary) {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  box-shadow: 
+    0 4px 12px rgba(34, 197, 94, 0.4),
+    inset 0 1px 0 var(--glass-border) !important;
+  color: #ffffff !important;
+}
+
+.sceneActions :global(.ant-btn-primary:hover) {
+  transform: translateY(-1px) !important;
+  box-shadow: 
+    0 6px 18px rgba(34, 197, 94, 0.5),
+    inset 0 1px 0 var(--glass-border) !important;
+}
+
+.sceneRight {
+  width: 200px;
+  flex-shrink: 0;
+}
+
+/* 图片预览框 */
+.imagePreview {
+  width: 200px;
+  height: 120px;
+  background: var(--input-bg);
+  border: 1px solid var(--item-border-color);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 2px 4px var(--shadow-light);
+}
+
+.imagePreview:hover {
+  border-color: #22c55e;
+  box-shadow: 
+    inset 0 2px 4px var(--shadow-light),
+    0 0 15px rgba(34, 197, 94, 0.15);
+}
+
+.imagePreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.previewOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--shadow-heavy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+  font-size: 24px;
+  color: var(--body-color);
+}
+
+.imagePreview:hover .previewOverlay {
+  opacity: 1;
+}
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--placeholder-color);
+  font-size: 12px;
+}
+
+.placeholder :global(.anticon) {
+  font-size: 32px;
+  color: #22c55e;
+  opacity: 0.5;
+}
+
+.previewModal :global(.ant-modal-content) {
+  background: transparent;
+  box-shadow: none;
+}
+
+.previewModal :global(.ant-modal-body) {
+  padding: 0;
+}
+
+.previewFullImage {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px var(--shadow-heavy);
+}

@@ -1,0 +1,96 @@
+/* ========================================
+   角色选择卡片 - 高级感深色主题
+   ======================================== */
+
+.card {
+  display: flex;
+  align-items: center;
+  background: var(--panel-bg-gradient);
+  border: 2px solid #3a3a3a;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  overflow: hidden;
+  contain: content;
+  padding: 8px;
+  gap: 10px;
+  box-shadow: 
+    0 2px 8px var(--shadow-light),
+    inset 0 1px 0 var(--glass-border);
+}
+
+.card:hover {
+  border-color: #8b5cf6;
+  background: linear-gradient(145deg, #2e2e2e 0%, #242424 100%);
+  transform: translateX(4px);
+  box-shadow: 
+    0 4px 15px var(--shadow-light),
+    0 0 10px rgba(139, 92, 246, 0.1);
+}
+
+.selected {
+  border-color: #8b5cf6 !important;
+  background: linear-gradient(145deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.08) 100%);
+  box-shadow: 
+    0 0 0 2px rgba(139, 92, 246, 0.2),
+    0 4px 15px rgba(139, 92, 246, 0.2);
+}
+
+.avatar {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px var(--shadow-light);
+}
+
+.checkMark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(139, 92, 246, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkMark :global(.ant-checkbox-wrapper) {
+  pointer-events: none;
+}
+
+.checkMark :global(.ant-checkbox) {
+  transform: scale(0.8);
+}
+
+.checkMark :global(.ant-checkbox-checked .ant-checkbox-inner) {
+  background-color: #ffffff !important;
+  border-color: #ffffff !important;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--body-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.description {
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}

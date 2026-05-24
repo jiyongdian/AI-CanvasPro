@@ -1,0 +1,504 @@
+:root {
+  /* 白天模式变量 - 清晰层次与高可用性 */
+  --body-bg: #f0f2f7; /* 偏冷灰底色，与纯白卡片形成明显层次 */
+  --body-color: #0f172a; /* 极黑字色，提供最强锐度对比 */
+  
+  --panel-bg-gradient: #ffffff;
+  --panel-border: #c5cdd8; /* 边框略深，在白底上更清晰 */
+  --item-hover-bg: #f1f5f9;
+  --item-border-color: #c5cdd8;
+  
+  --input-bg: #ffffff;
+  --input-border: #94a3b8;
+  
+  --modal-bg: #ffffff;
+  --modal-header-border: #c5cdd8;
+  --modal-footer-bg: #f4f6f8; /* 略深于纯白，与卡片主体有层次 */
+  
+  --btn-default-bg: #ffffff;
+  --btn-default-border: #bcc3ce; /* 按钮边框加深 */
+  --btn-default-color: #0f172a;
+  --btn-default-hover-bg: #eef1f5;
+  
+  /* 阴影：提供更清晰的悬浮层次 */
+  --shadow-light: 0 1px 3px 0 rgba(15, 23, 42, 0.09), 0 1px 2px -1px rgba(15, 23, 42, 0.06);
+  --shadow-base: 0 4px 8px -2px rgba(15, 23, 42, 0.12), 0 2px 4px -2px rgba(15, 23, 42, 0.08);
+  --shadow-heavy: 0 12px 24px -4px rgba(15, 23, 42, 0.16), 0 4px 8px -4px rgba(15, 23, 42, 0.1);
+  
+  --placeholder-color: #94a3b8; /* 占位符：最淡，灰调 */
+  --text-secondary: #475569; /* 副文本：中等浓度 */
+  --text-tertiary: #64748b; /* 三级文字：介于副文本与占位符 */
+  --text-label: #334155; /* 标签/表头：接近主色的深灰 */
+  --icon-hover-bg: #e2e8f0;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(15, 23, 42, 0.06); /* 光模式：微灰色线代替白色线 */
+  --gradient-border-bg: #ffffff;
+  --divider-color: #e2e8f0; /* 分割线/内部区域边框 */
+}
+
+:root[data-theme='dark'] {
+  /* 暗黑模式变量 */
+  --body-bg: #0d0d0d;
+  --body-color: #e5e5e5;
+  
+  --panel-bg-gradient: linear-gradient(145deg, #282828 0%, #1e1e1e 100%);
+  --panel-border: #3a3a3a;
+  --item-hover-bg: linear-gradient(145deg, #333 0%, #2a2a2a 100%);
+  --item-border-color: #4a4a4a;
+  
+  --input-bg: linear-gradient(145deg, #1a1a1a 0%, #141414 100%);
+  --input-border: #3a3a3a;
+  
+  --modal-bg: linear-gradient(145deg, #282828 0%, #1e1e1e 100%);
+  --modal-header-border: rgba(255, 255, 255, 0.08);
+  --modal-footer-bg: linear-gradient(145deg, #222 0%, #1a1a1a 100%);
+  
+  --btn-default-bg: linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%);
+  --btn-default-border: #4a4a4a;
+  --btn-default-color: #e5e5e5;
+  --btn-default-hover-bg: linear-gradient(145deg, #444 0%, #333 100%);
+  
+  --shadow-light: rgba(0, 0, 0, 0.3);
+  --shadow-base: rgba(0, 0, 0, 0.4);
+  --shadow-heavy: rgba(0, 0, 0, 0.6);
+  
+  --placeholder-color: #555;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #888;
+  --text-label: #bbb;
+  --icon-hover-bg: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --gradient-border-bg: #1a1a2e;
+  --divider-color: rgba(255, 255, 255, 0.08);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: var(--body-bg);
+  color: var(--body-color);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "ss01" 1, "cv01" 1;
+  letter-spacing: 0.2px;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #b0b8c4;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: #3a7bd5;
+}
+
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: #4a8be5;
+}
+
+::selection {
+  background: rgba(58, 123, 213, 0.4);
+  color: #fff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(58, 123, 213, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(58, 123, 213, 0.8), 0 0 30px rgba(0, 210, 255, 0.4); }
+}
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+}
+
+.gradient-border {
+  position: relative;
+  background: var(--gradient-border-bg);
+  border: 1px solid #3a7bd5;
+}
+
+.neon-glow {
+  color: #00d2ff;
+}
+
+.hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px var(--shadow-base);
+}
+
+/* ========================================
+   Ant Design Select 下拉菜单 - 高级感样式
+   ======================================== */
+
+.ant-select-dropdown {
+  background: var(--panel-bg-gradient) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: 12px !important;
+  box-shadow: 
+    0 10px 40px var(--shadow-heavy),
+    0 4px 15px var(--shadow-light),
+    inset 0 1px 0 var(--glass-border) !important;
+  padding: 8px !important;
+  overflow: hidden;
+}
+
+.ant-select-item {
+  color: var(--body-color) !important;
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+  margin: 2px 0 !important;
+  transition: all 0.2s ease !important;
+}
+
+.ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background: var(--item-hover-bg) !important;
+  box-shadow: 
+    0 2px 8px var(--shadow-light),
+    inset 0 1px 0 var(--glass-border) !important;
+}
+
+.ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(99, 102, 241, 0.15) 100%) !important;
+  color: var(--body-color) !important;
+  font-weight: 600 !important;
+  box-shadow: 
+    0 2px 10px rgba(99, 102, 241, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  text-shadow: none !important;
+}
+
+.ant-select-item-option-selected .ant-select-item-option-state {
+  color: #6366f1 !important;
+}
+
+.ant-select-selector {
+  background: var(--input-bg) !important;
+  border: 1px solid var(--input-border) !important;
+  border-radius: 10px !important;
+  box-shadow: 
+    inset 0 2px 4px var(--shadow-light),
+    0 1px 0 var(--glass-border) !important;
+  transition: all 0.25s ease !important;
+}
+
+.ant-select:hover .ant-select-selector {
+  border-color: var(--item-border-color) !important;
+}
+
+.ant-select-focused .ant-select-selector {
+  border-color: #6366f1 !important;
+  box-shadow: 
+    inset 0 2px 4px var(--shadow-light),
+    0 0 0 3px rgba(99, 102, 241, 0.2),
+    0 0 15px rgba(99, 102, 241, 0.1) !important;
+}
+
+.ant-select-arrow {
+  color: var(--text-secondary) !important;
+  transition: color 0.2s ease !important;
+}
+
+.ant-select:hover .ant-select-arrow {
+  color: var(--body-color) !important;
+}
+
+.ant-select-selection-item {
+  color: var(--body-color) !important;
+}
+
+.ant-select-selection-placeholder {
+  color: var(--placeholder-color) !important;
+}
+
+/* ========================================
+   Ant Design Modal 弹窗 - 高级感样式
+   ======================================== */
+
+.ant-modal-mask {
+  background: rgba(0, 0, 0, 0.45) !important; /* 减轻遮罩减轻白天压迫感 */
+  backdrop-filter: blur(4px);
+}
+:root[data-theme='dark'] .ant-modal-mask {
+  background: rgba(0, 0, 0, 0.75) !important;
+}
+
+.ant-modal-content {
+  background: var(--modal-bg) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: 16px !important;
+  box-shadow: 
+    0 25px 80px var(--shadow-heavy),
+    0 10px 30px var(--shadow-base),
+    inset 0 1px 0 var(--glass-border) !important;
+  overflow: hidden;
+}
+
+.ant-modal-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--modal-header-border) !important;
+  padding: 20px 24px !important;
+}
+
+.ant-modal-title {
+  color: var(--body-color) !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+}
+
+.ant-modal-body {
+  background: transparent !important;
+  padding: 24px !important;
+  color: var(--body-color) !important;
+}
+
+.ant-modal-footer {
+  background: var(--modal-footer-bg) !important;
+  border-top: 1px solid var(--modal-header-border) !important;
+  padding: 16px 24px !important;
+}
+
+.ant-modal-close {
+  color: var(--text-secondary) !important;
+  transition: all 0.2s ease !important;
+}
+
+.ant-modal-close:hover {
+  color: var(--body-color) !important;
+  background: var(--icon-hover-bg) !important;
+  border-radius: 8px !important;
+}
+
+.ant-modal-footer .ant-btn {
+  border-radius: 8px !important;
+  padding: 8px 20px !important;
+  height: auto !important;
+  font-weight: 500 !important;
+  transition: all 0.25s ease !important;
+}
+
+.ant-modal-footer .ant-btn-default {
+  background: var(--btn-default-bg) !important;
+  border: 1px solid var(--btn-default-border) !important;
+  color: var(--btn-default-color) !important;
+  box-shadow: 
+    0 4px 12px var(--shadow-light),
+    inset 0 1px 0 var(--glass-border) !important;
+}
+
+.ant-modal-footer .ant-btn-default:hover {
+  transform: translateY(-2px) !important;
+  background: var(--btn-default-hover-bg) !important;
+  border-color: var(--item-border-color) !important;
+}
+
+.ant-modal-footer .ant-btn-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: 
+    0 4px 15px rgba(99, 102, 241, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.ant-modal-footer .ant-btn-primary:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 
+    0 8px 25px rgba(99, 102, 241, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
+.ant-modal-footer .ant-btn-dangerous {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: 
+    0 4px 15px rgba(239, 68, 68, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.ant-modal-footer .ant-btn-dangerous:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 
+    0 8px 25px rgba(239, 68, 68, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
+.ant-modal-confirm .ant-modal-confirm-title {
+  color: var(--body-color) !important;
+  font-weight: 600 !important;
+}
+
+.ant-modal-confirm .ant-modal-confirm-content {
+  color: var(--text-secondary) !important;
+}
+
+/* ========================================
+   Ant Design Input 输入框 - 高级感样式
+   ======================================== */
+
+.ant-input {
+  background: var(--input-bg) !important;
+  border: 1px solid var(--input-border) !important;
+  border-radius: 10px !important;
+  color: var(--body-color) !important;
+  box-shadow: 
+    inset 0 2px 4px var(--shadow-light),
+    0 1px 0 var(--glass-border) !important;
+  transition: all 0.25s ease !important;
+}
+
+.ant-input:hover {
+  border-color: var(--item-border-color) !important;
+}
+
+.ant-input:focus,
+.ant-input-focused {
+  border-color: #6366f1 !important;
+  box-shadow: 
+    inset 0 2px 4px var(--shadow-light),
+    0 0 0 3px rgba(99, 102, 241, 0.2),
+    0 0 15px rgba(99, 102, 241, 0.1) !important;
+}
+
+.ant-input::placeholder {
+  color: var(--placeholder-color) !important;
+}
+
+.ant-input-password {
+  background: var(--input-bg) !important;
+  border: 1px solid var(--input-border) !important;
+  border-radius: 10px !important;
+  box-shadow: 
+    inset 0 2px 4px var(--shadow-light),
+    0 1px 0 var(--glass-border) !important;
+}
+
+.ant-input-password .ant-input {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.ant-input-password .ant-input-suffix {
+  color: var(--text-secondary) !important;
+}
+
+.ant-input-textarea textarea {
+  background: var(--input-bg) !important;
+  border: 1px solid var(--input-border) !important;
+  border-radius: 10px !important;
+  color: var(--body-color) !important;
+  box-shadow: 
+    inset 0 2px 4px var(--shadow-light),
+    0 1px 0 var(--glass-border) !important;
+}
+
+.ant-input-textarea textarea:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 
+    inset 0 2px 4px var(--shadow-light),
+    0 0 0 3px rgba(99, 102, 241, 0.2),
+    0 0 15px rgba(99, 102, 241, 0.1) !important;
+}
+
+/* ========================================
+   Ant Design Button 按钮 - 高级感样式
+   ======================================== */
+
+.ant-btn {
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  transition: all 0.25s ease !important;
+}
+
+.ant-btn-default {
+  background: var(--btn-default-bg) !important;
+  border: 1px solid var(--btn-default-border) !important;
+  color: var(--btn-default-color) !important;
+  box-shadow: 
+    0 2px 8px var(--shadow-light),
+    inset 0 1px 0 var(--glass-border) !important;
+}
+
+.ant-btn-default:hover {
+  transform: translateY(-1px) !important;
+  background: var(--btn-default-hover-bg) !important;
+  border-color: var(--item-border-color) !important;
+  color: var(--body-color) !important;
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: 
+    0 4px 15px rgba(99, 102, 241, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+}
+
+.ant-btn-primary:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 
+    0 8px 25px rgba(99, 102, 241, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}

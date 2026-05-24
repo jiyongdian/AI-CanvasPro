@@ -1,0 +1,193 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.replaceToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+  border-radius: 8px;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.toolbarLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--body-color);
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
+.scriptTextArea {
+  flex: 1;
+  min-height: calc(65vh - 180px) !important;
+  background: var(--input-bg) !important;
+  border-color: var(--input-border) !important;
+  color: var(--body-color) !important;
+  font-size: 14px !important;
+  line-height: 1.8 !important;
+  font-family: 'Microsoft YaHei', sans-serif !important;
+  resize: none !important;
+}
+
+.scriptTextArea:focus {
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2) !important;
+}
+
+.scriptTextArea::placeholder {
+  color: var(--placeholder-color) !important;
+}
+
+/* AI起名按钮样式 */
+.namingButton {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%) !important;
+  border-color: rgba(168, 85, 247, 0.4) !important;
+  color: #a855f7 !important;
+}
+
+.namingButton:hover {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(99, 102, 241, 0.25) 100%) !important;
+  border-color: #a855f7 !important;
+}
+
+/* 重新生成按钮样式 */
+.regenerateButton {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(16, 185, 129, 0.15) 100%) !important;
+  border-color: rgba(34, 197, 94, 0.4) !important;
+  color: #22c55e !important;
+}
+
+.regenerateButton:hover {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.25) 0%, rgba(16, 185, 129, 0.25) 100%) !important;
+  border-color: #22c55e !important;
+}
+
+/* 起名弹窗容器 */
+.namingContainer {
+  padding: 8px 0;
+}
+
+.namingInputSection {
+  margin-bottom: 16px;
+}
+
+.namingHint {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.namingInput {
+  background: var(--input-bg) !important;
+  border-color: var(--input-border) !important;
+  color: var(--body-color) !important;
+  font-size: 14px !important;
+  margin-bottom: 12px;
+}
+
+.namingInput:focus {
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2) !important;
+}
+
+.namingInput::placeholder {
+  color: var(--placeholder-color) !important;
+}
+
+.generateNameButton {
+  width: 100%;
+  height: 40px;
+  font-size: 15px;
+  background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+}
+
+.generateNameButton:hover {
+  background: linear-gradient(135deg, #9333ea 0%, #4f46e5 100%) !important;
+}
+
+/* 加载状态 */
+.namingLoading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 0;
+}
+
+/* 生成结果 */
+.namingResults {
+  margin-top: 16px;
+}
+
+.namingTable {
+  background: transparent !important;
+}
+
+.namingTable :global(.ant-table) {
+  background: transparent !important;
+}
+
+.namingTable :global(.ant-table-thead > tr > th) {
+  background: rgba(168, 85, 247, 0.1) !important;
+  color: var(--body-color) !important;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.3) !important;
+}
+
+.namingTable :global(.ant-table-tbody > tr > td) {
+  background: transparent !important;
+  color: var(--body-color) !important;
+  border-bottom: 1px solid var(--divider-color) !important;
+}
+
+.namingTable :global(.ant-table-tbody > tr:hover > td) {
+  background: rgba(168, 85, 247, 0.1) !important;
+}
+
+/* 重新生成弹窗容器 */
+.regenerateContainer {
+  padding: 8px 0;
+}
+
+.regenerateHint {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.regenerateInput {
+  background: var(--input-bg) !important;
+  border-color: var(--input-border) !important;
+  color: var(--body-color) !important;
+  font-size: 14px !important;
+  margin-bottom: 16px;
+}
+
+.regenerateInput:focus {
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2) !important;
+}
+
+.regenerateInput::placeholder {
+  color: var(--placeholder-color) !important;
+}
+
+.regenerateSubmitButton {
+  width: 100%;
+  height: 40px;
+  font-size: 15px;
+  background: linear-gradient(135deg, #22c55e 0%, #10b981 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+}
+
+.regenerateSubmitButton:hover {
+  background: linear-gradient(135deg, #16a34a 0%, #059669 100%) !important;
+}

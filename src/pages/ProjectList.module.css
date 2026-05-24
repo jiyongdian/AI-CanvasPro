@@ -1,0 +1,296 @@
+/* ========================================
+   作品区页面 - 高级感深色主题
+   ======================================== */
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--modal-header-border);
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--body-color);
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 10px var(--shadow-light);
+}
+
+/* 新建项目按钮 */
+.header :global(.ant-btn-primary) {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  padding: 10px 24px !important;
+  height: auto !important;
+  font-weight: 600 !important;
+  box-shadow: 
+    0 6px 20px rgba(34, 197, 94, 0.4),
+    0 2px 8px var(--shadow-light),
+    inset 0 1px 0 var(--glass-border) !important;
+  transition: all 0.25s ease !important;
+  color: #ffffff !important;
+}
+
+.header :global(.ant-btn-primary:hover) {
+  transform: translateY(-2px) !important;
+  box-shadow: 
+    0 10px 30px rgba(34, 197, 94, 0.5),
+    0 4px 12px var(--shadow-base),
+    inset 0 1px 0 var(--glass-border) !important;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+}
+
+.empty {
+  margin-top: 100px;
+}
+
+/* 弹窗表单 */
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.modalForm .formItem {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modalForm .formItem label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.novelInput {
+  background: var(--input-bg) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: 10px !important;
+  color: var(--body-color) !important;
+  font-size: 14px !important;
+  line-height: 1.8 !important;
+  box-shadow: 
+    inset 0 2px 4px var(--shadow-light),
+    0 1px 0 var(--glass-border) !important;
+  transition: all 0.25s ease !important;
+}
+
+.novelInput:focus {
+  border-color: #8b5cf6 !important;
+  box-shadow: 
+    inset 0 2px 4px var(--shadow-light),
+    0 0 0 3px rgba(139, 92, 246, 0.2),
+    0 0 15px rgba(139, 92, 246, 0.1) !important;
+}
+
+.modeSelector {
+  margin-top: 8px;
+}
+
+.modeHint {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* 生成日志 */
+.generatingLog {
+  padding: 18px;
+  background: var(--input-bg);
+  border: 1px solid var(--item-border-color);
+  border-radius: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: inset 0 2px 4px var(--shadow-light);
+}
+
+.logItem {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: var(--body-color);
+  line-height: 1.6;
+}
+
+.logItem:last-child {
+  margin-bottom: 0;
+}
+
+/* 项目卡片 - 层次感 */
+.projectCard {
+  background: var(--panel-bg-gradient) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 
+    0 8px 30px var(--shadow-base),
+    0 2px 8px var(--shadow-light),
+    inset 0 1px 0 var(--glass-border);
+  transition: all 0.3s ease;
+}
+
+.projectCard:hover {
+  border-color: #22c55e !important;
+  transform: translateY(-6px);
+  box-shadow: 
+    0 15px 50px var(--shadow-heavy),
+    0 5px 15px rgba(34, 197, 94, 0.2),
+    inset 0 1px 0 var(--glass-border);
+}
+
+/* 卡片内容区域 */
+.projectCard :global(.ant-card-body) {
+  background: transparent !important;
+  padding: 16px !important;
+}
+
+.projectCard :global(.ant-card-meta-title) {
+  color: var(--body-color) !important;
+  font-weight: 600 !important;
+}
+
+.projectCard :global(.ant-card-meta-description) {
+  color: var(--text-secondary) !important;
+}
+
+/* 卡片操作按钮 */
+.projectCard :global(.ant-card-actions) {
+  background: var(--modal-footer-bg) !important;
+  border-top: 1px solid var(--modal-header-border) !important;
+}
+
+.projectCard :global(.ant-card-actions > li) {
+  border-right-color: var(--item-border-color) !important;
+}
+
+.projectCard :global(.ant-card-actions > li > span) {
+  color: var(--text-secondary) !important;
+  transition: color 0.2s ease !important;
+}
+
+.projectCard :global(.ant-card-actions > li:hover > span) {
+  color: #22c55e !important;
+}
+
+.cardCover {
+  height: 180px;
+  background: var(--input-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.cardCover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.projectCard:hover .cardCover img {
+  transform: scale(1.08);
+}
+
+.placeholder {
+  font-size: 56px;
+  color: #22c55e;
+  opacity: 0.4;
+  transition: all 0.3s;
+}
+
+.projectCard:hover .placeholder {
+  opacity: 0.8;
+  filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.4));
+}
+
+/* ========================================
+   自定义创作要求板块
+   ======================================== */
+
+.customReqHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.customReqHeader label {
+  display: flex;
+  align-items: center;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--text-label) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  margin: 0 !important;
+}
+
+.customReqIcon {
+  font-size: 14px;
+  color: #a855f7;
+  flex-shrink: 0;
+}
+
+.customReqHint {
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.06) 0%, rgba(99, 102, 241, 0.06) 100%);
+  border-left: 3px solid rgba(168, 85, 247, 0.5);
+  border-radius: 0 6px 6px 0;
+}
+
+.customReqInput {
+  background: var(--input-bg) !important;
+  border: 1px solid rgba(168, 85, 247, 0.3) !important;
+  border-radius: 10px !important;
+  color: var(--body-color) !important;
+  font-size: 14px !important;
+  line-height: 1.8 !important;
+  box-shadow:
+    inset 0 2px 4px var(--shadow-light),
+    0 0 0 0 transparent !important;
+  transition: all 0.25s ease !important;
+}
+
+.customReqInput:focus {
+  border-color: #a855f7 !important;
+  box-shadow:
+    inset 0 2px 4px var(--shadow-light),
+    0 0 0 3px rgba(168, 85, 247, 0.2),
+    0 0 15px rgba(168, 85, 247, 0.1) !important;
+}
+
+.customReqInput::placeholder {
+  color: var(--placeholder-color) !important;
+}

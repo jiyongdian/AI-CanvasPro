@@ -1,0 +1,252 @@
+.container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 16px;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--body-bg);
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--body-color);
+  letter-spacing: 0.5px;
+}
+
+.sceneList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.empty {
+  margin-top: 40px;
+}
+
+.sceneItem {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  margin-bottom: 14px;
+  background: var(--panel-bg-gradient);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid var(--panel-border);
+  position: relative;
+  overflow: hidden;
+}
+
+.sceneItem::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #3a7bd5;
+  opacity: 0;
+  transition: opacity 0.3s;
+  color: #ffffff !important;
+}
+
+.sceneItem:hover {
+  background: var(--input-bg);
+  border-color: #3a7bd5;
+}
+
+.sceneItem.active {
+  border-color: #3a7bd5;
+  background: var(--input-bg);
+}
+
+.sceneItem.active::before {
+  opacity: 1;
+}
+
+/* 顶部：标题 + 场景标签 */
+.sceneHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sceneTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--body-color);
+}
+
+.dragHandle {
+  cursor: grab;
+  color: rgba(58, 123, 213, 0.5);
+  transition: color 0.3s;
+}
+
+.sceneItem:hover .dragHandle {
+  color: #00d2ff;
+}
+
+.sceneTag {
+  background: #a855f7 !important;
+  border-color: #a855f7 !important;
+  color: #ffffff !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 2px 12px !important;
+  height: 26px !important;
+  line-height: 22px !important;
+  border-radius: 6px !important;
+}
+
+/* 参考选择行 */
+.referenceRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.checkbox {
+  color: var(--text-secondary);
+}
+
+.refLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  background: var(--input-bg);
+  border-radius: 4px;
+}
+
+.refSelect {
+  flex: 1;
+  max-width: 100px;
+}
+
+.refSelect :global(.ant-select-selector) {
+  background: var(--input-bg) !important;
+  border-color: var(--item-border-color) !important;
+  font-size: 12px !important;
+}
+
+/* 缩略图预览区 */
+.thumbnailArea {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--modal-footer-bg);
+  border: 1px solid var(--panel-border);
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.thumbnailArea img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.sceneItem:hover .thumbnailArea img {
+  transform: scale(1.05);
+}
+
+.videoThumb {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.videoThumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playIcon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 32px;
+  color: rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+}
+
+.placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #3a7bd5;
+  text-align: center;
+}
+
+/* 底部信息 */
+.sceneFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.footerInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.refStatus {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.genStatus {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.genRefBtn {
+  width: 100%;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 8px 16px !important;
+  height: auto !important;
+  border-radius: 8px !important;
+}
+
+/* 删除按钮 */
+.deleteBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.sceneItem:hover .deleteBtn {
+  opacity: 1;
+}
+
+.deleteBtn:hover {
+  color: #ff4d4f !important;
+  transform: scale(1.1);
+}

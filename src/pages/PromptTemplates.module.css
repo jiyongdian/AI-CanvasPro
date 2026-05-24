@@ -1,0 +1,487 @@
+/* ========================================
+   提示词库页面 - 卡片式UI，高级设计风格
+   ======================================== */
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--modal-header-border);
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--body-color);
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 10px var(--shadow-light);
+}
+
+.header :global(.ant-btn-primary) {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  padding: 10px 24px !important;
+  height: auto !important;
+  font-weight: 600 !important;
+  box-shadow:
+    0 6px 20px rgba(139, 92, 246, 0.4),
+    0 2px 8px var(--shadow-light),
+    inset 0 1px 0 var(--glass-border) !important;
+  transition: all 0.25s ease !important;
+  color: #ffffff !important;
+}
+
+.header :global(.ant-btn-primary:hover) {
+  transform: translateY(-2px) !important;
+  box-shadow:
+    0 10px 30px rgba(139, 92, 246, 0.5),
+    0 4px 12px var(--shadow-base),
+    inset 0 1px 0 var(--glass-border) !important;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+}
+
+.empty {
+  margin-top: 100px;
+}
+
+/* ══════════════════════════════════════════
+   模板卡片
+   ══════════════════════════════════════════ */
+
+.templateCard {
+  background: var(--panel-bg-gradient) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+  box-shadow:
+    0 8px 30px var(--shadow-base),
+    0 2px 8px var(--shadow-light),
+    inset 0 1px 0 var(--glass-border);
+  transition: all 0.3s ease;
+}
+
+.templateCard:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 15px 50px var(--shadow-heavy),
+    0 5px 15px rgba(139, 92, 246, 0.2),
+    inset 0 1px 0 var(--glass-border);
+}
+
+.cardImage:hover {
+  border-color: #3b82f6 !important;
+  box-shadow:
+    0 15px 50px var(--shadow-heavy),
+    0 5px 20px rgba(59, 130, 246, 0.25),
+    inset 0 1px 0 var(--glass-border);
+}
+
+.cardVideo:hover {
+  border-color: #10b981 !important;
+  box-shadow:
+    0 15px 50px var(--shadow-heavy),
+    0 5px 20px rgba(16, 185, 129, 0.25),
+    inset 0 1px 0 var(--glass-border);
+}
+
+.cardDirector:hover {
+  border-color: #f59e0b !important;
+  box-shadow:
+    0 15px 50px var(--shadow-heavy),
+    0 5px 20px rgba(245, 158, 11, 0.25),
+    inset 0 1px 0 var(--glass-border);
+}
+
+/* ── 封面区域 ── */
+.cardCover {
+  height: 180px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.cardCoverBg {
+  position: absolute;
+  inset: 0;
+}
+
+/* 图片模板 — 蓝色系封面 */
+.coverImage {
+  background:
+    radial-gradient(ellipse 70% 50% at 35% 35%, rgba(59, 130, 246, 0.18) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 65% 55%, rgba(96, 165, 250, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 45% 75%, rgba(147, 197, 253, 0.06) 0%, transparent 45%),
+    var(--card-cover-bg, rgba(15, 23, 42, 0.35));
+}
+
+[data-theme="light"] .coverImage {
+  background:
+    radial-gradient(ellipse 70% 50% at 35% 35%, rgba(59, 130, 246, 0.13) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 65% 55%, rgba(96, 165, 250, 0.07) 0%, transparent 50%),
+    linear-gradient(180deg, #eff6ff 0%, #dbeafe 30%, #f8fafc 100%);
+}
+
+/* 视频模板 — 绿色系封面 */
+.coverVideo {
+  background:
+    radial-gradient(ellipse 70% 50% at 35% 35%, rgba(16, 185, 129, 0.15) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 65% 55%, rgba(52, 211, 153, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 45% 75%, rgba(110, 231, 183, 0.05) 0%, transparent 45%),
+    var(--card-cover-bg, rgba(15, 23, 42, 0.35));
+}
+
+[data-theme="light"] .coverVideo {
+  background:
+    radial-gradient(ellipse 70% 50% at 35% 35%, rgba(16, 185, 129, 0.11) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 65% 55%, rgba(52, 211, 153, 0.06) 0%, transparent 50%),
+    linear-gradient(180deg, #ecfdf5 0%, #d1fae5 30%, #f8fafc 100%);
+}
+
+/* 导演模板 — 金色系封面 */
+.coverDirector {
+  background:
+    radial-gradient(ellipse 70% 50% at 35% 35%, rgba(245, 158, 11, 0.15) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 65% 55%, rgba(251, 191, 36, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 45% 75%, rgba(252, 211, 77, 0.05) 0%, transparent 45%),
+    var(--card-cover-bg, rgba(15, 23, 42, 0.35));
+}
+
+[data-theme="light"] .coverDirector {
+  background:
+    radial-gradient(ellipse 70% 50% at 35% 35%, rgba(245, 158, 11, 0.11) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 65% 55%, rgba(251, 191, 36, 0.06) 0%, transparent 50%),
+    linear-gradient(180deg, #fffbeb 0%, #fef3c7 30%, #f8fafc 100%);
+}
+
+/* ── 图标环 ── */
+.cardIconWrapper {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 12px;
+}
+
+.cardIconRing {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(148, 163, 184, 0.15);
+  backdrop-filter: blur(12px);
+  transition: all 0.3s ease;
+}
+
+[data-theme="light"] .cardIconRing {
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.ringImage {
+  background: rgba(59, 130, 246, 0.08);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.12);
+}
+
+[data-theme="light"] .ringImage {
+  background: rgba(59, 130, 246, 0.06);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.08);
+}
+
+.ringVideo {
+  background: rgba(16, 185, 129, 0.08);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.12);
+}
+
+[data-theme="light"] .ringVideo {
+  background: rgba(16, 185, 129, 0.06);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.08);
+}
+
+.ringDirector {
+  background: rgba(245, 158, 11, 0.08);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.12);
+}
+
+[data-theme="light"] .ringDirector {
+  background: rgba(245, 158, 11, 0.06);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.08);
+}
+
+.cardIcon {
+  font-size: 26px;
+  opacity: 0.7;
+}
+
+.ringImage .cardIcon { color: #3b82f6; }
+.ringVideo .cardIcon { color: #059669; }
+.ringDirector .cardIcon { color: #d97706; }
+
+[data-theme="light"] .ringImage .cardIcon { color: #2563eb; }
+[data-theme="light"] .ringVideo .cardIcon { color: #047857; }
+[data-theme="light"] .ringDirector .cardIcon { color: #b45309; }
+
+.templateCard:hover .cardIconRing {
+  transform: scale(1.05);
+}
+
+/* ── 封面名称 ── */
+.cardName {
+  position: relative;
+  z-index: 1;
+  color: var(--body-color);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  padding: 0 16px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* ── 类型徽章 — 卡片右上角 ── */
+.cardTypeBadge {
+  position: absolute !important;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  font-size: 11px;
+  border-radius: 6px;
+}
+
+/* ── 卡片内容 ── */
+.templateCard :global(.ant-card-body) {
+  background: transparent !important;
+  padding: 16px !important;
+}
+
+.cardMetaDesc {
+  color: var(--text-secondary) !important;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.5;
+  max-height: 4.5em;
+  font-size: 12px;
+}
+
+.templateCard :global(.ant-card-meta-description) {
+  color: var(--text-secondary) !important;
+}
+
+/* ── 卡片操作 ── */
+.templateCard :global(.ant-card-actions) {
+  background: var(--modal-footer-bg) !important;
+  border-top: 1px solid var(--modal-header-border) !important;
+}
+
+.templateCard :global(.ant-card-actions > li) {
+  border-right-color: var(--item-border-color) !important;
+}
+
+.templateCard :global(.ant-card-actions > li > span) {
+  color: var(--text-secondary) !important;
+  transition: color 0.2s ease !important;
+}
+
+.cardImage:hover :global(.ant-card-actions > li:hover > span) {
+  color: #3b82f6 !important;
+}
+
+.cardVideo:hover :global(.ant-card-actions > li:hover > span) {
+  color: #10b981 !important;
+}
+
+.cardDirector:hover :global(.ant-card-actions > li:hover > span) {
+  color: #f59e0b !important;
+}
+
+/* ══════════════════════════════════════════
+   表单
+   ══════════════════════════════════════════ */
+
+.formItem {
+  margin-bottom: 24px;
+}
+
+.formItem label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--text-label);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.formLabelRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.formLabelRow label {
+  margin-bottom: 0;
+}
+
+.expandBtn {
+  color: var(--text-secondary) !important;
+  font-size: 12px;
+  padding: 2px 6px;
+  transition: color 0.2s;
+}
+
+.expandBtn:hover {
+  color: #8b5cf6 !important;
+}
+
+/* ══════════════════════════════════════════
+   全屏放大编辑弹窗
+   ══════════════════════════════════════════ */
+
+.fullscreenModal {
+  z-index: 1050 !important;
+}
+
+.fullscreenModal :global(.ant-modal-mask) {
+  z-index: 1049 !important;
+}
+
+.fullscreenModal :global(.ant-modal-content) {
+  background: var(--body-bg, #0d0d14) !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.fullscreenModal :global(.ant-modal-body) {
+  height: 85vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 极简顶部栏 ── */
+.fullscreenHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--panel-border, rgba(255, 255, 255, 0.06));
+  flex-shrink: 0;
+}
+
+.fullscreenTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary, #a0a0a0);
+  letter-spacing: 0.5px;
+}
+
+/* ── 输入框填满剩余空间 ── */
+.fullscreenTextarea {
+  flex: 1;
+  width: 100% !important;
+  padding: 20px 24px !important;
+  font-size: 16px !important;
+  line-height: 1.85 !important;
+  background: transparent !important;
+  border: none !important;
+  color: var(--body-color, #e5e5e5) !important;
+  resize: none !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.fullscreenTextarea:focus {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* ══════════════════════════════════════════
+   预览弹窗
+   ══════════════════════════════════════════ */
+
+.previewModal :global(.ant-modal-content) {
+  background: var(--panel-bg-gradient, #1a1a2e) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+}
+
+.previewContent {
+  padding: 8px 0;
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px 16px;
+  border-bottom: 1px solid var(--panel-border, rgba(255,255,255,0.06));
+  margin-bottom: 16px;
+}
+
+.previewName {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--body-color);
+}
+
+.previewSection {
+  margin-bottom: 18px;
+}
+
+.previewSection:last-child {
+  margin-bottom: 0;
+}
+
+.previewLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+
+.previewText {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-secondary);
+  background: var(--body-bg, rgba(0,0,0,0.15));
+  border-radius: 8px;
+  padding: 14px 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+}
