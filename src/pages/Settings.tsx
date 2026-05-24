@@ -395,7 +395,6 @@ const Settings: React.FC = () => {
           })}
         </div>
 
-        {isTauri && (
         <div className={styles.downloadSection}>
           <Form.Item label="下载保存位置" className={styles.downloadItem}>
             <div className={styles.downloadPathRow}>
@@ -422,7 +421,6 @@ const Settings: React.FC = () => {
             </div>
           </Form.Item>
         </div>
-        )}
 
         {isTauri && (
         <div className={styles.updateSection}>
