@@ -103,9 +103,11 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
   // 本地图片下载进度状态
   const [localImageLoadingProgress, setLocalImageLoadingProgress] = useState(0);
   
-  // 本地提示词状态：用于即时响应输入，避免每次输入都触发项目保存
-  const [localImagePrompt, setLocalImagePrompt] = useState(scene.imagePrompt || '');
-  const [localVideoPrompt, setLocalVideoPrompt] = useState(scene.videoPrompt || '');
+  // 本地提示词状态：优先从 sessionStorage 恢复（虚拟滚动卸载再挂载后输入不丢失）
+  const savedImage = sessionStorage.getItem(`input_${scene.id}_image`);
+  const savedVideo = sessionStorage.getItem(`input_${scene.id}_video`);
+  const [localImagePrompt, setLocalImagePrompt] = useState(savedImage || scene.imagePrompt || '');
+  const [localVideoPrompt, setLocalVideoPrompt] = useState(savedVideo || scene.videoPrompt || '');
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   
   // 当 scene 的提示词从外部更新时（如 AI 生成），同步到本地状态
@@ -148,11 +150,13 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
   // PromptInput 的 ref，用于推理时直接读取当前输入框的最新文本
   const promptInputRef = useRef<PromptInputRef>(null);
 
-  // 使用 ref 存储最新的 prompt 输入文本（即时更新，不受防抖影响）
+  // 使用 ref 存储最新的 prompt 输入文本（优先 sessionStorage，虚拟滚动卸载再挂载后不会丢失）
+  const savedSessionPrompt = scene.promptMode === 'video'
+    ? sessionStorage.getItem(`input_${scene.id}_video`)
+    : sessionStorage.getItem(`input_${scene.id}_image`);
   const latestPromptRef = useRef(
-    scene.promptMode === 'video'
-      ? (scene.videoPrompt || '')
-      : (scene.imagePrompt || '')
+    savedSessionPrompt
+    || (scene.promptMode === 'video' ? scene.videoPrompt || '' : scene.imagePrompt || '')
   );
 
   // 使用 ref 存储最新的 characters 状态，确保 handleGenerateImage 使用最新数据
@@ -783,8 +787,9 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
 
       const activeTemplate = promptMode === 'image' ? imageTemplate : videoTemplate;
 
-      // 直接从 PromptInput 的 ref 读取输入框当前实值，确保推理使用用户最新输入
-      const currentInput = promptInputRef.current?.getValue() || latestPromptRef.current;
+      // 从 sessionStorage 读取用户最新输入（不受虚拟滚动卸载/React状态丢失影响）
+      const sessionInput = sessionStorage.getItem(`input_${scene.id}_${promptMode}`);
+      const currentInput = sessionInput || promptInputRef.current?.getValue() || latestPromptRef.current;
       const sceneWithLatestPrompt = {
         ...scene,
         imagePrompt: promptMode === 'image' && currentInput ? currentInput : scene.imagePrompt,
@@ -820,7 +825,9 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
 
   // AI 导演优化提示词（流式输出，双通道分流）
   const handleDirectorOptimize = useCallback(async () => {
-    const currentPrompt = promptInputRef.current?.getValue()
+    const sessionInput = sessionStorage.getItem(`input_${scene.id}_${promptMode}`);
+    const currentPrompt = sessionInput
+      || promptInputRef.current?.getValue()
       || latestPromptRef.current
       || (promptMode === 'image' ? (scene.imagePrompt || '') : (scene.videoPrompt || ''));
     if (!currentPrompt.trim()) {
@@ -1284,6 +1291,8 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
               }}
               onChange={(text) => {
                 latestPromptRef.current = text;
+                // 同步写入 sessionStorage，确保虚拟滚动卸载再挂载后输入不丢失
+                sessionStorage.setItem(`input_${scene.id}_${promptMode}`, text);
               }}
               placeholder={promptMode === 'image'
                 ? "图片提示词将在此显示，点击推理按钮生成..."
