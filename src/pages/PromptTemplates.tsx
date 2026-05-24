@@ -5,7 +5,7 @@
 import * as React from 'react';
 import { useEffect, useState, useCallback, memo } from 'react';
 import { Card, Button, Modal, Input, Empty, Spin, message, Row, Col, Popconfirm, Select, Tag } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, PictureOutlined, VideoCameraOutlined, FundViewOutlined, ExpandOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, EditOutlined, PictureOutlined, VideoCameraOutlined, FundViewOutlined, CopyOutlined, ExpandOutlined } from '@ant-design/icons';
 import { FullscreenPromptEditor } from '../components/common';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -200,6 +200,15 @@ const PromptTemplates: React.FC = () => {
     setModalVisible(true);
   };
 
+  const handleCopyPrompt = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      message.success(`${label}已复制到剪贴板`);
+    } catch {
+      message.error('复制失败');
+    }
+  };
+
   const openEditModal = useCallback((template: PromptTemplate) => {
     setEditingTemplate(template);
     setFormData({
@@ -364,12 +373,26 @@ const PromptTemplates: React.FC = () => {
               </Tag>
             </div>
             <div className={styles.previewSection}>
-              <div className={styles.previewLabel}>正向提示词</div>
+              <div className={styles.previewLabelRow}>
+                <div className={styles.previewLabel}>正向提示词</div>
+                <Button
+                  type="text" size="small"
+                  icon={<CopyOutlined />}
+                  onClick={() => handleCopyPrompt(previewTemplate.positive_prompt, '正向提示词')}
+                >复制</Button>
+              </div>
               <div className={styles.previewText}>{previewTemplate.positive_prompt}</div>
             </div>
             {previewTemplate.negative_prompt && (
               <div className={styles.previewSection}>
-                <div className={styles.previewLabel}>反向提示词</div>
+                <div className={styles.previewLabelRow}>
+                  <div className={styles.previewLabel}>反向提示词</div>
+                  <Button
+                    type="text" size="small"
+                    icon={<CopyOutlined />}
+                    onClick={() => handleCopyPrompt(previewTemplate.negative_prompt || '', '反向提示词')}
+                  >复制</Button>
+                </div>
                 <div className={styles.previewText}>{previewTemplate.negative_prompt}</div>
               </div>
             )}

@@ -470,7 +470,22 @@
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: var(--text-tertiary);
+}
+
+.previewLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 8px;
+}
+
+.previewLabelRow :global(.ant-btn) {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.previewLabelRow :global(.ant-btn:hover) {
+  color: #8b5cf6;
 }
 
 .previewText {
