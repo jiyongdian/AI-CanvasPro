@@ -881,10 +881,11 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
     }
   }, [promptMode, scene.imagePrompt, scene.videoPrompt, scene.actionDescription, scene.dialogue, scene.character, scene.description, index, onUpdateScene, directorTemplate]);
 
-  // 判断是否已推理成功（有提示词内容）
-  const hasPromptContent = promptMode === 'image'
-    ? !!(localImagePrompt || scene.imagePrompt)
-    : !!(localVideoPrompt || scene.videoPrompt);
+  // 判断输入框是否有任意内容（含用户输入，不限定推理结果）
+  const hasPromptContent = !!(
+    sessionStorage.getItem(`input_${scene.id}_${promptMode}`)
+    || (promptMode === 'image' ? (localImagePrompt || scene.imagePrompt) : (localVideoPrompt || scene.videoPrompt))
+  );
 
   // 提示词输入已移至独立的 PromptInput 组件，内置防抖和本地状态管理
 
@@ -1144,8 +1145,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
               className={styles.directorBtn}
               onClick={handleDirectorOptimize}
               loading={directorOptimizing}
-              disabled={!hasPromptContent}
-              title={hasPromptContent ? 'AI导演优化' : '请先生成提示词后再使用导演优化'}
+              title="AI导演优化"
             >
               导演优化
             </Button>
