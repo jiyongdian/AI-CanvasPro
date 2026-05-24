@@ -37,6 +37,26 @@ const App: React.FC = () => {
     });
   }, []);
 
+  // 启动后预加载常用页面，页面切换时达到瞬间响应
+  useEffect(() => {
+    const prefetchPages = async () => {
+      try {
+        // 等待初始渲染完成后再预加载
+        await new Promise(r => setTimeout(r, 500));
+        // 并行预加载所有页面（浏览器会缓存，用户导航时无需下载）
+        await Promise.all([
+          import('./pages/ProjectList'),
+          import('./pages/Workspace'),
+          import('./pages/Settings'),
+          import('./pages/CharacterLibrary'),
+        ]);
+      } catch {
+        // 预加载失败不影响后续使用
+      }
+    };
+    prefetchPages();
+  }, []);
+
   const isDark = currentTheme === 'dark';
 
   const lightThemeTokens = {
