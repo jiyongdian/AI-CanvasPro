@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设置页面 - 风格预览</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(180deg, #0f0f0f 0%, #1a1a1a 100%);
+      color: #e5e5e5;
+      min-height: 100vh;
+      padding: 40px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .page-title {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 32px;
+      color: #fff;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .settings-card {
+      background: linear-gradient(145deg, #282828 0%, #1e1e1e 100%);
+      border: 1px solid #3a3a3a;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 
+        0 10px 40px rgba(0, 0, 0, 0.4),
+        0 2px 10px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .settings-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 
+        0 15px 50px rgba(0, 0, 0, 0.5),
+        0 5px 15px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .section-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 24px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #b0b0b0;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-size: 12px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 14px 18px;
+      font-size: 14px;
+      background: linear-gradient(145deg, #1a1a1a 0%, #141414 100%);
+      border: 1px solid #3a3a3a;
+      border-radius: 10px;
+      color: #e5e5e5;
+      outline: none;
+      transition: all 0.25s ease;
+      box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.3),
+        0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .form-input:focus {
+      border-color: #6366f1;
+      box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.3),
+        0 0 0 3px rgba(99, 102, 241, 0.2),
+        0 0 20px rgba(99, 102, 241, 0.1);
+    }
+
+    .form-input::placeholder {
+      color: #555;
+    }
+
+    .form-input-password {
+      position: relative;
+    }
+
+    .form-input-password input {
+      width: 100%;
+      padding: 14px 50px 14px 18px;
+      font-size: 14px;
+      background: linear-gradient(145deg, #1a1a1a 0%, #141414 100%);
+      border: 1px solid #3a3a3a;
+      border-radius: 10px;
+      color: #e5e5e5;
+      outline: none;
+      transition: all 0.25s ease;
+      box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.3),
+        0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .form-input-password input:focus {
+      border-color: #6366f1;
+      box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.3),
+        0 0 0 3px rgba(99, 102, 241, 0.2),
+        0 0 20px rgba(99, 102, 241, 0.1);
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      padding: 6px;
+      font-size: 16px;
+      transition: color 0.2s;
+    }
+
+    .password-toggle:hover {
+      color: #999;
+    }
+
+    .model-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .model-item {
+      background: linear-gradient(145deg, #222 0%, #1a1a1a 100%);
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 
+        0 4px 15px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      transition: all 0.25s ease;
+    }
+
+    .model-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 
+        0 8px 25px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      border-color: #444;
+    }
+
+    .model-select {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 13px;
+      background: linear-gradient(145deg, #1a1a1a 0%, #141414 100%);
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #e5e5e5;
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .model-select:focus {
+      border-color: #6366f1;
+      box-shadow: 
+        inset 0 1px 3px rgba(0, 0, 0, 0.2),
+        0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    .download-row {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .download-input {
+      flex: 1;
+      padding: 14px 18px;
+      font-size: 14px;
+      background: linear-gradient(145deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.08) 100%);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      border-radius: 10px;
+      color: #22c55e;
+      outline: none;
+      box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.2),
+        0 0 15px rgba(34, 197, 94, 0.1);
+    }
+
+    .download-hint {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #22c55e;
+      text-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+    }
+
+    .btn-folder {
+      padding: 14px 22px;
+      font-size: 14px;
+      font-weight: 500;
+      background: linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%);
+      border: 1px solid #4a4a4a;
+      border-radius: 10px;
+      color: #e5e5e5;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      white-space: nowrap;
+      box-shadow: 
+        0 4px 15px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-folder:hover {
+      transform: translateY(-2px);
+      background: linear-gradient(145deg, #444 0%, #333 100%);
+      border-color: #555;
+      box-shadow: 
+        0 8px 25px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 14px;
+      margin-top: 32px;
+      padding-top: 28px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* 紫色/橙色渐变按钮 - 测试连接 */
+    .btn-test {
+      padding: 14px 32px;
+      font-size: 14px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #8b5cf6 0%, #f97316 100%);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 
+        0 6px 20px rgba(139, 92, 246, 0.4),
+        0 2px 8px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-test:hover {
+      transform: translateY(-3px);
+      box-shadow: 
+        0 10px 30px rgba(139, 92, 246, 0.5),
+        0 4px 12px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-test:active {
+      transform: translateY(-1px);
+    }
+
+    /* 绿色主要按钮 - 保存配置 */
+    .btn-save {
+      padding: 14px 32px;
+      font-size: 14px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 
+        0 6px 20px rgba(34, 197, 94, 0.4),
+        0 2px 8px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-save:hover {
+      transform: translateY(-3px);
+      box-shadow: 
+        0 10px 30px rgba(34, 197, 94, 0.5),
+        0 4px 12px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-save:active {
+      transform: translateY(-1px);
+    }
+
+    /* 蓝色按钮 - 提示词 */
+    .btn-blue {
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 
+        0 4px 15px rgba(59, 130, 246, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-blue:hover {
+      transform: translateY(-2px);
+      box-shadow: 
+        0 8px 25px rgba(59, 130, 246, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    /* 紫色按钮 - 推理 */
+    .btn-purple {
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 
+        0 4px 15px rgba(139, 92, 246, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-purple:hover {
+      transform: translateY(-2px);
+      box-shadow: 
+        0 8px 25px rgba(139, 92, 246, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    /* 橙色按钮 - 插入 */
+    .btn-orange {
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 
+        0 4px 15px rgba(249, 115, 22, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-orange:hover {
+      transform: translateY(-2px);
+      box-shadow: 
+        0 8px 25px rgba(249, 115, 22, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    /* 红色按钮 - 删除 */
+    .btn-red {
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 
+        0 4px 15px rgba(239, 68, 68, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-red:hover {
+      transform: translateY(-2px);
+      box-shadow: 
+        0 8px 25px rgba(239, 68, 68, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    /* 按钮预览区域 */
+    .button-preview {
+      margin-top: 24px;
+      padding: 24px;
+      background: linear-gradient(145deg, #1a1a1a 0%, #141414 100%);
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.3),
+        0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .button-preview-title {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 18px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .button-preview-row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    /* 图标样式 */
+    .icon {
+      margin-right: 8px;
+    }
+
+    /* 响应式 */
+    @media (max-width: 768px) {
+      .model-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .button-group {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="page-title">⚙️ 设置</h1>
+
+    <div class="settings-card">
+      <h2 class="section-title">API 配置</h2>
+      
+      <div class="form-group">
+        <label class="form-label">API 地址</label>
+        <input type="text" class="form-input" placeholder="请输入 API 地址，例如：https://api.openai.com/v1">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">API 密钥</label>
+        <div class="form-input-password">
+          <input type="password" placeholder="请输入 API Key" value="sk-xxxxxxxxxxxxxxxx">
+          <button class="password-toggle">👁</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">模型选择</label>
+        <div class="model-grid">
+          <div>
+            <label class="form-label" style="font-size: 12px; margin-bottom: 6px;">聊天模型</label>
+            <select class="model-select">
+              <option>Gemini 3 Flash Preview</option>
+              <option>Gemini 2.5 Pro</option>
+              <option>GPT-4o Mini</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="font-size: 12px; margin-bottom: 6px;">图像模型</label>
+            <select class="model-select">
+              <option>Nano Banana 2 4K</option>
+              <option>Gemini 3 Pro Image</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="font-size: 12px; margin-bottom: 6px;">视频模型</label>
+            <select class="model-select">
+              <option>Sora 2</option>
+              <option>Sora 2 Pro</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h2 class="section-title">下载设置</h2>
+      
+      <div class="form-group">
+        <label class="form-label">下载保存位置</label>
+        <div class="download-row">
+          <input type="text" class="download-input" value="📁 Downloads" readonly>
+          <button class="btn-folder">📂 更换文件夹</button>
+        </div>
+        <div class="download-hint">✅ 已设置自定义下载目录，视频将保存到「Downloads」文件夹中</div>
+      </div>
+
+      <div class="button-group">
+        <button class="btn-test">
+          <span class="icon">🔗</span>测试连接
+        </button>
+        <button class="btn-save">
+          <span class="icon">💾</span>保存配置
+        </button>
+      </div>
+    </div>
+
+    <!-- 按钮风格预览 -->
+    <div class="settings-card">
+      <h2 class="section-title">按钮风格预览</h2>
+      <p style="color: #666; font-size: 13px; margin-bottom: 16px;">以下是复刻图片中的按钮风格：</p>
+      
+      <div class="button-preview">
+        <div class="button-preview-title">操作按钮组</div>
+        <div class="button-preview-row">
+          <button class="btn-blue">🏷 提示词</button>
+          <button class="btn-purple">✨ 推理</button>
+          <button class="btn-orange">➕ 插入</button>
+          <button class="btn-red">🗑 删除</button>
+        </div>
+      </div>
+
+      <div class="button-preview" style="margin-top: 16px;">
+        <div class="button-preview-title">主要操作按钮</div>
+        <div class="button-preview-row">
+          <button class="btn-save" style="padding: 14px 40px;">
+            <span class="icon">▶</span>开始生成
+          </button>
+          <button class="btn-folder" style="padding: 14px 30px;">
+            全部任务
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 密码显示/隐藏切换
+    document.querySelector('.password-toggle').addEventListener('click', function() {
+      const input = this.previousElementSibling;
+      if (input.type === 'password') {
+        input.type = 'text';
+        this.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        this.textContent = '👁';
+      }
+    });
+  </script>
+</body>
+</html>

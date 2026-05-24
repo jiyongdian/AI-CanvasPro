@@ -142,6 +142,9 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
   const onUpdateSceneRef = useRef(onUpdateScene);
   onUpdateSceneRef.current = onUpdateScene;
 
+  // 标记是否正在进行 AI 推理/优化，防止防抖保存覆盖 AI 生成的内容
+  const processingRef = useRef(false);
+
   // 使用 ref 存储最新的 prompt 输入文本（即时更新，不受防抖影响）
   const latestPromptRef = useRef(
     scene.promptMode === 'video'
@@ -762,6 +765,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
   const handleInferPrompt = useCallback(async () => {
     try {
       setInferring(true);
+      processingRef.current = true;
       const previousSceneLastPrompt = getPreviousSceneLastPrompt();
 
       // 流式回调：实时更新本地提示词状态 + ref
@@ -807,6 +811,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
       console.error(error);
     } finally {
       setInferring(false);
+      processingRef.current = false;
     }
   }, [scene, promptMode, gridMode, selectedStyle, allScenes, getPreviousSceneLastPrompt, onUpdateScene, imageTemplate, videoTemplate]);
 
@@ -820,6 +825,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
     }
     try {
       setDirectorOptimizing(true);
+      processingRef.current = true;
       setDirectorAnalysis('');
       setDirectorModalVisible(true);
 
@@ -863,6 +869,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
       setDirectorModalVisible(false);
     } finally {
       setDirectorOptimizing(false);
+      processingRef.current = false;
     }
   }, [promptMode, scene.imagePrompt, scene.videoPrompt, scene.actionDescription, scene.dialogue, scene.character, scene.description, index, onUpdateScene, directorTemplate]);
 
@@ -1260,6 +1267,8 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
                 ? (localImagePrompt || (scene.actionDescription || scene.dialogue ? `动作描述：${scene.actionDescription || ''}\n对话：\n${scene.dialogue || ''}` : ''))
                 : (localVideoPrompt || (scene.actionDescription || scene.dialogue ? `动作描述：${scene.actionDescription || ''}\n对话：\n${scene.dialogue || ''}` : ''))}
               onSave={(text) => {
+                // 推理/优化进行中时跳过，防止防抖保存覆盖 AI 生成内容
+                if (processingRef.current) return;
                 if (promptMode === 'image') {
                   setLocalImagePrompt(text);
                   onUpdateScene({ imagePrompt: text });
