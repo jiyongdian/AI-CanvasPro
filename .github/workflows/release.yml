@@ -29,6 +29,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Update Cargo dependencies
+        run: cargo update
+        working-directory: src-tauri
+
       - name: Build and Release (Tauri)
         uses: tauri-apps/tauri-action@v0
         env:
