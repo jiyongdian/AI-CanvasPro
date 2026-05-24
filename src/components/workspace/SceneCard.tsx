@@ -3,7 +3,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Input, Button, Checkbox, message, Modal, Spin, Progress, Upload } from 'antd';
 import { RedoOutlined, DeleteOutlined, DragOutlined, PlusOutlined, ThunderboltOutlined, DownloadOutlined, UploadOutlined, ClearOutlined, ExpandOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { LazyImage, LazyVideoThumbnail, FullscreenPromptEditor } from '../common';
-import PromptInput from './PromptInput';
+import PromptInput, { type PromptInputRef } from './PromptInput';
 import { useRecoilValue } from 'recoil';
 import { characterListState } from '../../store/projectStore';
 import { aiService } from '../../services/aiService';
@@ -144,6 +144,9 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
 
   // 标记是否正在进行 AI 推理/优化，防止防抖保存覆盖 AI 生成的内容
   const processingRef = useRef(false);
+
+  // PromptInput 的 ref，用于推理时直接读取当前输入框的最新文本
+  const promptInputRef = useRef<PromptInputRef>(null);
 
   // 使用 ref 存储最新的 prompt 输入文本（即时更新，不受防抖影响）
   const latestPromptRef = useRef(
@@ -780,12 +783,12 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
 
       const activeTemplate = promptMode === 'image' ? imageTemplate : videoTemplate;
 
-      // 将最新的用户输入合并到 scene 中，确保 generatePrompt 使用实时内容
-      const latestInput = latestPromptRef.current;
+      // 直接从 PromptInput 的 ref 读取输入框当前实值，确保推理使用用户最新输入
+      const currentInput = promptInputRef.current?.getValue() || latestPromptRef.current;
       const sceneWithLatestPrompt = {
         ...scene,
-        imagePrompt: promptMode === 'image' && latestInput ? latestInput : scene.imagePrompt,
-        videoPrompt: promptMode === 'video' && latestInput ? latestInput : scene.videoPrompt,
+        imagePrompt: promptMode === 'image' && currentInput ? currentInput : scene.imagePrompt,
+        videoPrompt: promptMode === 'video' && currentInput ? currentInput : scene.videoPrompt,
       };
 
       const prompt = await aiService.generatePrompt(
@@ -817,7 +820,8 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
 
   // AI 导演优化提示词（流式输出，双通道分流）
   const handleDirectorOptimize = useCallback(async () => {
-    const currentPrompt = latestPromptRef.current
+    const currentPrompt = promptInputRef.current?.getValue()
+      || latestPromptRef.current
       || (promptMode === 'image' ? (scene.imagePrompt || '') : (scene.videoPrompt || ''));
     if (!currentPrompt.trim()) {
       message.warning('请先生成提示词，再进行AI导演优化');
@@ -1262,6 +1266,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
                 </div>
             </div>
             <PromptInput
+              ref={promptInputRef}
               key={`${promptMode}-default`}
               value={promptMode === 'image'
                 ? (localImagePrompt || (scene.actionDescription || scene.dialogue ? `动作描述：${scene.actionDescription || ''}\n对话：\n${scene.dialogue || ''}` : ''))

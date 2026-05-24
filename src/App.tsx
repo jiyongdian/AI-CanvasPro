@@ -1,26 +1,19 @@
 import * as React from 'react';
-import { Suspense, useEffect, useState } from 'react';
-import { ConfigProvider, theme, Spin } from 'antd';
+import { useEffect } from 'react';
+import { ConfigProvider, theme } from 'antd';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useRecoilValue } from 'recoil';
 import { themeState } from './store/themeStore';
 import MainLayout from './components/layout/MainLayout';
 import { checkForUpdate } from './services/updateService';
+import ProjectList from './pages/ProjectList';
+import Workspace from './pages/Workspace';
+import CharacterLibrary from './pages/CharacterLibrary';
+import AICharacter from './pages/AICharacter';
+import Settings from './pages/Settings';
+import StyleLibrary from './pages/StyleLibrary';
+import PromptTemplates from './pages/PromptTemplates';
 import 'antd/dist/reset.css';
-
-const ProjectList = React.lazy(() => import('./pages/ProjectList'));
-const Workspace = React.lazy(() => import('./pages/Workspace'));
-const CharacterLibrary = React.lazy(() => import('./pages/CharacterLibrary'));
-const AICharacter = React.lazy(() => import('./pages/AICharacter'));
-const Settings = React.lazy(() => import('./pages/Settings'));
-const StyleLibrary = React.lazy(() => import('./pages/StyleLibrary'));
-const PromptTemplates = React.lazy(() => import('./pages/PromptTemplates'));
-
-const PageLoading = () => (
-  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-    <Spin size="large" />
-  </div>
-);
 
 const App: React.FC = () => {
   const currentTheme = useRecoilValue(themeState);
@@ -37,25 +30,6 @@ const App: React.FC = () => {
     });
   }, []);
 
-  // 启动后预加载常用页面，页面切换时达到瞬间响应
-  useEffect(() => {
-    const prefetchPages = async () => {
-      try {
-        // 等待初始渲染完成后再预加载
-        await new Promise(r => setTimeout(r, 500));
-        // 并行预加载所有页面（浏览器会缓存，用户导航时无需下载）
-        await Promise.all([
-          import('./pages/ProjectList'),
-          import('./pages/Workspace'),
-          import('./pages/Settings'),
-          import('./pages/CharacterLibrary'),
-        ]);
-      } catch {
-        // 预加载失败不影响后续使用
-      }
-    };
-    prefetchPages();
-  }, []);
 
   const isDark = currentTheme === 'dark';
 
@@ -204,20 +178,18 @@ const App: React.FC = () => {
       }}
     >
       <BrowserRouter>
-        <Suspense fallback={<PageLoading />}>
-          <Routes>
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<Navigate to="/projects" replace />} />
-              <Route path="projects" element={<ProjectList />} />
-              <Route path="workspace/:projectId" element={<Workspace />} />
-              <Route path="ai-character" element={<AICharacter />} />
-              <Route path="characters" element={<CharacterLibrary />} />
-              <Route path="styles" element={<StyleLibrary />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="prompt-templates" element={<PromptTemplates />} />
-            </Route>
-          </Routes>
-        </Suspense>
+        <Routes>
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<Navigate to="/projects" replace />} />
+            <Route path="projects" element={<ProjectList />} />
+            <Route path="workspace/:projectId" element={<Workspace />} />
+            <Route path="ai-character" element={<AICharacter />} />
+            <Route path="characters" element={<CharacterLibrary />} />
+            <Route path="styles" element={<StyleLibrary />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="prompt-templates" element={<PromptTemplates />} />
+          </Route>
+        </Routes>
       </BrowserRouter>
     </ConfigProvider>
   );
