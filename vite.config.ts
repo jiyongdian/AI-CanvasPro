@@ -4,8 +4,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 const host = process.env.TAURI_DEV_HOST;
+const isGitHub = process.env.GITHUB_PAGES === 'true';
 
 export default defineConfig(async () => ({
+  base: isGitHub ? '/AI-CanvasPro/' : '/',
   plugins: [react()],
   clearScreen: false,
   server: {

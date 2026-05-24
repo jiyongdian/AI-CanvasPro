@@ -177,7 +177,7 @@ const App: React.FC = () => {
         components: isDark ? darkComponents : lightComponents,
       }}
     >
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Navigate to="/projects" replace />} />
