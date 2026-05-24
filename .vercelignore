@@ -1,0 +1,8 @@
+node_modules
+src-tauri
+.git
+.github
+README.md
+*.cmd
+*.ps1
+*.bat
