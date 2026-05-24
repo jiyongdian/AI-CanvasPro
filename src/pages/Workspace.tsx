@@ -540,13 +540,14 @@ const Workspace: React.FC = () => {
             renderProp={({ height, width }) => (
               <List
                 ref={(listInstance: any) => {
-                  // 恢复上一次滚动位置
-                  if (listInstance) {
-                    const saved = sessionStorage.getItem(`workspace_scroll_${projectId}`);
-                    if (saved) {
-                      const offset = parseInt(saved, 10);
-                      listInstance.scrollTo(offset);
-                    }
+                  if (!listInstance) return;
+                  // 延迟恢复滚动位置，等虚拟列表完成首次渲染后再滚动
+                  const savedIndex = sessionStorage.getItem(`workspace_scroll_item_${projectId}`);
+                  if (savedIndex) {
+                    const index = parseInt(savedIndex, 10);
+                    requestAnimationFrame(() => {
+                      listInstance.scrollToItem(index, 'start');
+                    });
                   }
                 }}
                 height={height || 0}
@@ -557,7 +558,9 @@ const Workspace: React.FC = () => {
                 itemKey={(index) => project.script[index]?.id || `scene-${index}`}
                 itemData={listItemData}
                 onScroll={({ scrollOffset }: { scrollOffset: number }) => {
-                  sessionStorage.setItem(`workspace_scroll_${projectId}`, String(scrollOffset));
+                  // 保存当前可见的分镜序号
+                  const visibleIndex = Math.floor(scrollOffset / 450);
+                  sessionStorage.setItem(`workspace_scroll_item_${projectId}`, String(visibleIndex));
                 }}
               >
                 {renderSceneItem}
