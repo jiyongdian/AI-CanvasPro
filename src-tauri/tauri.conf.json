@@ -32,7 +32,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/ashuoAI/AI-CanvasPro/releases/latest/download/latest.json"
+        "https://github.com/MMKJ555-PNG/AI-CanvasPro/releases/latest/download/latest.json"
       ],
       "dialog": false,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZBOTU0NEE0RjEwQjQwNDIKUldSQ1FBdnhwRVNWYWpueXAva0xGdkhYT2l3cEVWTEhldkhkSDA2ODZoZUFPaUU1aHpQdHhwSTEK"
