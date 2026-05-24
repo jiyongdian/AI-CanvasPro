@@ -10,12 +10,7 @@ permissions:
 jobs:
   release:
     name: Build and Release
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [windows-latest]
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -29,31 +24,63 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         run: npm install
 
       - name: Update Cargo dependencies
         run: cargo update
         working-directory: src-tauri
 
-      - name: Build and Release (Tauri)
-        uses: tauri-apps/tauri-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Build Tauri app
+        id: build_tauri
+        shell: pwsh
+        run: |
+          npx tauri build --target x86_64-pc-windows-msvc
+          # 记录构建产物的版本号
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          echo "APP_VERSION=v$version" >> $env:GITHUB_OUTPUT
+          echo "APP_VERSION=$version"
+
+      - name: Generate Updater JSON
+        shell: pwsh
+        run: |
+          $version = "${{ steps.build_tauri.outputs.APP_VERSION }}"
+          $installerName = "ZhexianComic_${version}_x64-setup.exe"
+          $sigFile = "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/ZhexianComic_${version}_x64-setup.exe.sig"
+          $signature = Get-Content $sigFile -Raw
+          $url = "https://github.com/${{ github.repository }}/releases/download/v$version/$installerName"
+          $json = @{
+            version = $version
+            pub_date = (Get-Date -Format "o")
+            platforms = @{
+              "windows-x86_64" = @{
+                url = $url
+                signature = $signature.Trim()
+              }
+            }
+          }
+          $json | ConvertTo-Json -Depth 10 | Set-Content "latest.json"
+          Get-Content "latest.json"
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: '谪仙漫剧 v__VERSION__'
-          releaseBody: |
+          tag_name: ${{ github.ref_name }}
+          name: 谪仙漫剧 v${{ github.ref_name }}
+          body: |
             ## 更新内容
 
-            请下载对应平台的安装包进行安装。
+            请下载安装包进行安装。
 
             **Windows**: 下载 `.exe` 安装包。
 
             ---
             自动更新已启用，已安装旧版本的用户将在启动时收到更新提示。
-          releaseDraft: false
+          draft: false
           prerelease: false
-          args: --target x86_64-pc-windows-msvc
+          files: |
+            latest.json
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/ZhexianComic_*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/ZhexianComic_*.exe.sig
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
