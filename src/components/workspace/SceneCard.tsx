@@ -787,9 +787,10 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
 
       const activeTemplate = promptMode === 'image' ? imageTemplate : videoTemplate;
 
-      // 从 sessionStorage 读取用户最新输入（不受虚拟滚动卸载/React状态丢失影响）
-      const sessionInput = sessionStorage.getItem(`input_${scene.id}_${promptMode}`);
-      const currentInput = sessionInput || promptInputRef.current?.getValue() || latestPromptRef.current;
+      // getValue() 为输入框实值（优先），sessionStorage 为备份（虚拟滚动恢复用）
+      const currentInput = promptInputRef.current?.getValue()
+        || sessionStorage.getItem(`input_${scene.id}_${promptMode}`)
+        || latestPromptRef.current;
       const sceneWithLatestPrompt = {
         ...scene,
         imagePrompt: promptMode === 'image' && currentInput ? currentInput : scene.imagePrompt,
@@ -827,9 +828,9 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
 
   // AI 导演优化提示词（流式输出，双通道分流）
   const handleDirectorOptimize = useCallback(async () => {
-    const sessionInput = sessionStorage.getItem(`input_${scene.id}_${promptMode}`);
-    const currentPrompt = sessionInput
-      || promptInputRef.current?.getValue()
+    // getValue() 读取输入框实时值，sessionStorage 为备份（虚拟滚动恢复用）
+    const currentPrompt = promptInputRef.current?.getValue()
+      || (sessionStorage.getItem(`input_${scene.id}_${promptMode}`))
       || latestPromptRef.current
       || (promptMode === 'image' ? (scene.imagePrompt || '') : (scene.videoPrompt || ''));
     if (!currentPrompt.trim()) {
