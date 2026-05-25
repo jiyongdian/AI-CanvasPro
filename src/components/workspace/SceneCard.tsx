@@ -807,6 +807,8 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
         activeTemplate
       );
       latestPromptRef.current = prompt;
+      // 同步更新 sessionStorage，确保导演优化读到推理结果而非旧输入
+      sessionStorage.setItem(`input_${scene.id}_${promptMode}`, prompt);
       if (promptMode === 'image') {
         onUpdateScene({ imagePrompt: prompt });
       } else {
