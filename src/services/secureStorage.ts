@@ -13,6 +13,7 @@ interface ApiConfig {
   chatModel?: string;
   imageModel?: string;
   videoModel?: string;
+  temperature?: string;
 }
 
 // 简单的混淆函数（非加密，仅防止直接 grep 和随意查看）
@@ -74,6 +75,7 @@ export async function saveApiConfig(config: ApiConfig): Promise<void> {
     await store.set('chatModel', config.chatModel || '');
     await store.set('imageModel', config.imageModel || '');
     await store.set('videoModel', config.videoModel || '');
+    await store.set('temperature', config.temperature || '');
     await store.save();
   } else {
     // 浏览器环境：使用混淆存储
@@ -97,6 +99,7 @@ export async function loadApiConfig(): Promise<ApiConfig> {
       chatModel: (await store.get('chatModel')) as string || '',
       imageModel: (await store.get('imageModel')) as string || '',
       videoModel: (await store.get('videoModel')) as string || '',
+      temperature: (await store.get('temperature')) as string || '',
     };
   }
 

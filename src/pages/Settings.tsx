@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Input, Button, message, Form, Select, Modal, Progress } from 'antd';
-import { SaveOutlined, EyeOutlined, EyeInvisibleOutlined, ApiOutlined, FolderOpenOutlined, PlusOutlined, DeleteOutlined, SettingOutlined, CloudDownloadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Input, Button, message, Form, Select, Modal, Progress, Slider, Popover } from 'antd';
+import { SaveOutlined, EyeOutlined, EyeInvisibleOutlined, ApiOutlined, FolderOpenOutlined, PlusOutlined, DeleteOutlined, SettingOutlined, CloudDownloadOutlined, ReloadOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { aiService } from '../services/aiService';
 import { saveDirHandle, getDirHandle, verifyPermission } from '../utils/downloadHelper';
 import { saveApiConfig, loadApiConfig } from '../services/secureStorage';
@@ -65,6 +65,10 @@ const Settings: React.FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<{ visible: boolean; category: ModelCategory; name: string }>({
     visible: false, category: 'chat', name: ''
   });
+
+  // 温度控制
+  const [temperature, setTemperature] = useState(0.6);
+  const [tempModalVisible, setTempModalVisible] = useState(false);
 
   // 自动更新状态
   const [isTauri, setIsTauri] = useState(false);
@@ -134,6 +138,9 @@ const Settings: React.FC = () => {
     const initConfig = async () => {
       try {
         const secureConfig = await loadApiConfig();
+        if (secureConfig.temperature) {
+          setTemperature(parseFloat(secureConfig.temperature));
+        }
         if (secureConfig.apiUrl || secureConfig.apiKey) {
           form.setFieldsValue(secureConfig);
           aiService.setApiKeys({ apiUrl: secureConfig.apiUrl, apiKey: secureConfig.apiKey });
@@ -253,6 +260,7 @@ const Settings: React.FC = () => {
       chatModel: values.chatModel || '',
       imageModel: values.imageModel || '',
       videoModel: values.videoModel || '',
+      temperature: String(temperature),
     };
 
     // 使用安全存储代替 localStorage 明文存储
@@ -265,6 +273,13 @@ const Settings: React.FC = () => {
   };
 
   const handleSaveConfig = () => saveConfig(true);
+
+  // 温度变更时自动保存并刷新 AI 配置
+  const handleTemperatureChange = (val: number) => {
+    setTemperature(val);
+    saveConfig();
+    message.success(`稳定性已设为 ${val}`, 1);
+  };
 
   const handleTestApi = async () => {
     const values = form.getFieldsValue();
@@ -393,6 +408,37 @@ const Settings: React.FC = () => {
               </div>
             );
           })}
+        </div>
+
+        <div className={styles.tempSection}>
+          <div className={styles.tempRow}>
+            <span className={styles.tempLabel}>
+              AI 稳定性
+              <Popover
+                content={
+                  <div style={{ maxWidth: 280, fontSize: 13, lineHeight: 1.7 }}>
+                    <p>控制 AI 输出的随机性和创造性。</p>
+                    <p><strong>0 = 高度确定</strong>：每次结果几乎一致，严格遵循指令，适合精炼和格式化任务。</p>
+                    <p><strong>1 = 平衡</strong>：有一定变化但总体可控。</p>
+                    <p><strong>2 = 高度创造</strong>：输出多样且不可预测，适合创意类任务。</p>
+                    <p style={{ color: '#f59e0b' }}>推荐：导演优化、提示词精炼建议 0.2 ~ 0.4</p>
+                  </div>
+                }
+                title="AI 稳定性（Temperature）说明"
+              >
+                <QuestionCircleOutlined style={{ marginLeft: 4, color: 'var(--text-tertiary)', cursor: 'pointer' }} />
+              </Popover>
+            </span>
+            <span className={styles.tempValue}>{temperature}</span>
+          </div>
+          <Slider
+            min={0.1}
+            max={2.0}
+            step={0.1}
+            value={temperature}
+            onChange={handleTemperatureChange}
+            tooltip={{ formatter: (v) => `${v}` }}
+          />
         </div>
 
         <div className={styles.downloadSection}>
