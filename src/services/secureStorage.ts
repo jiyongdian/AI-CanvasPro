@@ -144,3 +144,125 @@ export async function clearApiConfig(): Promise<void> {
     localStorage.removeItem('api_config');
   }
 }
+
+// ============================================================
+// 多API提供商配置存储
+// ============================================================
+
+const PROVIDERS_STORE_FILE = 'api-providers.json';
+const PROVIDERS_LOCAL_KEY = 'api_providers_secure';
+
+let tauriProvidersStore: any = null;
+
+async function getTauriProvidersStore() {
+  if (tauriProvidersStore) return tauriProvidersStore;
+  try {
+    const { load } = await import('@tauri-apps/plugin-store');
+    tauriProvidersStore = await load(PROVIDERS_STORE_FILE, { autoSave: true, defaults: {} });
+    return tauriProvidersStore;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 安全保存多个API提供商配置
+ */
+export async function saveApiProviders(providers: import('../types').ApiProvider[]): Promise<void> {
+  const store = await getTauriProvidersStore();
+
+  // 序列化时保留日期字段
+  const serializable = providers.map(p => ({
+    ...p,
+    createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+    updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : p.updatedAt,
+  }));
+
+  if (store) {
+    await store.set('providers', serializable);
+    await store.save();
+  } else {
+    const encrypted = obfuscate(JSON.stringify(serializable));
+    localStorage.setItem(PROVIDERS_LOCAL_KEY, encrypted);
+  }
+}
+
+/**
+ * 安全读取多个API提供商配置
+ */
+export async function loadApiProviders(): Promise<import('../types').ApiProvider[]> {
+  const store = await getTauriProvidersStore();
+
+  const parseProviders = (raw: any[]): import('../types').ApiProvider[] => {
+    return raw.map((p: any) => ({
+      ...p,
+      createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+      updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date(),
+      models: Array.isArray(p.models) ? p.models : [],
+      enabled: p.enabled !== false,
+    }));
+  };
+
+  if (store) {
+    const data = (await store.get('providers')) as any[];
+    if (Array.isArray(data) && data.length > 0) {
+      return parseProviders(data);
+    }
+    return [];
+  }
+
+  // 浏览器环境
+  const secure = localStorage.getItem(PROVIDERS_LOCAL_KEY);
+  if (secure) {
+    try {
+      const parsed = JSON.parse(deobfuscate(secure));
+      if (Array.isArray(parsed)) return parseProviders(parsed);
+    } catch { /* ignore */ }
+  }
+
+  // 迁移旧单配置为多provider格式（如果存在旧配置但没有providers）
+  const legacyConfig = localStorage.getItem('api_config_secure') || localStorage.getItem('api_config');
+  if (legacyConfig) {
+    try {
+      let config: any;
+      if (legacyConfig === localStorage.getItem('api_config_secure')) {
+        config = JSON.parse(deobfuscate(legacyConfig));
+      } else {
+        config = JSON.parse(legacyConfig);
+      }
+      if (config.apiUrl || config.apiKey) {
+        const models: import('../types').ProviderModel[] = [];
+        if (config.chatModel) models.push({ id: config.chatModel, name: config.chatModel, category: 'text' });
+        if (config.imageModel) models.push({ id: config.imageModel, name: config.imageModel, category: 'image' });
+        if (config.videoModel) models.push({ id: config.videoModel, name: config.videoModel, category: 'video' });
+        
+        const legacyProvider: import('../types').ApiProvider = {
+          id: 'legacy-migration',
+          name: '默认API',
+          apiUrl: config.apiUrl || '',
+          apiKey: config.apiKey || '',
+          models,
+          enabled: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        return [legacyProvider];
+      }
+    } catch { /* ignore */ }
+  }
+
+  return [];
+}
+
+/**
+ * 清除所有API提供商配置
+ */
+export async function clearApiProviders(): Promise<void> {
+  const store = await getTauriProvidersStore();
+  if (store) {
+    await store.clear();
+    await store.save();
+  } else {
+    localStorage.removeItem(PROVIDERS_LOCAL_KEY);
+  }
+}

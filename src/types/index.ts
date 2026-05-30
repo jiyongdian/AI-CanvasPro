@@ -103,6 +103,70 @@ export interface Style {
 
 export type GenerationMode = 'text-to-video' | 'image-to-video';
 
+// ============================================================
+// 多API平台配置类型定义
+// ============================================================
+
+/** 模型分类 */
+export type ModelCategory = 'text' | 'image' | 'video' | 'audio' | 'other';
+
+/** 模型分类标签映射 */
+export const MODEL_CATEGORY_LABELS: Record<ModelCategory, string> = {
+  text: '文本/聊天',
+  image: '图像',
+  video: '视频',
+  audio: '音频',
+  other: '其它',
+};
+
+/** 单个模型信息 */
+export interface ProviderModel {
+  id: string;           // 模型ID，如 "gpt-4o"
+  name: string;         // 显示名称（通常与id相同）
+  category: ModelCategory;
+  owned_by?: string;    // 模型所有者
+}
+
+/** API提供商配置 */
+export interface ApiProvider {
+  id: string;
+  name: string;               // 用户自定义名称，如 "我的OpenAI"
+  apiUrl: string;             // API基础地址
+  apiKey: string;             // API密钥
+  models: ProviderModel[];    // 用户选择的模型列表
+  enabled: boolean;           // 是否启用
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** 模型分类的关键词映射（用于自动分类拉取的模型） */
+export const MODEL_CATEGORY_KEYWORDS: Record<ModelCategory, string[]> = {
+  video: [
+    'veo', 'sora', 'video', 'kling', 'runway', 'hailuo', 'pika',
+    'gen', 'movie', 'film', 'animate', 'luma', 'mochi', 'cogvideo',
+    'videocraft', 'vidu', 'pixverse', 'morph', 'dreamina',
+  ],
+  image: [
+    'dall-e', 'dalle', 'midjourney', 'flux', 'stable-diffusion', 'sd-',
+    'imagen', 'image', 'picture', 'photo', 'draw', 'paint', 'janus',
+    'illust', 'vision', 'sdxl', 'playground', 'recraft', 'ideogram',
+  ],
+  audio: [
+    'whisper', 'tts', 'audio', 'speech', 'voice', 'sound', 'music',
+    'sonic', 'bark', 'eleven', 'melody', 'harmony',
+  ],
+  text: [
+    'gpt', 'claude', 'gemini', 'llama', 'qwen', 'deepseek', 'chat',
+    'mistral', 'mixtral', 'command', 'jurassic', 'cohere', 'yi-',
+    'baichuan', 'chatglm', 'ernie', 'spark', 'hunyuan', 'minimax',
+    'abab', 'moonshot', 'step', 'phi', 'falcon', 'dbrx', 'reka',
+    'text', 'lang', 'instruct', 'complete',
+  ],
+  other: [
+    'embedding', 'moderation', 'rerank', 'search',
+  ],
+};
+
 // 生成任务类型
 export interface GenerationTask {
   id: string;

@@ -1,9 +1,10 @@
 import {
   Scene, Character, Style, GenerationMode, PromptTemplate,
+  ApiProvider, ProviderModel, ModelCategory, MODEL_CATEGORY_KEYWORDS,
 } from '../types';
 import { blobToBase64, processReferenceImage, compressImage, isUrl } from '../utils/imageUtils';
 import { getMedia } from './mediaService';
-import { loadApiConfig } from './secureStorage';
+import { loadApiConfig, loadApiProviders } from './secureStorage';
 
 export interface ScriptScene {
   order: number;
@@ -22,6 +23,204 @@ const DEFAULT_MODELS = {
   image: 'nano-banana-2-4k',
   video: 'sora-2',
 } as const;
+
+/**
+ * 根据模型ID自动分类
+ */
+export function categorizeModel(modelId: string): ModelCategory {
+  const lower = modelId.toLowerCase();
+  for (const [category, keywords] of Object.entries(MODEL_CATEGORY_KEYWORDS)) {
+    for (const kw of keywords) {
+      if (lower.includes(kw)) return category as ModelCategory;
+    }
+  }
+  return 'other';
+}
+
+/**
+ * 从 OpenAI 兼容 API 拉取模型列表并自动分类
+ * 兼容绝大多数第三方API（OpenAI、DeepSeek、Qwen、Zhipu、Moonshot、SiliconFlow 等）
+ */
+export async function fetchModelsFromApi(
+  apiUrl: string,
+  apiKey: string,
+): Promise<ProviderModel[]> {
+  // 标准化 URL
+  let base = apiUrl.replace(/\/+$/, '');
+  
+  const headers: Record<string, string> = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  };
+
+  let response: Response;
+  let modelsData: any[] = [];
+
+  // 尝试标准 OpenAI 端点
+  try {
+    response = await fetch(`${base}/models`, { headers });
+    if (response.ok) {
+      const data = await response.json();
+      if (data.data && Array.isArray(data.data)) {
+        modelsData = data.data;
+      } else if (Array.isArray(data)) {
+        modelsData = data;
+      }
+    }
+  } catch {
+    // 继续尝试其他端点
+  }
+
+  // 如果 /models 失败，尝试 /v1/models
+  if (modelsData.length === 0) {
+    try {
+      response = await fetch(`${base}/v1/models`, { headers });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data && Array.isArray(data.data)) {
+          modelsData = data.data;
+        } else if (Array.isArray(data)) {
+          modelsData = data;
+        }
+      }
+    } catch {
+      // 继续
+    }
+  }
+
+  // 如果还是失败，尝试不带 Authorization header（某些API用其他方式验证）
+  if (modelsData.length === 0) {
+    try {
+      const altHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      };
+      response = await fetch(`${base}/models`, { headers: altHeaders });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data && Array.isArray(data.data)) {
+          modelsData = data.data;
+        } else if (Array.isArray(data)) {
+          modelsData = data;
+        }
+      }
+    } catch {
+      // 继续
+    }
+  }
+
+  // 也尝试直接 chat/completions 端点探测（某些API不暴露 /models）
+  if (modelsData.length === 0) {
+    try {
+      response = await fetch(`${base}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'hi' }],
+          max_tokens: 1,
+        }),
+      });
+      // 即使返回错误，如果状态码不是404说明端点存在
+      if (response.status !== 404 && response.status !== 405) {
+        // 端点存在，但无法列出模型，返回一些常见模型供用户选择
+        modelsData = [
+          { id: 'gpt-4o', owned_by: 'openai' },
+          { id: 'gpt-4o-mini', owned_by: 'openai' },
+          { id: 'gpt-4-turbo', owned_by: 'openai' },
+          { id: 'gpt-3.5-turbo', owned_by: 'openai' },
+          { id: 'deepseek-chat', owned_by: 'deepseek' },
+          { id: 'deepseek-reasoner', owned_by: 'deepseek' },
+          { id: 'qwen-turbo', owned_by: 'qwen' },
+          { id: 'qwen-plus', owned_by: 'qwen' },
+          { id: 'glm-4', owned_by: 'zhipu' },
+          { id: 'moonshot-v1-8k', owned_by: 'moonshot' },
+        ];
+      }
+    } catch {
+      // 完全无法连接
+      throw new Error('无法连接到该API地址，请检查地址和密钥是否正确。\n\n💡 提示：API地址应包含基础路径，如 https://api.openai.com/v1');
+    }
+  }
+
+  // 分类并去重
+  const seen = new Set<string>();
+  const result: ProviderModel[] = [];
+
+  for (const item of modelsData) {
+    const id = typeof item === 'string' ? item : (item.id || '');
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+
+    result.push({
+      id,
+      name: id,
+      category: categorizeModel(id),
+      owned_by: typeof item === 'object' ? item.owned_by : undefined,
+    });
+  }
+
+  if (result.length === 0) {
+    throw new Error('未能获取到任何模型。\n\n💡 该API可能不兼容OpenAI格式，或密钥权限不足。');
+  }
+
+  return result;
+}
+
+/**
+ * 测试API连接是否正常
+ */
+export async function testApiConnection(
+  apiUrl: string,
+  apiKey: string,
+): Promise<{ success: boolean; message: string }> {
+  let base = apiUrl.replace(/\/+$/, '');
+  
+  try {
+    const response = await fetch(`${base}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: 'Hi' }],
+        max_tokens: 5,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        success: true,
+        message: `连接成功！模型: ${data.model || 'N/A'}`,
+      };
+    }
+
+    const errorData = await response.json().catch(() => ({}));
+    const errMsg = errorData.error?.message || response.statusText;
+    
+    // 如果模型不存在但端点可访问，也算部分成功
+    if (response.status === 404) {
+      return {
+        success: false,
+        message: `端点可访问但模型不存在\n${errMsg}`,
+      };
+    }
+
+    return {
+      success: false,
+      message: `状态码: ${response.status}\n${errMsg}`,
+    };
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : '未知错误';
+    return {
+      success: false,
+      message: `网络错误: ${errMsg}`,
+    };
+  }
+}
 
 /**
  * 创建用于临时生成请求的 Scene 对象（避免整个应用中散落空 ID 的构造）
@@ -58,6 +257,10 @@ class AIGenerationService {
     temperature: string;
   } | null = null;
 
+  // 多provider支持
+  private providersCache: ApiProvider[] | null = null;
+  private providersLoadPromise: Promise<ApiProvider[]> | null = null;
+
   setApiKeys(keys: Partial<typeof this.config>) {
     this.config = { ...this.config, ...keys };
   }
@@ -68,6 +271,68 @@ class AIGenerationService {
 
   getApiKey(): string {
     return this.config.apiKey;
+  }
+
+  /**
+   * 加载所有API提供商
+   */
+  async getProviders(): Promise<ApiProvider[]> {
+    if (this.providersCache) return this.providersCache;
+    if (!this.providersLoadPromise) {
+      this.providersLoadPromise = loadApiProviders();
+    }
+    this.providersCache = await this.providersLoadPromise;
+    this.providersLoadPromise = null;
+    return this.providersCache;
+  }
+
+  /**
+   * 刷新provider缓存
+   */
+  refreshProviders() {
+    this.providersCache = null;
+    this.providersLoadPromise = null;
+  }
+
+  /**
+   * 根据 providerId 获取配置，若未指定则使用第一个启用的provider或fallback
+   */
+  async getProviderConfig(providerId?: string): Promise<{
+    apiUrl: string;
+    apiKey: string;
+    models: ProviderModel[];
+  }> {
+    // 如果指定了providerId，从providers中查找
+    if (providerId) {
+      const providers = await this.getProviders();
+      const provider = providers.find(p => p.id === providerId);
+      if (provider && provider.enabled !== false) {
+        return {
+          apiUrl: provider.apiUrl,
+          apiKey: provider.apiKey,
+          models: provider.models,
+        };
+      }
+    }
+
+    // 尝试从providers中获取第一个启用的
+    const providers = await this.getProviders();
+    const enabled = providers.filter(p => p.enabled !== false);
+    if (enabled.length > 0) {
+      return {
+        apiUrl: enabled[0].apiUrl,
+        apiKey: enabled[0].apiKey,
+        models: enabled[0].models,
+      };
+    }
+
+    // fallback到旧配置
+    const config = this.getConfig();
+    return {
+      apiUrl: config.apiUrl || this.config.apiUrl,
+      apiKey: config.apiKey || this.config.apiKey,
+      models: [],
+    };
   }
 
   /**
@@ -238,9 +503,19 @@ class AIGenerationService {
     return baseUrl.replace(/\/v1$/, '') + '/v1';
   }
 
-  async generateScript(novelContent: string, mode: ScriptMode, userRequirement?: string): Promise<ScriptScene[]> {
-    const config = this.getConfig();
-    const apiUrl = this.getApiBaseUrl();
+  async generateScript(
+    novelContent: string,
+    mode: ScriptMode,
+    userRequirement?: string,
+    options?: { model?: string; providerId?: string },
+  ): Promise<ScriptScene[]> {
+    const providerConfig = await this.getProviderConfig(options?.providerId);
+    const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
+    const apiKey = providerConfig.apiKey || this.config.apiKey;
+    const model = options?.model || this.getConfig().chatModel || 'gemini-3-flash-preview';
+    
+    // 标准化 URL
+    const baseUrl = apiUrl.replace(/\/+$/, '');
     
     // 如果用户提供了创作要求，注入到系统提示中
     const requirementBlock = userRequirement && userRequirement.trim()
@@ -291,11 +566,14 @@ ${requirementBlock}
       ? `【创作要求】${userRequirement.trim()}\n\n请将以下小说内容完整转换为分镜脚本，不要省略任何剧情：\n\n${novelContent}`
       : `请将以下小说内容完整转换为分镜脚本，不要省略任何剧情：\n\n${novelContent}`;
 
-    const response = await fetch(`${apiUrl}/chat/completions`, {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
-        model: config.chatModel || 'gemini-3-flash-preview',
+        model: model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }

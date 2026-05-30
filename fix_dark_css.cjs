@@ -1,11 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 
+const basePath = path.join(__dirname, 'src', 'components', 'workspace');
 const cssFiles = [
-  'd:\\谪仙漫剧\\src\\components\\workspace\\SceneNavigator.module.css',
-  'd:\\谪仙漫剧\\src\\components\\workspace\\SceneCard.module.css',
-  'd:\\谪仙漫剧\\src\\components\\workspace\\SceneManagerModal.module.css',
-  'd:\\谪仙漫剧\\src\\components\\workspace\\SceneLocationItem.module.css',
+  path.join(basePath, 'SceneNavigator.module.css'),
+  path.join(basePath, 'SceneCard.module.css'),
+  path.join(basePath, 'SceneManagerModal.module.css'),
+  path.join(basePath, 'SceneLocationItem.module.css'),
 ];
 
 const replacements = [

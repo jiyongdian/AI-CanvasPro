@@ -1,9 +1,10 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Modal, Input, Button, message, Divider, Spin, Table } from 'antd';
+import { Modal, Input, Button, message, Divider, Spin, Table, Select } from 'antd';
 import { ImportOutlined, SwapOutlined, UserOutlined, RobotOutlined, CopyOutlined, RedoOutlined } from '@ant-design/icons';
-import { Scene } from '../types';
+import { Scene, ApiProvider } from '../types';
 import { aiService } from '../services/aiService';
+import { loadApiProviders } from '../services/secureStorage';
 import styles from './ScriptEditorModal.module.css';
 
 const { TextArea } = Input;
@@ -105,6 +106,25 @@ const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({
   const [regenerateModalVisible, setRegenerateModalVisible] = useState(false);
   const [regenerateRequirement, setRegenerateRequirement] = useState('');
   const [regenerating, setRegenerating] = useState(false);
+
+  // 模型选择
+  const [providers, setProviders] = useState<ApiProvider[]>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>(undefined);
+  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    (async () => {
+      const list = await loadApiProviders();
+      setProviders(list.filter(p => p.enabled !== false));
+      if (list.length > 0) {
+        const first = list.find(p => p.enabled !== false);
+        if (first && !selectedProviderId) setSelectedProviderId(first.id);
+      }
+    })();
+  }, []);
+
+  const selectedProvider = providers.find(p => p.id === selectedProviderId);
+  const availableModels = selectedProvider?.models || [];
 
   useEffect(() => {
     if (visible && scenes) {
@@ -322,6 +342,33 @@ return (
             重新生成
           </Button>
         </div>
+
+        {/* 模型选择器 */}
+        {providers.length > 0 && (
+          <div className={styles.modelSelectorBar}>
+            <span className={styles.modelSelectorLabel}>AI模型：</span>
+            <Select
+              size="small"
+              placeholder="平台"
+              value={selectedProviderId}
+              onChange={(val) => { setSelectedProviderId(val); setSelectedModel(undefined); }}
+              style={{ width: 140 }}
+              options={providers.map(p => ({ label: p.name, value: p.id }))}
+            />
+            <Select
+              size="small"
+              placeholder="模型"
+              value={selectedModel}
+              onChange={setSelectedModel}
+              style={{ width: 180 }}
+              options={availableModels.map(m => ({ label: m.id, value: m.id }))}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+              }
+            />
+          </div>
+        )}
 
         <Divider style={{ margin: '12px 0' }} />
 

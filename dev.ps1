@@ -1,10 +1,10 @@
-# 谪仙漫剧 - 开发模式预览启动脚本
+# 源极AI漫剧 - 开发模式预览启动脚本
 # PowerShell 版本
 
-$Host.UI.RawUI.WindowTitle = "谪仙漫剧 - 开发服务器"
+$Host.UI.RawUI.WindowTitle = "源极AI漫剧 - 开发服务器"
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "   谪仙漫剧 - 开发模式预览" -ForegroundColor Yellow
+Write-Host "   源极AI漫剧 - 开发模式预览" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "正在启动开发服务器..." -ForegroundColor Green

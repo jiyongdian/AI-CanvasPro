@@ -294,3 +294,23 @@
 .customReqInput::placeholder {
   color: var(--placeholder-color) !important;
 }
+
+/* 模型选择器 */
+.modelSelectorRow {
+  display: flex;
+  gap: 12px;
+}
+
+.providerSelect {
+  flex: 1;
+}
+
+.modelSelect {
+  flex: 1;
+}
+
+.modelSelectorHint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}

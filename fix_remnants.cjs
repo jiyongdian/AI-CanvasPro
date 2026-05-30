@@ -1,6 +1,7 @@
 const fs = require('fs');
+const path = require('path');
 
-const file = 'd:\\谪仙漫剧\\src\\components\\workspace\\SceneCard.module.css';
+const file = path.join(__dirname, 'src', 'components', 'workspace', 'SceneCard.module.css');
 
 let content = fs.readFileSync(file, 'utf8');
 

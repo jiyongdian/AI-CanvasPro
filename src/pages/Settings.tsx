@@ -1,93 +1,271 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Input, Button, message, Form, Select, Modal, Progress, Slider, Popover } from 'antd';
-import { SaveOutlined, EyeOutlined, EyeInvisibleOutlined, ApiOutlined, FolderOpenOutlined, PlusOutlined, DeleteOutlined, SettingOutlined, CloudDownloadOutlined, ReloadOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import { aiService } from '../services/aiService';
+import { Input, Button, message, Modal, Progress, Slider, Popover, Tag, Tooltip, Checkbox, Empty, Spin } from 'antd';
+import {
+  PlusOutlined, DeleteOutlined, ApiOutlined, FolderOpenOutlined,
+  CloudDownloadOutlined, ReloadOutlined, QuestionCircleOutlined,
+  EditOutlined, LinkOutlined, DownloadOutlined, CheckCircleOutlined,
+  CloseCircleOutlined, EyeOutlined, EyeInvisibleOutlined, KeyOutlined,
+} from '@ant-design/icons';
+import { aiService, fetchModelsFromApi, testApiConnection } from '../services/aiService';
 import { saveDirHandle, getDirHandle, verifyPermission } from '../utils/downloadHelper';
-import { saveApiConfig, loadApiConfig } from '../services/secureStorage';
+import { saveApiProviders, loadApiProviders, saveApiConfig } from '../services/secureStorage';
 import { checkForUpdate, downloadAndInstallUpdate, type UpdateStatus } from '../services/updateService';
+import {
+  ApiProvider, ProviderModel, ModelCategory, MODEL_CATEGORY_LABELS,
+} from '../types';
 import styles from './Settings.module.css';
 
-type ModelCategory = 'chat' | 'image' | 'video';
+const { Password } = Input;
 
-interface ModelsMap {
-  chat: string[];
-  image: string[];
-  video: string[];
-}
-
-const MODELS_KEY = 'custom_models';
-
-const presetModels: ModelsMap = {
-  chat: [],
-  image: [],
-  video: [],
-};
-
-const loadModels = (): ModelsMap => {
-  try {
-    const saved = localStorage.getItem(MODELS_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return {
-        chat: Array.isArray(parsed.chat) ? parsed.chat : [...presetModels.chat],
-        image: Array.isArray(parsed.image) ? parsed.image : [...presetModels.image],
-        video: Array.isArray(parsed.video) ? parsed.video : [...presetModels.video],
-      };
-    }
-  } catch { /* ignore */ }
-  return {
-    chat: [...presetModels.chat],
-    image: [...presetModels.image],
-    video: [...presetModels.video],
-  };
-};
-
-const saveModels = (models: ModelsMap) => {
-  localStorage.setItem(MODELS_KEY, JSON.stringify(models));
-};
+// ======================== 设置页面主组件 ========================
 
 const Settings: React.FC = () => {
-  const [form] = Form.useForm();
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [testing, setTesting] = useState(false);
+  // --- 提供商列表 ---
+  const [providers, setProviders] = useState<ApiProvider[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(true);
+
+  // --- 添加/编辑弹窗 ---
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<ApiProvider | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editApiUrl, setEditApiUrl] = useState('');
+  const [editApiKey, setEditApiKey] = useState('');
+  const [editModels, setEditModels] = useState<ProviderModel[]>([]);
+  const [editShowKey, setEditShowKey] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
   const [testResult, setTestResult] = useState<{ visible: boolean; success: boolean; message: string }>({
-    visible: false,
-    success: false,
-    message: ''
-  });
-  const [downloadPath, setDownloadPath] = useState<string>('');
-  const [models, setModels] = useState<ModelsMap>(loadModels);
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [addModalCategory, setAddModalCategory] = useState<ModelCategory>('chat');
-  const [addModalValue, setAddModalValue] = useState('');
-  const [addModalError, setAddModalError] = useState('');
-  const [deleteConfirm, setDeleteConfirm] = useState<{ visible: boolean; category: ModelCategory; name: string }>({
-    visible: false, category: 'chat', name: ''
+    visible: false, success: false, message: '',
   });
 
-  // 温度控制
+  // --- 模型选择弹窗（顶层） ---
+  const [modelSelectVisible, setModelSelectVisible] = useState(false);
+  const [fetchedModels, setFetchedModels] = useState<ProviderModel[]>([]);
+  const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(new Set());
+  const [modelSelectSearch, setModelSelectSearch] = useState('');
+
+  // --- 删除确认 ---
+  const [deleteTarget, setDeleteTarget] = useState<ApiProvider | null>(null);
+
+  // --- 温度控制 ---
   const [temperature, setTemperature] = useState(0.6);
-  const [tempModalVisible, setTempModalVisible] = useState(false);
 
-  // 自动更新状态
+  // --- 下载路径 ---
+  const [downloadPath, setDownloadPath] = useState('');
+
+  // --- 更新 ---
   const [isTauri, setIsTauri] = useState(false);
   const [appVersion, setAppVersion] = useState('0.1.0');
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
   const [updateChecking, setUpdateChecking] = useState(false);
 
+  // ==================== 初始化 ====================
+
   useEffect(() => {
     (async () => {
       try {
         const app = await import('@tauri-apps/api/app');
-        const v = await app.getVersion();
-        setAppVersion(v);
+        setAppVersion(await app.getVersion());
         setIsTauri(true);
-      } catch {
-        // 浏览器环境
-      }
+      } catch { /* browser */ }
     })();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      setProvidersLoading(true);
+      try {
+        const list = await loadApiProviders();
+        setProviders(list);
+        // 同步刷新 aiService 缓存
+        aiService.refreshProviders();
+      } catch { /* ignore */ }
+      setProvidersLoading(false);
+    })();
+
+    // 加载温度和下载路径
+    (async () => {
+      try {
+        const { loadApiConfig } = await import('../services/secureStorage');
+        const cfg = await loadApiConfig();
+        if (cfg.temperature) setTemperature(parseFloat(cfg.temperature));
+      } catch { /* ignore */ }
+
+      const savedPath = localStorage.getItem('download_path');
+      if (savedPath) setDownloadPath(savedPath);
+      try {
+        const handle = await getDirHandle();
+        if (handle) {
+          const ok = await verifyPermission(handle);
+          if (ok) setDownloadPath(handle.name);
+          else { setDownloadPath(''); localStorage.removeItem('download_path'); }
+        }
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
+  // ==================== 提供商 CRUD ====================
+
+  const persistProviders = async (list: ApiProvider[]) => {
+    setProviders(list);
+    await saveApiProviders(list);
+    aiService.refreshProviders();
+  };
+
+  const openAddModal = () => {
+    setEditingProvider(null);
+    setEditName('');
+    setEditApiUrl('');
+    setEditApiKey('');
+    setEditModels([]);
+    setEditShowKey(false);
+    setTestResult({ visible: false, success: false, message: '' });
+    setEditModalVisible(true);
+  };
+
+  const openEditModal = (p: ApiProvider) => {
+    setEditingProvider(p);
+    setEditName(p.name);
+    setEditApiUrl(p.apiUrl);
+    setEditApiKey(p.apiKey);
+    setEditModels([...p.models]);
+    setEditShowKey(false);
+    setTestResult({ visible: false, success: false, message: '' });
+    setEditModalVisible(true);
+  };
+
+  const handleSaveProvider = async () => {
+    if (!editName.trim()) { message.warning('请输入API网站名称'); return; }
+    if (!editApiUrl.trim()) { message.warning('请输入API地址'); return; }
+    if (!editApiKey.trim()) { message.warning('请输入密钥'); return; }
+
+    const now = new Date();
+    if (editingProvider) {
+      const updated = providers.map(p =>
+        p.id === editingProvider.id
+          ? { ...p, name: editName.trim(), apiUrl: editApiUrl.trim(), apiKey: editApiKey.trim(), models: editModels, updatedAt: now }
+          : p
+      );
+      await persistProviders(updated);
+      message.success('API配置已更新');
+    } else {
+      const newProvider: ApiProvider = {
+        id: `provider-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: editName.trim(),
+        apiUrl: editApiUrl.trim(),
+        apiKey: editApiKey.trim(),
+        models: editModels,
+        enabled: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await persistProviders([...providers, newProvider]);
+      message.success('API平台已添加');
+    }
+    setEditModalVisible(false);
+  };
+
+  const handleDeleteProvider = async () => {
+    if (!deleteTarget) return;
+    const updated = providers.filter(p => p.id !== deleteTarget.id);
+    await persistProviders(updated);
+    setDeleteTarget(null);
+    message.success('已删除');
+  };
+
+  // ==================== 模型拉取 ====================
+
+  const handleFetchModels = async () => {
+    if (!editApiUrl.trim() || !editApiKey.trim()) {
+      message.warning('请先填写API地址和密钥');
+      return;
+    }
+    setFetchLoading(true);
+    try {
+      const models = await fetchModelsFromApi(editApiUrl.trim(), editApiKey.trim());
+      setFetchedModels(models);
+      setSelectedModelIds(new Set(editModels.map(m => m.id)));
+      setModelSelectSearch('');
+      setModelSelectVisible(true);
+    } catch (e: any) {
+      message.error(e.message || '拉取模型失败');
+    } finally {
+      setFetchLoading(false);
+    }
+  };
+
+  const handleConfirmModelSelection = () => {
+    const selected = fetchedModels.filter(m => selectedModelIds.has(m.id));
+    setEditModels(selected);
+    setModelSelectVisible(false);
+    message.success(`已选择 ${selected.length} 个模型`);
+  };
+
+  const toggleModelSelect = (modelId: string) => {
+    setSelectedModelIds(prev => {
+      const next = new Set(prev);
+      if (next.has(modelId)) next.delete(modelId);
+      else next.add(modelId);
+      return next;
+    });
+  };
+
+  const toggleCategoryAll = (category: ModelCategory, models: ProviderModel[]) => {
+    setSelectedModelIds(prev => {
+      const next = new Set(prev);
+      const allSelected = models.every(m => next.has(m.id));
+      if (allSelected) {
+        models.forEach(m => next.delete(m.id));
+      } else {
+        models.forEach(m => next.add(m.id));
+      }
+      return next;
+    });
+  };
+
+  // ==================== 测试连接 ====================
+
+  const handleTestConnection = async () => {
+    if (!editApiUrl.trim() || !editApiKey.trim()) {
+      message.warning('请先填写API地址和密钥');
+      return;
+    }
+    setTestLoading(true);
+    try {
+      const result = await testApiConnection(editApiUrl.trim(), editApiKey.trim());
+      setTestResult({ visible: true, ...result });
+    } catch {
+      setTestResult({ visible: true, success: false, message: '测试失败' });
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  // ==================== 温度 & 下载 & 更新 ====================
+
+  const handleTemperatureChange = (val: number) => {
+    setTemperature(val);
+    const config = { temperature: String(val) };
+    saveApiConfig(config);
+    aiService.refreshConfig();
+    message.success(`稳定性已设为 ${val}`, 1);
+  };
+
+  const handleSelectDownloadFolder = async () => {
+    try {
+      // @ts-ignore
+      const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' });
+      setDownloadPath(dirHandle.name);
+      await saveDirHandle(dirHandle);
+      localStorage.setItem('download_path', dirHandle.name);
+      message.success(`已选择下载目录: ${dirHandle.name}`);
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        message.error('选择文件夹失败，请重试');
+      }
+    }
+  };
 
   const handleCheckUpdate = async () => {
     setUpdateChecking(true);
@@ -95,19 +273,13 @@ const Settings: React.FC = () => {
     try {
       const update = await checkForUpdate();
       if (update) {
-        setUpdateStatus({
-          state: 'available',
-          version: update.version,
-          body: update.body || undefined,
-        });
+        setUpdateStatus({ state: 'available', version: update.version, body: update.body || undefined });
       } else {
         setUpdateStatus({ state: 'up-to-date' });
         message.success('当前已是最新版本');
       }
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : '检查更新失败';
-      setUpdateStatus({ state: 'error', message: errMsg });
-      message.error('检查更新失败，请检查网络连接');
+    } catch (e: any) {
+      setUpdateStatus({ state: 'error', message: e.message || '检查失败' });
     } finally {
       setUpdateChecking(false);
     }
@@ -117,299 +289,124 @@ const Settings: React.FC = () => {
     if (updateStatus.state !== 'available') return;
     try {
       const update = await checkForUpdate();
-      if (!update) {
-        message.info('未检测到可用更新');
-        return;
-      }
+      if (!update) { message.info('未检测到可用更新'); return; }
       setUpdateStatus({ state: 'downloading', progress: 0 });
       await downloadAndInstallUpdate(update, (progress, total) => {
         setUpdateStatus({ state: 'downloading', progress, total });
       });
       setUpdateStatus({ state: 'ready', version: update.version });
       message.success('更新下载完成，即将重启应用');
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : '下载更新失败';
-      setUpdateStatus({ state: 'error', message: errMsg });
-      message.error('下载更新失败，请重试');
+    } catch (e: any) {
+      setUpdateStatus({ state: 'error', message: e.message || '下载失败' });
     }
   };
 
-  useEffect(() => {
-    const initConfig = async () => {
-      try {
-        const secureConfig = await loadApiConfig();
-        if (secureConfig.temperature) {
-          setTemperature(parseFloat(secureConfig.temperature));
-        }
-        if (secureConfig.apiUrl || secureConfig.apiKey) {
-          form.setFieldsValue(secureConfig);
-          aiService.setApiKeys({ apiUrl: secureConfig.apiUrl, apiKey: secureConfig.apiKey });
-        } else {
-          // 尝试回退到旧 localStorage（迁移期间）
-          const savedConfig = localStorage.getItem('api_config');
-          if (savedConfig) {
-            const config = JSON.parse(savedConfig);
-            form.setFieldsValue(config);
-            aiService.setApiKeys({ apiUrl: config.apiUrl, apiKey: config.apiKey });
-          }
-          // 无已保存配置时，不设置任何模型默认值，让 Select 显示为空
-        }
-      } catch {
-        // 加载失败，也不设置默认值
-      }
-    };
-    initConfig();
-    // 加载下载路径配置（从 IndexedDB 恢复）
-    const loadDownloadPath = async () => {
-      const savedPath = localStorage.getItem('download_path');
-      if (savedPath) {
-        setDownloadPath(savedPath);
-      }
-      // 尝试恢复文件夹句柄并验证权限
-      const handle = await getDirHandle();
-      if (handle) {
-        const hasPermission = await verifyPermission(handle);
-        if (hasPermission) {
-          setDownloadPath(handle.name);
-        } else {
-          // 权限失效，提示用户重新选择
-          setDownloadPath('');
-          localStorage.removeItem('download_path');
-        }
-      }
-    };
-    loadDownloadPath();
-  }, [form]);
+  // ==================== 工具函数 ====================
 
-  const categoryLabels: Record<ModelCategory, string> = { chat: '聊天', image: '图像', video: '视频' };
-  const fieldNameMap: Record<ModelCategory, string> = { chat: 'chatModel', image: 'imageModel', video: 'videoModel' };
-
-  const openManageModal = (category: ModelCategory) => {
-    setAddModalCategory(category);
-    setAddModalValue('');
-    setAddModalError('');
-    setAddModalOpen(true);
-  };
-
-  const handleAddModelInModal = () => {
-    const name = addModalValue.trim();
-    if (!name) {
-      setAddModalError('请输入模型名称');
-      return;
-    }
-    if (models[addModalCategory].includes(name)) {
-      setAddModalError('该模型已存在，请勿重复添加');
-      return;
-    }
-    const updated = { ...models, [addModalCategory]: [...models[addModalCategory], name] };
-    setModels(updated);
-    saveModels(updated);
-    setAddModalValue('');
-    setAddModalError('');
-    message.success(`已添加${categoryLabels[addModalCategory]}模型: ${name}`);
-  };
-
-  const confirmDeleteModel = (category: ModelCategory, name: string) => {
-    setDeleteConfirm({ visible: true, category, name });
-  };
-
-  const executeDeleteModel = () => {
-    const { category, name } = deleteConfirm;
-    const updated = { ...models, [category]: models[category].filter(m => m !== name) };
-    setModels(updated);
-    saveModels(updated);
-    const fn = fieldNameMap[category];
-    const currentValue = form.getFieldValue(fn);
-    if (currentValue === name) {
-      // 删除后若列表为空，清空表单字段（允许 Select 为空状态）
-      form.setFieldValue(fn, undefined);
-      saveConfig();
-    }
-    setDeleteConfirm({ ...deleteConfirm, visible: false });
-    message.success(`已删除模型: ${name}`);
-  };
-
-  // 选择下载文件夹
-  const handleSelectDownloadFolder = async () => {
+  const maskApiUrl = (url: string): string => {
     try {
-      // 使用 File System Access API 选择文件夹
-      // @ts-ignore - showDirectoryPicker 是较新的 API
-      const dirHandle = await window.showDirectoryPicker({
-        mode: 'readwrite',
-        startIn: 'downloads'
-      });
-      const path = dirHandle.name;
-      setDownloadPath(path);
-      // 保存文件夹句柄到 IndexedDB（持久化存储）
-      await saveDirHandle(dirHandle);
-      localStorage.setItem('download_path', path);
-      message.success(`已选择下载目录: ${path}`);
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        console.error('选择文件夹失败:', err);
-        message.error('选择文件夹失败，请重试');
-      }
+      const u = new URL(url);
+      return `${u.protocol}//${u.hostname}${u.pathname}`;
+    } catch {
+      return url.length > 40 ? url.slice(0, 40) + '...' : url;
     }
   };
 
-  const saveConfig = (showMessage = false) => {
-    const values = form.getFieldsValue();
-    const config = {
-      apiUrl: values.apiUrl || '',
-      apiKey: values.apiKey || '',
-      chatModel: values.chatModel || '',
-      imageModel: values.imageModel || '',
-      videoModel: values.videoModel || '',
-      temperature: String(temperature),
-    };
-
-    // 使用安全存储代替 localStorage 明文存储
-    saveApiConfig(config);
-    aiService.setApiKeys({ apiUrl: config.apiUrl, apiKey: config.apiKey });
-    aiService.refreshConfig();
-    if (showMessage) {
-      message.success('API配置已保存');
-    }
+  const maskApiKey = (key: string): string => {
+    if (key.length <= 8) return '••••••••';
+    return key.slice(0, 4) + '••••••••' + key.slice(-4);
   };
 
-  const handleSaveConfig = () => saveConfig(true);
-
-  // 温度变更时自动保存并刷新 AI 配置
-  const handleTemperatureChange = (val: number) => {
-    setTemperature(val);
-    saveConfig();
-    message.success(`稳定性已设为 ${val}`, 1);
+  const categoryColorMap: Record<ModelCategory, string> = {
+    text: '#3b82f6',
+    image: '#22c55e',
+    video: '#f59e0b',
+    audio: '#a855f7',
+    other: '#6b7280',
   };
 
-  const handleTestApi = async () => {
-    const values = form.getFieldsValue();
-    const apiUrl = values.apiUrl;
-    const apiKey = values.apiKey;
+  // ==================== 渲染 ====================
 
-    if (!apiUrl || !apiKey) {
-      setTestResult({
-        visible: true,
-        success: false,
-        message: '请先填写API地址和密钥'
-      });
-      return;
-    }
-
-    // 安全检查：生产环境建议使用 HTTPS
-    const urlLower = apiUrl.toLowerCase();
-    if (urlLower.startsWith('http://') && !urlLower.includes('localhost') && !urlLower.includes('127.0.0.1')) {
-      setTestResult({
-        visible: true,
-        success: false,
-        message: '安全警告：API 地址使用 HTTP 明文协议，密钥可能在网络中泄露。\n建议使用 HTTPS 地址。\n\n如果这是本地测试服务器，请忽略此警告。'
-      });
-      // 不阻止用户继续，但给出明确警告
-    }
-
-    setTesting(true);
-
-    try {
-      const response = await fetch(`${apiUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: values.chatModel || 'gemini-3-flash-preview',
-          messages: [{ role: 'user', content: 'Hi' }],
-          max_tokens: 10
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setTestResult({
-          visible: true,
-          success: true,
-          message: `连接成功！\n模型: ${data.model || values.chatModel}\n响应状态: ${response.status}`
-        });
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        setTestResult({
-          visible: true,
-          success: false,
-          message: `连接失败\n状态码: ${response.status}\n${errorData.error?.message || response.statusText}`
-        });
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : '无法连接到服务器';
-      let hint = '';
-      if (errorMsg.includes('not valid JSON') || errorMsg.includes('Unexpected token')) {
-        hint = '\n\n💡 提示：服务器返回了非JSON响应，请检查API地址是否正确。\n例如：https://api.openai.com/v1';
-      }
-      setTestResult({
-        visible: true,
-        success: false,
-        message: `网络错误: ${errorMsg}${hint}`
-      });
-    } finally {
-      setTesting(false);
-    }
+  // 分组模型用于模型选择弹窗
+  const groupedFetchedModels: Record<ModelCategory, ProviderModel[]> = {
+    text: [], image: [], video: [], audio: [], other: [],
   };
+  const searchLower = modelSelectSearch.toLowerCase();
+  fetchedModels.forEach(m => {
+    if (searchLower && !m.id.toLowerCase().includes(searchLower)) return;
+    groupedFetchedModels[m.category].push(m);
+  });
+
+  const totalFiltered = Object.values(groupedFetchedModels).reduce((s, arr) => s + arr.length, 0);
 
   return (
     <div className={styles.container}>
-      <Form form={form} layout="vertical" className={styles.form} onValuesChange={() => saveConfig()}>
-        <Form.Item label="API 地址" name="apiUrl">
-          <Input
-            placeholder="请输入 API 地址，例如：https://api.openai.com/v1"
-            size="middle"
-            className={styles.input}
-          />
-        </Form.Item>
+      {/* ========== API 平台卡片区域 ========== */}
+      <div className={styles.sectionHeader}>
+        <h2 className={styles.sectionTitle}>第三方API平台</h2>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal} className={styles.addBtn}>
+          添加API
+        </Button>
+      </div>
 
-        <Form.Item label="API 密钥" name="apiKey">
-          <Input.Password
-            placeholder="请输入 API Key"
-            size="middle"
-            className={styles.input}
-            visibilityToggle={{
-              visible: showApiKey,
-              onVisibleChange: () => setShowApiKey(!showApiKey),
-            }}
-            iconRender={(visible) => visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
-          />
-        </Form.Item>
-
-        <div className={styles.modelRow}>
-          {([
-            { category: 'chat' as ModelCategory, label: '聊天模型', fieldName: 'chatModel', placeholder: '选择聊天模型' },
-            { category: 'image' as ModelCategory, label: '图像模型', fieldName: 'imageModel', placeholder: '选择图像模型' },
-            { category: 'video' as ModelCategory, label: '视频模型', fieldName: 'videoModel', placeholder: '选择视频模型' },
-          ]).map(({ category, label, fieldName, placeholder }) => {
-            const options = models[category].map(name => ({ label: name, value: name }));
-            return (
-              <div key={category} className={styles.modelItem}>
-                <Form.Item
-                  name={fieldName}
-                  label={
-                    <div className={styles.modelLabelRow}>
-                      <span>{label}</span>
-                      <SettingOutlined
-                        className={styles.manageModelBtn}
-                        onClick={() => openManageModal(category)}
-                        title={`管理${categoryLabels[category]}模型`}
-                      />
-                    </div>
-                  }
-                >
-                  <Select
-                    placeholder={placeholder}
-                    options={options}
-                    size="middle"
-                  />
-                </Form.Item>
-              </div>
-            );
-          })}
+      {providersLoading ? (
+        <div className={styles.loadingWrap}><Spin /></div>
+      ) : providers.length === 0 ? (
+        <div className={styles.emptyProviders}>
+          <Empty description="暂无API平台配置，点击上方按钮添加" />
         </div>
+      ) : (
+        <div className={styles.providersGrid}>
+          {providers.map(p => (
+            <div key={p.id} className={styles.providerCard}>
+              <div className={styles.providerCardHeader}>
+                <div className={styles.providerCardTitle}>
+                  <ApiOutlined className={styles.providerIcon} />
+                  <span>{p.name}</span>
+                </div>
+                <div className={styles.providerCardActions}>
+                  <Tooltip title="编辑">
+                    <Button type="text" size="small" icon={<EditOutlined />}
+                      onClick={() => openEditModal(p)} />
+                  </Tooltip>
+                  <Tooltip title="删除">
+                    <Button type="text" size="small" danger icon={<DeleteOutlined />}
+                      onClick={() => setDeleteTarget(p)} />
+                  </Tooltip>
+                </div>
+              </div>
+              <div className={styles.providerCardBody}>
+                <div className={styles.providerInfoRow}>
+                  <LinkOutlined className={styles.providerInfoIcon} />
+                  <span className={styles.providerInfoText} title={p.apiUrl}>{maskApiUrl(p.apiUrl)}</span>
+                </div>
+                <div className={styles.providerInfoRow}>
+                  <KeyOutlined className={styles.providerInfoIcon} />
+                  <span className={styles.providerInfoText}>{maskApiKey(p.apiKey)}</span>
+                </div>
+                <div className={styles.providerModelsArea}>
+                  {p.models.length === 0 ? (
+                    <span className={styles.noModels}>尚未选择模型</span>
+                  ) : (
+                    <div className={styles.modelTagsWrap}>
+                      {p.models.map(m => (
+                        <Tag key={m.id} color={categoryColorMap[m.category]}
+                          className={styles.modelTag}>
+                          {m.id}
+                        </Tag>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
+      {/* ========== 温度 & 下载 & 更新 ========== */}
+      <div className={styles.otherSettings}>
+        {/* 温度 */}
         <div className={styles.tempSection}>
           <div className={styles.tempRow}>
             <span className={styles.tempLabel}>
@@ -418,211 +415,241 @@ const Settings: React.FC = () => {
                 content={
                   <div style={{ maxWidth: 280, fontSize: 13, lineHeight: 1.7 }}>
                     <p>控制 AI 输出的随机性和创造性。</p>
-                    <p><strong>0 = 高度确定</strong>：每次结果几乎一致，严格遵循指令，适合精炼和格式化任务。</p>
-                    <p><strong>1 = 平衡</strong>：有一定变化但总体可控。</p>
-                    <p><strong>2 = 高度创造</strong>：输出多样且不可预测，适合创意类任务。</p>
-                    <p style={{ color: '#f59e0b' }}>推荐：导演优化、提示词精炼建议 0.2 ~ 0.4</p>
+                    <p><strong>0 = 高度确定</strong>：每次结果几乎一致</p>
+                    <p><strong>1 = 平衡</strong>：有一定变化</p>
+                    <p><strong>2 = 高度创造</strong>：输出多样</p>
                   </div>
                 }
-                title="AI 稳定性（Temperature）说明"
               >
                 <QuestionCircleOutlined style={{ marginLeft: 4, color: 'var(--text-tertiary)', cursor: 'pointer' }} />
               </Popover>
             </span>
             <span className={styles.tempValue}>{temperature}</span>
           </div>
-          <Slider
-            min={0.1}
-            max={2.0}
-            step={0.1}
-            value={temperature}
-            onChange={handleTemperatureChange}
-            tooltip={{ formatter: (v) => `${v}` }}
-          />
+          <Slider min={0.1} max={2.0} step={0.1} value={temperature}
+            onChange={handleTemperatureChange} tooltip={{ formatter: (v) => `${v}` }} />
         </div>
 
+        {/* 下载路径 */}
         <div className={styles.downloadSection}>
-          <Form.Item label="下载保存位置" className={styles.downloadItem}>
-            <div className={styles.downloadPathRow}>
-              <Input 
-                value={downloadPath ? `📁 ${downloadPath}` : '未设置（使用浏览器默认下载目录）'} 
-                readOnly 
-                size="middle"
-                className={`${styles.downloadPathInput} ${downloadPath ? styles.downloadPathSet : ''}`}
-                placeholder="点击右侧按钮选择下载目录"
-              />
-              <Button 
-                icon={<FolderOpenOutlined />}
-                onClick={handleSelectDownloadFolder}
-                size="middle"
-                type={downloadPath ? 'default' : 'primary'}
-              >
-                {downloadPath ? '更换文件夹' : '选择文件夹'}
-              </Button>
-            </div>
-            <div className={styles.downloadHint}>
-              {downloadPath 
-                ? `✅ 已设置自定义下载目录，视频将保存到「${downloadPath}」文件夹中`
-                : '⚠️ 未设置下载目录，视频将下载到浏览器默认位置'}
-            </div>
-          </Form.Item>
-        </div>
-
-        {isTauri && (
-        <div className={styles.updateSection}>
-          <div className={styles.sectionTitle}>软件更新</div>
-          <div className={styles.updateRow}>
-            <span className={styles.versionLabel}>当前版本：v{appVersion}</span>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={handleCheckUpdate}
-              loading={updateChecking}
-              size="middle"
-            >
-              检查更新
+          <div className={styles.downloadPathRow}>
+            <Input
+              value={downloadPath ? `📁 ${downloadPath}` : '未设置（使用浏览器默认下载目录）'}
+              readOnly size="middle"
+              className={`${styles.downloadPathInput} ${downloadPath ? styles.downloadPathSet : ''}`}
+            />
+            <Button icon={<FolderOpenOutlined />} onClick={handleSelectDownloadFolder} size="middle"
+              type={downloadPath ? 'default' : 'primary'}>
+              {downloadPath ? '更换文件夹' : '选择文件夹'}
             </Button>
           </div>
-          {updateStatus.state === 'available' && (
-            <div className={styles.updateAvailable}>
-              <div className={styles.updateVersion}>新版本：v{updateStatus.version}</div>
-              {updateStatus.body && (
-                <div className={styles.updateBody}>{updateStatus.body}</div>
-              )}
-              <Button
-                type="primary"
-                icon={<CloudDownloadOutlined />}
-                onClick={handleDownloadUpdate}
-                size="middle"
-              >
-                下载并安装更新
+          <div className={styles.downloadHint}>
+            {downloadPath
+              ? `✅ 已设置，视频将保存到「${downloadPath}」文件夹`
+              : '⚠️ 未设置下载目录，视频将下载到浏览器默认位置'}
+          </div>
+        </div>
+
+        {/* 软件更新 */}
+        {isTauri && (
+          <div className={styles.updateSection}>
+            <div className={styles.sectionSubtitle}>软件更新</div>
+            <div className={styles.updateRow}>
+              <span className={styles.versionLabel}>当前版本：v{appVersion}</span>
+              <Button icon={<ReloadOutlined />} onClick={handleCheckUpdate} loading={updateChecking} size="middle">
+                检查更新
               </Button>
             </div>
-          )}
-          {updateStatus.state === 'downloading' && (
-            <div className={styles.updateDownloading}>
-              <span>正在下载更新...</span>
-              <Progress percent={updateStatus.progress} size="small" />
-            </div>
-          )}
-          {updateStatus.state === 'ready' && (
-            <div className={styles.updateReady}>
-              更新已下载完成，应用即将重启...
-            </div>
-          )}
-          {updateStatus.state === 'up-to-date' && !updateChecking && (
-            <div className={styles.updateUpToDate}>当前已是最新版本</div>
-          )}
-          {updateStatus.state === 'error' && (
-            <div className={styles.updateError}>检查失败：{updateStatus.message}</div>
-          )}
-        </div>
+            {updateStatus.state === 'available' && (
+              <div className={styles.updateAvailable}>
+                <div className={styles.updateVersion}>新版本：v{updateStatus.version}</div>
+                {updateStatus.body && <div className={styles.updateBody}>{updateStatus.body}</div>}
+                <Button type="primary" icon={<CloudDownloadOutlined />} onClick={handleDownloadUpdate} size="middle">
+                  下载并安装更新
+                </Button>
+              </div>
+            )}
+            {updateStatus.state === 'downloading' && (
+              <div className={styles.updateDownloading}>
+                <span>正在下载更新...</span>
+                <Progress percent={updateStatus.progress} size="small" />
+              </div>
+            )}
+            {updateStatus.state === 'ready' && (
+              <div className={styles.updateReady}>更新已下载完成，应用即将重启...</div>
+            )}
+            {updateStatus.state === 'up-to-date' && !updateChecking && (
+              <div className={styles.updateUpToDate}>当前已是最新版本</div>
+            )}
+            {updateStatus.state === 'error' && (
+              <div className={styles.updateError}>检查失败：{updateStatus.message}</div>
+            )}
+          </div>
         )}
+      </div>
 
-        <div className={styles.buttonGroup}>
-          <Button
-            icon={<ApiOutlined />}
-            onClick={handleTestApi}
-            loading={testing}
-            size="middle"
-            className={styles.testBtn}
-          >
-            测试连接
-          </Button>
-          <Button type="primary" icon={<SaveOutlined />} onClick={handleSaveConfig} size="middle" className={styles.saveBtn}>
-            保存配置
-          </Button>
-        </div>
-      </Form>
-
+      {/* ========== 添加/编辑 API 弹窗 ========== */}
       <Modal
-        title={testResult.success ? '✅ 测试成功' : '❌ 测试失败'}
-        open={testResult.visible}
-        onCancel={() => setTestResult({ ...testResult, visible: false })}
-        footer={[
-          <Button key="ok" type="primary" onClick={() => setTestResult({ ...testResult, visible: false })}>
-            确定
-          </Button>
-        ]}
+        title={editingProvider ? '编辑API平台' : '添加API平台'}
+        open={editModalVisible}
+        onCancel={() => setEditModalVisible(false)}
+        onOk={handleSaveProvider}
+        okText="保存"
+        cancelText="取消"
+        width={620}
         centered
-        width={400}
         forceRender
         destroyOnClose={false}
       >
-        <div className={styles.testResult}>
-          <pre>{testResult.message}</pre>
-        </div>
-      </Modal>
-
-      <Modal
-        title={`管理${categoryLabels[addModalCategory]}模型`}
-        open={addModalOpen}
-        onCancel={() => setAddModalOpen(false)}
-        footer={[
-          <Button key="close" onClick={() => setAddModalOpen(false)}>关闭</Button>
-        ]}
-        centered
-        width={420}
-        destroyOnClose
-      >
-        <div className={styles.manageModalBody}>
-          {models[addModalCategory].length > 0 && (
-            <div className={styles.customModelList}>
-              <div className={styles.customModelListTitle}>当前模型列表</div>
-              {models[addModalCategory].map((name) => (
-                <div key={name} className={styles.customModelItem}>
-                  <span className={styles.customModelName}>{name}</span>
-                  <DeleteOutlined
-                    className={styles.customModelDelete}
-                    onClick={() => confirmDeleteModel(addModalCategory, name)}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-          {models[addModalCategory].length === 0 && (
-            <div className={styles.customModelEmpty}>暂无模型，请添加</div>
-          )}
-          <div className={styles.addModelSection}>
-            <div className={styles.addModalLabel}>添加新模型</div>
-            <div className={styles.addModelInputRow}>
-              <Input
-                placeholder="输入模型名称，例如：gpt-4o"
-                value={addModalValue}
-                onChange={(e) => {
-                  setAddModalValue(e.target.value);
-                  if (addModalError) setAddModalError('');
-                }}
-                onPressEnter={handleAddModelInModal}
-                status={addModalError ? 'error' : undefined}
-                className={styles.addModalInput}
-              />
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleAddModelInModal}
-              >
-                添加
-              </Button>
-            </div>
-            {addModalError && <div className={styles.addModalError}>{addModalError}</div>}
+        <div className={styles.editModalBody}>
+          <div className={styles.editField}>
+            <label className={styles.editLabel}>API网站名称</label>
+            <Input placeholder="如：我的OpenAI、硅基流动"
+              value={editName} onChange={e => setEditName(e.target.value)} />
           </div>
+          <div className={styles.editField}>
+            <label className={styles.editLabel}>API地址</label>
+            <Input placeholder="https://api.openai.com/v1"
+              value={editApiUrl} onChange={e => setEditApiUrl(e.target.value)} />
+          </div>
+          <div className={styles.editField}>
+            <label className={styles.editLabel}>密钥</label>
+            <Password placeholder="sk-..."
+              value={editApiKey} onChange={e => setEditApiKey(e.target.value)}
+              visibilityToggle={{
+                visible: editShowKey,
+                onVisibleChange: setEditShowKey,
+              }}
+              iconRender={visible => visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+            />
+          </div>
+
+          {/* 操作按钮行 */}
+          <div className={styles.editActions}>
+            <Button icon={<DownloadOutlined />} onClick={handleFetchModels} loading={fetchLoading}
+              className={styles.fetchBtn}>
+              拉取模型
+            </Button>
+            <Button icon={<ApiOutlined />} onClick={handleTestConnection} loading={testLoading}
+              className={styles.testBtn}>
+              测试连接
+            </Button>
+          </div>
+
+          {/* 已选模型预览 */}
+          <div className={styles.editModelsPreview}>
+            <div className={styles.editModelsLabel}>
+              已选模型（{editModels.length}）
+            </div>
+            {editModels.length === 0 ? (
+              <span className={styles.noModels}>点击「拉取模型」从API获取模型列表</span>
+            ) : (
+              <div className={styles.modelTagsWrap}>
+                {editModels.map(m => (
+                  <Tag key={m.id} color={categoryColorMap[m.category]}
+                    closable
+                    onClose={() => setEditModels(prev => prev.filter(x => x.id !== m.id))}
+                    className={styles.modelTag}>
+                    {m.id}
+                  </Tag>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 测试结果 */}
+          {testResult.visible && (
+            <div className={`${styles.testResultBanner} ${testResult.success ? styles.testSuccess : styles.testFail}`}>
+              {testResult.success ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+              <pre>{testResult.message}</pre>
+            </div>
+          )}
         </div>
       </Modal>
 
+      {/* ========== 模型选择弹窗（顶层） ========== */}
+      <Modal
+        title={<span><DownloadOutlined style={{ marginRight: 8 }} />选择模型</span>}
+        open={modelSelectVisible}
+        onCancel={() => setModelSelectVisible(false)}
+        onOk={handleConfirmModelSelection}
+        okText={`确认选择（${selectedModelIds.size}）`}
+        cancelText="取消"
+        width={750}
+        centered
+        zIndex={1050}
+        forceRender
+        destroyOnClose={false}
+        bodyStyle={{ maxHeight: '60vh', overflow: 'auto', padding: '16px' }}
+      >
+        <div className={styles.modelSelectBody}>
+          {/* 搜索 */}
+          <Input
+            placeholder="搜索模型名称..."
+            value={modelSelectSearch}
+            onChange={e => setModelSelectSearch(e.target.value)}
+            allowClear
+            className={styles.modelSearch}
+            prefix={<span style={{ color: 'var(--text-tertiary)' }}>🔍</span>}
+          />
+
+          {totalFiltered === 0 ? (
+            <Empty description="未找到匹配的模型" style={{ marginTop: 24 }} />
+          ) : (
+            <div className={styles.modelCategoryList}>
+              {(Object.entries(groupedFetchedModels) as [ModelCategory, ProviderModel[]][]).map(([category, models]) => {
+                if (models.length === 0) return null;
+                const allSelected = models.every(m => selectedModelIds.has(m.id));
+                const someSelected = models.some(m => selectedModelIds.has(m.id));
+                return (
+                  <div key={category} className={styles.modelCategoryBlock}>
+                    <div className={styles.modelCategoryHeader}>
+                      <span className={styles.modelCategoryDot}
+                        style={{ background: categoryColorMap[category] }} />
+                      <span className={styles.modelCategoryName}>
+                        {MODEL_CATEGORY_LABELS[category]}
+                      </span>
+                      <span className={styles.modelCategoryCount}>({models.length})</span>
+                      <Button type="link" size="small"
+                        onClick={() => toggleCategoryAll(category, models)}
+                        className={styles.modelCategoryToggle}>
+                        {allSelected ? '取消全选' : '全选'}
+                      </Button>
+                    </div>
+                    <div className={styles.modelCheckList}>
+                      {models.map(m => (
+                        <div key={m.id}
+                          className={`${styles.modelCheckItem} ${selectedModelIds.has(m.id) ? styles.modelCheckItemSelected : ''}`}
+                          onClick={() => toggleModelSelect(m.id)}>
+                          <Checkbox checked={selectedModelIds.has(m.id)} />
+                          <span className={styles.modelCheckName}>{m.id}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* ========== 删除确认弹窗 ========== */}
       <Modal
         title="确认删除"
-        open={deleteConfirm.visible}
-        onCancel={() => setDeleteConfirm({ ...deleteConfirm, visible: false })}
-        onOk={executeDeleteModel}
+        open={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onOk={handleDeleteProvider}
         okText="删除"
         cancelText="取消"
         okButtonProps={{ danger: true }}
         centered
-        width={360}
+        width={400}
         zIndex={1100}
       >
         <div className={styles.deleteConfirmBody}>
-          确定要删除模型 <strong>{deleteConfirm.name}</strong> 吗？
+          确定要删除API平台 <strong>{deleteTarget?.name}</strong> 吗？<br />
+          删除后，依赖该平台的生成任务将无法正常工作。
         </div>
       </Modal>
     </div>

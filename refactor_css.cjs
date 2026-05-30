@@ -10,7 +10,7 @@ const cssFiles = [
   'StyleLibrary.module.css'
 ];
 
-const basePath = 'd:\\谪仙漫剧\\src\\pages';
+const basePath = path.join(__dirname, 'src', 'pages');
 
 const replacements = [
   // Backgrounds

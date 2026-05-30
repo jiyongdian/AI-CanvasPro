@@ -191,3 +191,23 @@
 .regenerateSubmitButton:hover {
   background: linear-gradient(135deg, #16a34a 0%, #059669 100%) !important;
 }
+
+/* 模型选择器栏 */
+.modelSelectorBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+
+.modelSelectorLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--body-color);
+  white-space: nowrap;
+  margin-right: 4px;
+}

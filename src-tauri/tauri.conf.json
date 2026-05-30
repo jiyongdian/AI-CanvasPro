@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ZhexianComic",
+  "productName": "YuanJiAIManJu",
   "version": "0.1.0",
-  "identifier": "com.zhexian.comic-studio",
+  "identifier": "com.yuanji.ai-manju",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "谪仙漫剧",
+        "title": "源极AI漫剧",
         "width": 1280,
         "height": 800,
         "minWidth": 1024,

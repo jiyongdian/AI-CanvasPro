@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const basePath = 'd:\\谪仙漫剧\\src\\components';
+const basePath = path.join(__dirname, 'src', 'components');
 
 function getFiles(dir, filesList = []) {
   const files = fs.readdirSync(dir);

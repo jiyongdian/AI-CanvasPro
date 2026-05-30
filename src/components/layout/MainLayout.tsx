@@ -17,6 +17,7 @@ import {
   MoonOutlined,
   AppstoreOutlined,
   FileTextOutlined,
+  VideoCameraOutlined,
 } from '@ant-design/icons';
 import styles from './MainLayout.module.css';
 
@@ -54,6 +55,11 @@ const MainLayout: React.FC = () => {
         key: '/prompt-templates',
         icon: <FileTextOutlined style={{ fontSize: 18 }} />,
         label: '提示词库',
+      },
+      {
+        key: '/studio',
+        icon: <VideoCameraOutlined style={{ fontSize: 18 }} />,
+        label: 'AI漫剧工作台',
       },
       {
         key: '/ai-character',
@@ -94,7 +100,7 @@ const MainLayout: React.FC = () => {
           <div className={styles.logoIconWrapper}>
             <ThunderboltOutlined className={styles.logoIcon} />
           </div>
-          <span className={styles.logoText}>谪仙漫剧</span>
+          <span className={styles.logoText}>源极AI漫剧</span>
         </div>
         <div className={styles.headerRight}>
           <div className={styles.themeToggleBtn} onClick={toggleTheme} title="切换主题">

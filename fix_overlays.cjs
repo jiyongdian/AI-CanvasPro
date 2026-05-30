@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const srcDir = 'd:\\谪仙漫剧\\src';
+const srcDir = path.join(__dirname, 'src');
 
 function walk(dir) {
   let results = [];

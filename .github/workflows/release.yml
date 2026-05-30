@@ -45,8 +45,8 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ steps.build_tauri.outputs.APP_VERSION }}"
-          $installerName = "ZhexianComic_${version}_x64-setup.exe"
-          $sigFile = "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/ZhexianComic_${version}_x64-setup.exe.sig"
+          $installerName = "YuanJiAIManJu_${version}_x64-setup.exe"
+          $sigFile = "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/YuanJiAIManJu_${version}_x64-setup.exe.sig"
           $signature = Get-Content $sigFile -Raw
           $url = "https://github.com/${{ github.repository }}/releases/download/v$version/$installerName"
           $json = @{
@@ -66,7 +66,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: 谪仙漫剧 v${{ github.ref_name }}
+          name: 源极AI漫剧 v${{ github.ref_name }}
           body: |
             ## 更新内容
 
@@ -80,7 +80,7 @@ jobs:
           prerelease: false
           files: |
             latest.json
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/ZhexianComic_*.exe
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/ZhexianComic_*.exe.sig
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/YuanJiAIManJu_*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/YuanJiAIManJu_*.exe.sig
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

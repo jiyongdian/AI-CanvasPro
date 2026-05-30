@@ -1,14 +1,15 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { Card, Button, Modal, Input, Empty, Spin, message, Row, Col, Popconfirm, Radio, Tag } from 'antd';
+import { Card, Button, Modal, Input, Empty, Spin, message, Row, Col, Popconfirm, Radio, Tag, Select } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, PlayCircleOutlined, RobotOutlined, BulbOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useRecoilState } from 'recoil';
 import { v4 as uuidv4 } from 'uuid';
 import { projectListState, currentProjectState } from '../store/projectStore';
 import { getAllProjects, saveProject, deleteProject as deleteProjectFromDB } from '../services/database';
-import { Project, Scene } from '../types';
+import { Project, Scene, ApiProvider } from '../types';
 import { aiService, ScriptMode } from '../services/aiService';
+import { loadApiProviders } from '../services/secureStorage';
 import ScriptEditorModal from '../components/ScriptEditorModal';
 import styles from './ProjectList.module.css';
 
@@ -30,6 +31,28 @@ const ProjectList: React.FC = () => {
   const [generatingLog, setGeneratingLog] = useState<string[]>([]);
   const [scriptEditorVisible, setScriptEditorVisible] = useState(false);
   const [scriptEditorProject, setScriptEditorProject] = useState<Project | null>(null);
+
+  // 模型选择
+  const [providers, setProviders] = useState<ApiProvider[]>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>(undefined);
+  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    (async () => {
+      const list = await loadApiProviders();
+      setProviders(list.filter(p => p.enabled !== false));
+      if (list.length > 0) {
+        const first = list.find(p => p.enabled !== false);
+        if (first && !selectedProviderId) {
+          setSelectedProviderId(first.id);
+        }
+      }
+    })();
+  }, []);
+
+  // 当前选中provider的模型列表
+  const selectedProvider = providers.find(p => p.id === selectedProviderId);
+  const availableModels = selectedProvider?.models || [];
 
   useEffect(() => {
     let cancelled = false;
@@ -74,14 +97,17 @@ const ProjectList: React.FC = () => {
 
     try {
       setGeneratingLog(prev => [...prev, '🤖 AI正在分析小说内容...']);
-      const scriptScenes = await aiService.generateScript(novelContent.trim(), scriptMode, customRequirement.trim() || undefined);
+      const scriptScenes = await aiService.generateScript(
+        novelContent.trim(), scriptMode, customRequirement.trim() || undefined,
+        { model: selectedModel, providerId: selectedProviderId },
+      );
       setGeneratingLog(prev => [...prev, `✅ AI分析完成，共生成 ${scriptScenes.length} 个分镜`]);
       
       const scenes: Scene[] = scriptScenes.map((s, index) => ({
         id: uuidv4(),
         order: s.order || index + 1,
         description: s.sceneDescription,
-        prompt: '',  // 场景描述不导入到提示词输入框
+        prompt: '',
         generationMode: 'text-to-image' as const,
         images: {},
         videos: [],
@@ -219,7 +245,10 @@ const ProjectList: React.FC = () => {
 
     try {
       setGeneratingLog(prev => [...prev, '🤖 AI正在分析小说内容...']);
-      const scriptScenes = await aiService.generateScript(novelContent.trim(), scriptMode, customRequirement.trim() || undefined);
+      const scriptScenes = await aiService.generateScript(
+        novelContent.trim(), scriptMode, customRequirement.trim() || undefined,
+        { model: selectedModel, providerId: selectedProviderId },
+      );
       setGeneratingLog(prev => [...prev, `✅ AI分析完成，共生成 ${scriptScenes.length} 个分镜`]);
       
       const scenes: Scene[] = scriptScenes.map((s, index) => ({
@@ -424,6 +453,40 @@ const ProjectList: React.FC = () => {
                 : '解说对话模式：包含旁白解说词和角色对话，适合需要场景描述的故事'}
             </p>
           </div>
+
+          {/* 模型选择器 */}
+          {providers.length > 0 && (
+            <div className={styles.formItem}>
+              <label>AI模型选择</label>
+              <div className={styles.modelSelectorRow}>
+                <Select
+                  placeholder="选择API平台"
+                  value={selectedProviderId}
+                  onChange={(val) => {
+                    setSelectedProviderId(val);
+                    setSelectedModel(undefined);
+                  }}
+                  className={styles.providerSelect}
+                  options={providers.map(p => ({ label: p.name, value: p.id }))}
+                />
+                <Select
+                  placeholder="选择模型"
+                  value={selectedModel}
+                  onChange={setSelectedModel}
+                  className={styles.modelSelect}
+                  options={availableModels.map(m => ({ label: m.id, value: m.id }))}
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+                  }
+                />
+              </div>
+              <p className={styles.modelSelectorHint}>
+                选择用于生成脚本的API平台和模型
+              </p>
+            </div>
+          )}
+
           <div className={styles.formItem}>
             <label>小说原文</label>
             <TextArea
