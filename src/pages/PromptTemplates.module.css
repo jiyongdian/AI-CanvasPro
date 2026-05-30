@@ -90,11 +90,6 @@
 .cardImage:hover { border-color: #3b82f6 !important; }
 .cardVideo:hover { border-color: #10b981 !important; }
 .cardDirector:hover { border-color: #f59e0b !important; }
-  box-shadow:
-    0 15px 50px var(--shadow-heavy),
-    0 5px 20px rgba(245, 158, 11, 0.25),
-    inset 0 1px 0 var(--glass-border);
-}
 
 /* ── 封面区域 ── */
 .cardCover {
