@@ -191,7 +191,7 @@ export interface GenerationTask {
 export interface PromptTemplate {
   id: string;
   name: string;
-  type: 'image' | 'video' | 'director';
+  type: 'image' | 'video' | 'director' | 'script';
   positive_prompt: string;
   negative_prompt?: string;
   created_at: Date;

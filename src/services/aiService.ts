@@ -518,7 +518,7 @@ class AIGenerationService {
     novelContent: string,
     mode: ScriptMode,
     userRequirement?: string,
-    options?: { model?: string; providerId?: string },
+    options?: { model?: string; providerId?: string; template?: { positive_prompt: string } },
   ): Promise<ScriptScene[]> {
     const providerConfig = await this.getProviderConfig(options?.providerId);
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
@@ -532,6 +532,51 @@ class AIGenerationService {
     const requirementBlock = userRequirement && userRequirement.trim()
       ? `\n【用户创作要求 - 必须严格遵守】\n${userRequirement.trim()}\n`
       : '';
+
+    // 如果有脚本模板，使用模板作为系统提示
+    const template = options?.template;
+    if (template?.positive_prompt) {
+      const systemPrompt = `你是一个专业的AI漫剧编剧。请严格按照下面的【脚本模板】要求，将小说内容转换为分镜脚本。
+
+【脚本模板 — 最高优先级，必须严格遵循】
+${template.positive_prompt}
+
+【补充规则】
+- 必须完整覆盖原文的所有剧情，不得省略任何场景、对话或情节
+- 每个分镜必须包含：分镜序号(order)、场景描述(sceneDescription)、动作描述(actionDescription)、出现的角色标签(character)、台词/对话内容(dialogue)${mode === 'narration' ? '、解说词(narration)' : ''}
+- 请直接输出JSON数组格式，不要添加任何额外文字
+${requirementBlock}`;
+
+      const userMessage = userRequirement && userRequirement.trim()
+        ? `【创作要求】${userRequirement.trim()}\n\n请将以下小说内容完整转换为分镜脚本，不要省略任何剧情：\n\n${novelContent}`
+        : `请将以下小说内容完整转换为分镜脚本，不要省略任何剧情：\n\n${novelContent}`;
+
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+          ],
+          temperature: this.getTemperature(),
+          max_tokens: 80000
+        })
+      });
+
+      if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '[]';
+      try { return JSON.parse(content); } catch {
+        const firstBracket = content.indexOf('[');
+        const lastBracket = content.lastIndexOf(']');
+        if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+          return JSON.parse(content.slice(firstBracket, lastBracket + 1));
+        }
+        throw new Error('AI 返回的脚本格式无法解析，请重试');
+      }
+    }
 
     const systemPrompt = mode === 'dialogue' 
       ? `你是一个专业的AI漫剧编剧。请将以下小说内容转换为纯对话剧本格式的分镜脚本。

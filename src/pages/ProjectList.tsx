@@ -7,9 +7,10 @@ import { useRecoilState } from 'recoil';
 import { v4 as uuidv4 } from 'uuid';
 import { projectListState, currentProjectState } from '../store/projectStore';
 import { getAllProjects, saveProject, deleteProject as deleteProjectFromDB } from '../services/database';
-import { Project, Scene, ApiProvider } from '../types';
+import { Project, Scene, ApiProvider, PromptTemplate } from '../types';
 import { aiService, ScriptMode } from '../services/aiService';
 import { loadApiProviders } from '../services/secureStorage';
+import { getAllPromptTemplates } from '../services/database';
 import ScriptEditorModal from '../components/ScriptEditorModal';
 import styles from './ProjectList.module.css';
 
@@ -31,6 +32,12 @@ const ProjectList: React.FC = () => {
   const [generatingLog, setGeneratingLog] = useState<string[]>([]);
   const [scriptEditorVisible, setScriptEditorVisible] = useState(false);
   const [scriptEditorProject, setScriptEditorProject] = useState<Project | null>(null);
+
+  // 脚本模板
+  const [scriptTemplates, setScriptTemplates] = useState<PromptTemplate[]>([]);
+  const [selectedScriptTemplateId, setSelectedScriptTemplateId] = useState<string | undefined>(undefined);
+
+  useEffect(() => { getAllPromptTemplates().then(d => setScriptTemplates(d.filter(t => t.type === 'script'))).catch(() => {}); }, []);
 
   // 模型选择
   const [providers, setProviders] = useState<ApiProvider[]>([]);
@@ -97,9 +104,11 @@ const ProjectList: React.FC = () => {
 
     try {
       setGeneratingLog(prev => [...prev, '🤖 AI正在分析小说内容...']);
+      const selTemplate = selectedScriptTemplateId ? scriptTemplates.find(t => t.id === selectedScriptTemplateId) : undefined;
       const scriptScenes = await aiService.generateScript(
         novelContent.trim(), scriptMode, customRequirement.trim() || undefined,
-        { model: selectedModel, providerId: selectedProviderId },
+        { model: selectedModel, providerId: selectedProviderId,
+          template: selTemplate ? { positive_prompt: selTemplate.positive_prompt } : undefined },
       );
       setGeneratingLog(prev => [...prev, `✅ AI分析完成，共生成 ${scriptScenes.length} 个分镜`]);
       
@@ -246,9 +255,11 @@ const ProjectList: React.FC = () => {
 
     try {
       setGeneratingLog(prev => [...prev, '🤖 AI正在分析小说内容...']);
+      const selTemplate2 = selectedScriptTemplateId ? scriptTemplates.find(t => t.id === selectedScriptTemplateId) : undefined;
       const scriptScenes = await aiService.generateScript(
         novelContent.trim(), scriptMode, customRequirement.trim() || undefined,
-        { model: selectedModel, providerId: selectedProviderId },
+        { model: selectedModel, providerId: selectedProviderId,
+          template: selTemplate2 ? { positive_prompt: selTemplate2.positive_prompt } : undefined },
       );
       setGeneratingLog(prev => [...prev, `✅ AI分析完成，共生成 ${scriptScenes.length} 个分镜`]);
       
@@ -455,6 +466,23 @@ const ProjectList: React.FC = () => {
                 : '解说对话模式：包含旁白解说词和角色对话，适合需要场景描述的故事'}
             </p>
           </div>
+
+          {/* 脚本模板选择器 */}
+          {scriptTemplates.length > 0 && (
+            <div className={styles.formItem}>
+              <label>脚本模板 <Tag color="purple" style={{ marginLeft: 6, fontSize: 11 }}>可选</Tag></label>
+              <Select
+                placeholder="选择提示词库中的脚本模板"
+                value={selectedScriptTemplateId}
+                onChange={setSelectedScriptTemplateId}
+                allowClear
+                options={scriptTemplates.map(t => ({ label: t.name, value: t.id }))}
+              />
+              <p className={styles.modeHint} style={{ marginTop: 6 }}>
+                选择模板后AI将按模板格式生成脚本，模板可在提示词库中自定义创建
+              </p>
+            </div>
+          )}
 
           {/* 模型选择器 */}
           {providers.length > 0 && (

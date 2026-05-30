@@ -111,7 +111,7 @@ const PromptTemplates: React.FC = () => {
 
   const [formData, setFormData] = useState({
     name: '',
-    type: 'image' as 'image' | 'video' | 'director',
+    type: 'image' as PromptTemplate['type'],
     positive_prompt: '',
     negative_prompt: '',
   });
@@ -292,6 +292,7 @@ const PromptTemplates: React.FC = () => {
               { label: '图片', value: 'image' },
               { label: '视频', value: 'video' },
               { label: '导演', value: 'director' },
+              { label: '脚本', value: 'script' },
             ]}
             style={{ width: '100%' }}
           />
