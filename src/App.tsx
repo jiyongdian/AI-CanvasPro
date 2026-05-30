@@ -13,7 +13,6 @@ import AICharacter from './pages/AICharacter';
 import Settings from './pages/Settings';
 import StyleLibrary from './pages/StyleLibrary';
 import PromptTemplates from './pages/PromptTemplates';
-import ComicVideoStudio from './pages/ComicVideoStudio';
 import 'antd/dist/reset.css';
 
 const App: React.FC = () => {
@@ -189,7 +188,6 @@ const App: React.FC = () => {
             <Route path="styles" element={<StyleLibrary />} />
             <Route path="settings" element={<Settings />} />
             <Route path="prompt-templates" element={<PromptTemplates />} />
-            <Route path="studio" element={<ComicVideoStudio />} />
           </Route>
         </Routes>
       </BrowserRouter>

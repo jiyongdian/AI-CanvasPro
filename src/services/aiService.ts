@@ -177,47 +177,58 @@ export async function testApiConnection(
   let base = apiUrl.replace(/\/+$/, '');
   
   try {
-    const response = await fetch(`${base}/chat/completions`, {
-      method: 'POST',
+    // 仅验证密钥有效性，不调用任何模型
+    // 尝试 GET /models（轻量级，不消耗 token）
+    let response = await fetch(`${base}/models`, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: 'Hi' }],
-        max_tokens: 5,
-      }),
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      return {
-        success: true,
-        message: `连接成功！模型: ${data.model || 'N/A'}`,
-      };
+    // fallback: 尝试 /v1/models
+    if (!response.ok) {
+      response = await fetch(`${base}/v1/models`, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
     }
 
-    const errorData = await response.json().catch(() => ({}));
-    const errMsg = errorData.error?.message || response.statusText;
-    
-    // 如果模型不存在但端点可访问，也算部分成功
-    if (response.status === 404) {
-      return {
-        success: false,
-        message: `端点可访问但模型不存在\n${errMsg}`,
-      };
+    if (response.ok) {
+      // 尝试读取模型数量以提供更详细的反馈
+      try {
+        const data = await response.json();
+        const count = data.data?.length || 0;
+        return {
+          success: true,
+          message: count > 0
+            ? `连接成功！可用模型数: ${count}`
+            : '连接成功！密钥验证通过',
+        };
+      } catch {
+        return { success: true, message: '连接成功！密钥验证通过' };
+      }
+    }
+
+    // 401 = 密钥无效，403 = 权限不足
+    if (response.status === 401) {
+      return { success: false, message: '密钥无效（401 Unauthorized）\n请检查密钥是否正确' };
+    }
+    if (response.status === 403) {
+      return { success: false, message: '权限不足（403 Forbidden）\n该密钥可能没有列出模型的权限，但可能仍可用于生成' };
     }
 
     return {
       success: false,
-      message: `状态码: ${response.status}\n${errMsg}`,
+      message: `状态码: ${response.status}\n${response.statusText || '未知错误'}`,
     };
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : '未知错误';
     return {
       success: false,
-      message: `网络错误: ${errMsg}`,
+      message: `网络错误: ${errMsg}\n\n💡 请检查API地址格式是否正确`,
     };
   }
 }

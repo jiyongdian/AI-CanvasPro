@@ -6,6 +6,7 @@ import {
   CloudDownloadOutlined, ReloadOutlined, QuestionCircleOutlined,
   EditOutlined, LinkOutlined, DownloadOutlined, CheckCircleOutlined,
   CloseCircleOutlined, EyeOutlined, EyeInvisibleOutlined, KeyOutlined,
+  SearchOutlined, CheckOutlined, ThunderboltOutlined, SettingOutlined,
 } from '@ant-design/icons';
 import { aiService, fetchModelsFromApi, testApiConnection } from '../services/aiService';
 import { saveDirHandle, getDirHandle, verifyPermission } from '../utils/downloadHelper';
@@ -17,6 +18,38 @@ import {
 import styles from './Settings.module.css';
 
 const { Password } = Input;
+
+const categoryIcons: Record<ModelCategory, React.ReactNode> = {
+  text: '💬',
+  image: '🖼️',
+  video: '🎬',
+  audio: '🎵',
+  other: '📦',
+};
+
+const categoryColorMap: Record<ModelCategory, string> = {
+  text: '#3b82f6',
+  image: '#22c55e',
+  video: '#f59e0b',
+  audio: '#a855f7',
+  other: '#6b7280',
+};
+
+const categoryBgMap: Record<ModelCategory, string> = {
+  text: 'rgba(59, 130, 246, 0.12)',
+  image: 'rgba(34, 197, 94, 0.12)',
+  video: 'rgba(245, 158, 11, 0.12)',
+  audio: 'rgba(168, 85, 247, 0.12)',
+  other: 'rgba(107, 114, 128, 0.10)',
+};
+
+const categoryBorderMap: Record<ModelCategory, string> = {
+  text: 'rgba(59, 130, 246, 0.30)',
+  image: 'rgba(34, 197, 94, 0.30)',
+  video: 'rgba(245, 158, 11, 0.30)',
+  audio: 'rgba(168, 85, 247, 0.30)',
+  other: 'rgba(107, 114, 128, 0.20)',
+};
 
 // ======================== 设置页面主组件 ========================
 
@@ -78,13 +111,11 @@ const Settings: React.FC = () => {
       try {
         const list = await loadApiProviders();
         setProviders(list);
-        // 同步刷新 aiService 缓存
         aiService.refreshProviders();
       } catch { /* ignore */ }
       setProvidersLoading(false);
     })();
 
-    // 加载温度和下载路径
     (async () => {
       try {
         const { loadApiConfig } = await import('../services/secureStorage');
@@ -185,6 +216,7 @@ const Settings: React.FC = () => {
     try {
       const models = await fetchModelsFromApi(editApiUrl.trim(), editApiKey.trim());
       setFetchedModels(models);
+      // 初始化选中状态：当前已编辑模型 + 之前已保存的模型
       setSelectedModelIds(new Set(editModels.map(m => m.id)));
       setModelSelectSearch('');
       setModelSelectVisible(true);
@@ -202,11 +234,12 @@ const Settings: React.FC = () => {
     message.success(`已选择 ${selected.length} 个模型`);
   };
 
-  const toggleModelSelect = (modelId: string) => {
+  // 修复: 使用 Checkbox onChange 而非父级 div onClick，避免事件冲突导致多选失败
+  const toggleModelSelect = (modelId: string, checked: boolean) => {
     setSelectedModelIds(prev => {
       const next = new Set(prev);
-      if (next.has(modelId)) next.delete(modelId);
-      else next.add(modelId);
+      if (checked) next.add(modelId);
+      else next.delete(modelId);
       return next;
     });
   };
@@ -249,7 +282,6 @@ const Settings: React.FC = () => {
     const config = { temperature: String(val) };
     saveApiConfig(config);
     aiService.refreshConfig();
-    message.success(`稳定性已设为 ${val}`, 1);
   };
 
   const handleSelectDownloadFolder = async () => {
@@ -317,14 +349,6 @@ const Settings: React.FC = () => {
     return key.slice(0, 4) + '••••••••' + key.slice(-4);
   };
 
-  const categoryColorMap: Record<ModelCategory, string> = {
-    text: '#3b82f6',
-    image: '#22c55e',
-    video: '#f59e0b',
-    audio: '#a855f7',
-    other: '#6b7280',
-  };
-
   // ==================== 渲染 ====================
 
   // 分组模型用于模型选择弹窗
@@ -341,151 +365,197 @@ const Settings: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      {/* ========== API 平台卡片区域 ========== */}
-      <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitle}>第三方API平台</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal} className={styles.addBtn}>
-          添加API
-        </Button>
-      </div>
-
-      {providersLoading ? (
-        <div className={styles.loadingWrap}><Spin /></div>
-      ) : providers.length === 0 ? (
-        <div className={styles.emptyProviders}>
-          <Empty description="暂无API平台配置，点击上方按钮添加" />
-        </div>
-      ) : (
-        <div className={styles.providersGrid}>
-          {providers.map(p => (
-            <div key={p.id} className={styles.providerCard}>
-              <div className={styles.providerCardHeader}>
-                <div className={styles.providerCardTitle}>
-                  <ApiOutlined className={styles.providerIcon} />
-                  <span>{p.name}</span>
-                </div>
-                <div className={styles.providerCardActions}>
-                  <Tooltip title="编辑">
-                    <Button type="text" size="small" icon={<EditOutlined />}
-                      onClick={() => openEditModal(p)} />
-                  </Tooltip>
-                  <Tooltip title="删除">
-                    <Button type="text" size="small" danger icon={<DeleteOutlined />}
-                      onClick={() => setDeleteTarget(p)} />
-                  </Tooltip>
-                </div>
-              </div>
-              <div className={styles.providerCardBody}>
-                <div className={styles.providerInfoRow}>
-                  <LinkOutlined className={styles.providerInfoIcon} />
-                  <span className={styles.providerInfoText} title={p.apiUrl}>{maskApiUrl(p.apiUrl)}</span>
-                </div>
-                <div className={styles.providerInfoRow}>
-                  <KeyOutlined className={styles.providerInfoIcon} />
-                  <span className={styles.providerInfoText}>{maskApiKey(p.apiKey)}</span>
-                </div>
-                <div className={styles.providerModelsArea}>
-                  {p.models.length === 0 ? (
-                    <span className={styles.noModels}>尚未选择模型</span>
-                  ) : (
-                    <div className={styles.modelTagsWrap}>
-                      {p.models.map(m => (
-                        <Tag key={m.id} color={categoryColorMap[m.category]}
-                          className={styles.modelTag}>
-                          {m.id}
-                        </Tag>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ========== 温度 & 下载 & 更新 ========== */}
-      <div className={styles.otherSettings}>
-        {/* 温度 */}
-        <div className={styles.tempSection}>
-          <div className={styles.tempRow}>
-            <span className={styles.tempLabel}>
-              AI 稳定性
-              <Popover
-                content={
-                  <div style={{ maxWidth: 280, fontSize: 13, lineHeight: 1.7 }}>
-                    <p>控制 AI 输出的随机性和创造性。</p>
-                    <p><strong>0 = 高度确定</strong>：每次结果几乎一致</p>
-                    <p><strong>1 = 平衡</strong>：有一定变化</p>
-                    <p><strong>2 = 高度创造</strong>：输出多样</p>
-                  </div>
-                }
-              >
-                <QuestionCircleOutlined style={{ marginLeft: 4, color: 'var(--text-tertiary)', cursor: 'pointer' }} />
-              </Popover>
-            </span>
-            <span className={styles.tempValue}>{temperature}</span>
+      {/* ========== API 平台卡片区域（主体） ========== */}
+      <div className={styles.apiSection}>
+        <div className={styles.sectionHeader}>
+          <div className={styles.sectionHeaderLeft}>
+            <ThunderboltOutlined className={styles.sectionHeaderIcon} />
+            <h2 className={styles.sectionTitle}>第三方API平台</h2>
+            {providers.length > 0 && (
+              <span className={styles.providerCount}>{providers.length} 个平台</span>
+            )}
           </div>
-          <Slider min={0.1} max={2.0} step={0.1} value={temperature}
-            onChange={handleTemperatureChange} tooltip={{ formatter: (v) => `${v}` }} />
+          <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal} className={styles.addBtn}>
+            添加API
+          </Button>
         </div>
 
-        {/* 下载路径 */}
-        <div className={styles.downloadSection}>
-          <div className={styles.downloadPathRow}>
-            <Input
-              value={downloadPath ? `📁 ${downloadPath}` : '未设置（使用浏览器默认下载目录）'}
-              readOnly size="middle"
-              className={`${styles.downloadPathInput} ${downloadPath ? styles.downloadPathSet : ''}`}
-            />
-            <Button icon={<FolderOpenOutlined />} onClick={handleSelectDownloadFolder} size="middle"
-              type={downloadPath ? 'default' : 'primary'}>
-              {downloadPath ? '更换文件夹' : '选择文件夹'}
+        {providersLoading ? (
+          <div className={styles.loadingWrap}><Spin /></div>
+        ) : providers.length === 0 ? (
+          <div className={styles.emptyProviders}>
+            <div className={styles.emptyIcon}>
+              <ApiOutlined style={{ fontSize: 48, color: 'var(--text-tertiary)' }} />
+            </div>
+            <Empty description="暂无API平台配置" />
+            <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal} style={{ marginTop: 16 }}>
+              添加第一个API平台
             </Button>
           </div>
-          <div className={styles.downloadHint}>
-            {downloadPath
-              ? `✅ 已设置，视频将保存到「${downloadPath}」文件夹`
-              : '⚠️ 未设置下载目录，视频将下载到浏览器默认位置'}
-          </div>
-        </div>
-
-        {/* 软件更新 */}
-        {isTauri && (
-          <div className={styles.updateSection}>
-            <div className={styles.sectionSubtitle}>软件更新</div>
-            <div className={styles.updateRow}>
-              <span className={styles.versionLabel}>当前版本：v{appVersion}</span>
-              <Button icon={<ReloadOutlined />} onClick={handleCheckUpdate} loading={updateChecking} size="middle">
-                检查更新
-              </Button>
-            </div>
-            {updateStatus.state === 'available' && (
-              <div className={styles.updateAvailable}>
-                <div className={styles.updateVersion}>新版本：v{updateStatus.version}</div>
-                {updateStatus.body && <div className={styles.updateBody}>{updateStatus.body}</div>}
-                <Button type="primary" icon={<CloudDownloadOutlined />} onClick={handleDownloadUpdate} size="middle">
-                  下载并安装更新
-                </Button>
+        ) : (
+          <div className={styles.providersGrid}>
+            {providers.map(p => (
+              <div key={p.id} className={styles.providerCard}>
+                {/* 卡片顶部渐变 Logo 区 */}
+                <div className={styles.providerCardBanner}>
+                  <div className={styles.providerLogoCircle}>
+                    <ApiOutlined className={styles.providerLogoIcon} />
+                  </div>
+                  <div className={styles.providerNameBlock}>
+                    <span className={styles.providerName}>{p.name}</span>
+                    <span className={styles.providerModelCount}>
+                      {p.models.length > 0 ? `${p.models.length} 个模型` : '无模型'}
+                    </span>
+                  </div>
+                  <div className={styles.providerCardActions}>
+                    <Tooltip title="编辑">
+                      <Button type="text" size="small" icon={<EditOutlined />}
+                        onClick={() => openEditModal(p)} className={styles.actionBtn} />
+                    </Tooltip>
+                    <Tooltip title="删除">
+                      <Button type="text" size="small" danger icon={<DeleteOutlined />}
+                        onClick={() => setDeleteTarget(p)} className={styles.actionBtn} />
+                    </Tooltip>
+                  </div>
+                </div>
+                {/* 卡片内容 */}
+                <div className={styles.providerCardBody}>
+                  <div className={styles.providerInfoRow}>
+                    <LinkOutlined className={styles.providerInfoIcon} />
+                    <span className={styles.providerInfoText} title={p.apiUrl}>{maskApiUrl(p.apiUrl)}</span>
+                  </div>
+                  <div className={styles.providerInfoRow}>
+                    <KeyOutlined className={styles.providerInfoIcon} />
+                    <span className={styles.providerInfoText}>{maskApiKey(p.apiKey)}</span>
+                  </div>
+                  <div className={styles.providerModelsArea}>
+                    {p.models.length === 0 ? (
+                      <span className={styles.noModels}>尚未选择模型 — 点击编辑并拉取</span>
+                    ) : (
+                      <div className={styles.modelTagsWrap}>
+                        {p.models.slice(0, 6).map(m => (
+                          <Tag key={m.id} color={categoryColorMap[m.category]}
+                            className={styles.modelTag}>
+                            {m.id}
+                          </Tag>
+                        ))}
+                        {p.models.length > 6 && (
+                          <Tag className={styles.modelTagMore}>+{p.models.length - 6}</Tag>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-            {updateStatus.state === 'downloading' && (
-              <div className={styles.updateDownloading}>
-                <span>正在下载更新...</span>
-                <Progress percent={updateStatus.progress} size="small" />
-              </div>
-            )}
-            {updateStatus.state === 'ready' && (
-              <div className={styles.updateReady}>更新已下载完成，应用即将重启...</div>
-            )}
-            {updateStatus.state === 'up-to-date' && !updateChecking && (
-              <div className={styles.updateUpToDate}>当前已是最新版本</div>
-            )}
-            {updateStatus.state === 'error' && (
-              <div className={styles.updateError}>检查失败：{updateStatus.message}</div>
-            )}
+            ))}
           </div>
         )}
+      </div>
+
+      {/* ========== 系统设置卡片区 ========== */}
+      <div className={styles.systemSection}>
+        <div className={styles.systemSectionHeader}>
+          <SettingOutlined className={styles.sectionHeaderIcon} />
+          <h2 className={styles.sectionTitle}>系统设置</h2>
+        </div>
+
+        <div className={styles.systemCards}>
+          {/* 温度卡片 */}
+          <div className={styles.systemCard}>
+            <div className={styles.systemCardIconWrap}>
+              <ThunderboltOutlined className={styles.systemCardIcon} />
+            </div>
+            <div className={styles.systemCardContent}>
+              <div className={styles.systemCardTitle}>
+                AI 稳定性
+                <Popover
+                  content={
+                    <div style={{ maxWidth: 260, fontSize: 13, lineHeight: 1.7 }}>
+                      <p>控制 AI 输出的随机性和创造性。</p>
+                      <p><strong>0 = 高度确定</strong>：每次结果几乎一致</p>
+                      <p><strong>1 = 平衡</strong>：有一定变化</p>
+                      <p><strong>2 = 高度创造</strong>：输出多样</p>
+                    </div>
+                  }
+                >
+                  <QuestionCircleOutlined style={{ marginLeft: 6, color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 13 }} />
+                </Popover>
+              </div>
+              <div className={styles.tempValue}>{temperature}</div>
+              <Slider min={0.1} max={2.0} step={0.1} value={temperature}
+                onChange={handleTemperatureChange} tooltip={{ formatter: (v) => `${v}` }}
+                className={styles.tempSlider} />
+            </div>
+          </div>
+
+          {/* 下载路径卡片 */}
+          <div className={styles.systemCard}>
+            <div className={styles.systemCardIconWrap}>
+              <FolderOpenOutlined className={styles.systemCardIcon} />
+            </div>
+            <div className={styles.systemCardContent}>
+              <div className={styles.systemCardTitle}>下载保存位置</div>
+              <div className={styles.downloadPathRow}>
+                <Input
+                  value={downloadPath ? `📁 ${downloadPath}` : '未设置（使用浏览器默认下载目录）'}
+                  readOnly size="middle"
+                  className={`${styles.downloadPathInput} ${downloadPath ? styles.downloadPathSet : ''}`}
+                />
+                <Button icon={<FolderOpenOutlined />} onClick={handleSelectDownloadFolder} size="middle"
+                  type={downloadPath ? 'default' : 'primary'}>
+                  {downloadPath ? '更换' : '选择'}
+                </Button>
+              </div>
+              <div className={styles.downloadHint}>
+                {downloadPath
+                  ? `✅ 视频将保存到「${downloadPath}」`
+                  : '⚠️ 将下载到浏览器默认位置'}
+              </div>
+            </div>
+          </div>
+
+          {/* 软件更新卡片（仅 Tauri） */}
+          {isTauri && (
+            <div className={styles.systemCard}>
+              <div className={styles.systemCardIconWrap}>
+                <CloudDownloadOutlined className={styles.systemCardIcon} />
+              </div>
+              <div className={styles.systemCardContent}>
+                <div className={styles.systemCardTitle}>软件更新</div>
+                <div className={styles.updateRow}>
+                  <span className={styles.versionLabel}>当前版本：v{appVersion}</span>
+                  <Button icon={<ReloadOutlined />} onClick={handleCheckUpdate} loading={updateChecking} size="small">
+                    检查更新
+                  </Button>
+                </div>
+                {updateStatus.state === 'available' && (
+                  <div className={styles.updateAvailable}>
+                    <span className={styles.updateVersion}>新版本：v{updateStatus.version}</span>
+                    {updateStatus.body && <div className={styles.updateBody}>{updateStatus.body.slice(0, 200)}</div>}
+                    <Button type="primary" icon={<CloudDownloadOutlined />} onClick={handleDownloadUpdate} size="small" block>
+                      下载并安装
+                    </Button>
+                  </div>
+                )}
+                {updateStatus.state === 'downloading' && (
+                  <div className={styles.updateDownloading}>
+                    <span>下载中...</span>
+                    <Progress percent={updateStatus.progress} size="small" />
+                  </div>
+                )}
+                {updateStatus.state === 'ready' && (
+                  <div className={styles.updateReady}>下载完成，即将重启...</div>
+                )}
+                {updateStatus.state === 'up-to-date' && !updateChecking && (
+                  <div className={styles.updateUpToDate}>✅ 已是最新版本</div>
+                )}
+                {updateStatus.state === 'error' && (
+                  <div className={styles.updateError}>检查失败：{updateStatus.message}</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ========== 添加/编辑 API 弹窗 ========== */}
@@ -496,7 +566,7 @@ const Settings: React.FC = () => {
         onOk={handleSaveProvider}
         okText="保存"
         cancelText="取消"
-        width={620}
+        width={600}
         centered
         forceRender
         destroyOnClose={false}
@@ -524,25 +594,23 @@ const Settings: React.FC = () => {
             />
           </div>
 
-          {/* 操作按钮行 */}
           <div className={styles.editActions}>
             <Button icon={<DownloadOutlined />} onClick={handleFetchModels} loading={fetchLoading}
               className={styles.fetchBtn}>
               拉取模型
             </Button>
             <Button icon={<ApiOutlined />} onClick={handleTestConnection} loading={testLoading}
-              className={styles.testBtn}>
+              className={styles.editTestBtn}>
               测试连接
             </Button>
           </div>
 
-          {/* 已选模型预览 */}
           <div className={styles.editModelsPreview}>
             <div className={styles.editModelsLabel}>
-              已选模型（{editModels.length}）
+              📋 已选模型（{editModels.length}）
             </div>
             {editModels.length === 0 ? (
-              <span className={styles.noModels}>点击「拉取模型」从API获取模型列表</span>
+              <span className={styles.noModels}>点击「拉取模型」从API获取并选择模型</span>
             ) : (
               <div className={styles.modelTagsWrap}>
                 {editModels.map(m => (
@@ -557,7 +625,6 @@ const Settings: React.FC = () => {
             )}
           </div>
 
-          {/* 测试结果 */}
           {testResult.visible && (
             <div className={`${styles.testResultBanner} ${testResult.success ? styles.testSuccess : styles.testFail}`}>
               {testResult.success ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
@@ -567,49 +634,68 @@ const Settings: React.FC = () => {
         </div>
       </Modal>
 
-      {/* ========== 模型选择弹窗（顶层） ========== */}
+      {/* ========== 模型选择弹窗（顶层、美化版） ========== */}
       <Modal
-        title={<span><DownloadOutlined style={{ marginRight: 8 }} />选择模型</span>}
+        title={
+          <div className={styles.modelSelectTitle}>
+            <DownloadOutlined style={{ fontSize: 16 }} />
+            <span>从 API 拉取模型</span>
+            <span className={styles.modelSelectSubtitle}>
+              共 {fetchedModels.length} 个模型 · 已选 {selectedModelIds.size}
+            </span>
+          </div>
+        }
         open={modelSelectVisible}
         onCancel={() => setModelSelectVisible(false)}
         onOk={handleConfirmModelSelection}
         okText={`确认选择（${selectedModelIds.size}）`}
         cancelText="取消"
-        width={750}
+        width={800}
         centered
         zIndex={1050}
         forceRender
         destroyOnClose={false}
-        bodyStyle={{ maxHeight: '60vh', overflow: 'auto', padding: '16px' }}
+        className={styles.modelSelectModal}
+        bodyStyle={{ maxHeight: '62vh', overflow: 'auto', padding: '20px 24px' }}
       >
         <div className={styles.modelSelectBody}>
-          {/* 搜索 */}
-          <Input
-            placeholder="搜索模型名称..."
-            value={modelSelectSearch}
-            onChange={e => setModelSelectSearch(e.target.value)}
-            allowClear
-            className={styles.modelSearch}
-            prefix={<span style={{ color: 'var(--text-tertiary)' }}>🔍</span>}
-          />
+          {/* 搜索栏 */}
+          <div className={styles.modelSearchWrap}>
+            <SearchOutlined className={styles.modelSearchIcon} />
+            <input
+              type="text"
+              className={styles.modelSearchInput}
+              placeholder="搜索模型名称..."
+              value={modelSelectSearch}
+              onChange={e => setModelSelectSearch(e.target.value)}
+            />
+            {modelSelectSearch && (
+              <Button type="text" size="small" className={styles.modelSearchClear}
+                onClick={() => setModelSelectSearch('')}>
+                清除
+              </Button>
+            )}
+          </div>
 
           {totalFiltered === 0 ? (
-            <Empty description="未找到匹配的模型" style={{ marginTop: 24 }} />
+            <Empty description={modelSelectSearch ? '未找到匹配的模型' : '未能获取到模型'}
+              style={{ marginTop: 32 }} />
           ) : (
             <div className={styles.modelCategoryList}>
               {(Object.entries(groupedFetchedModels) as [ModelCategory, ProviderModel[]][]).map(([category, models]) => {
                 if (models.length === 0) return null;
                 const allSelected = models.every(m => selectedModelIds.has(m.id));
-                const someSelected = models.some(m => selectedModelIds.has(m.id));
                 return (
-                  <div key={category} className={styles.modelCategoryBlock}>
+                  <div key={category} className={styles.modelCategoryBlock}
+                    style={{
+                      background: categoryBgMap[category],
+                      borderColor: categoryBorderMap[category],
+                    }}>
                     <div className={styles.modelCategoryHeader}>
-                      <span className={styles.modelCategoryDot}
-                        style={{ background: categoryColorMap[category] }} />
-                      <span className={styles.modelCategoryName}>
-                        {MODEL_CATEGORY_LABELS[category]}
-                      </span>
-                      <span className={styles.modelCategoryCount}>({models.length})</span>
+                      <span className={styles.modelCategoryEmoji}>{categoryIcons[category]}</span>
+                      <span className={styles.modelCategoryName}>{MODEL_CATEGORY_LABELS[category]}</span>
+                      <span className={styles.modelCategoryCount}>{models.length}</span>
+                      <span className={styles.modelCategoryDot} style={{ background: categoryColorMap[category] }} />
                       <Button type="link" size="small"
                         onClick={() => toggleCategoryAll(category, models)}
                         className={styles.modelCategoryToggle}>
@@ -617,14 +703,20 @@ const Settings: React.FC = () => {
                       </Button>
                     </div>
                     <div className={styles.modelCheckList}>
-                      {models.map(m => (
-                        <div key={m.id}
-                          className={`${styles.modelCheckItem} ${selectedModelIds.has(m.id) ? styles.modelCheckItemSelected : ''}`}
-                          onClick={() => toggleModelSelect(m.id)}>
-                          <Checkbox checked={selectedModelIds.has(m.id)} />
-                          <span className={styles.modelCheckName}>{m.id}</span>
-                        </div>
-                      ))}
+                      {models.map(m => {
+                        const isSelected = selectedModelIds.has(m.id);
+                        return (
+                          <label key={m.id}
+                            className={`${styles.modelCheckItem} ${isSelected ? styles.modelCheckItemSelected : ''}`}>
+                            <Checkbox
+                              checked={isSelected}
+                              onChange={(e) => toggleModelSelect(m.id, e.target.checked)}
+                            />
+                            <span className={styles.modelCheckName}>{m.id}</span>
+                            {isSelected && <CheckOutlined className={styles.modelCheckMark} />}
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                 );

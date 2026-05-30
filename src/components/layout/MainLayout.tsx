@@ -17,7 +17,6 @@ import {
   MoonOutlined,
   AppstoreOutlined,
   FileTextOutlined,
-  VideoCameraOutlined,
 } from '@ant-design/icons';
 import styles from './MainLayout.module.css';
 
@@ -55,11 +54,6 @@ const MainLayout: React.FC = () => {
         key: '/prompt-templates',
         icon: <FileTextOutlined style={{ fontSize: 18 }} />,
         label: '提示词库',
-      },
-      {
-        key: '/studio',
-        icon: <VideoCameraOutlined style={{ fontSize: 18 }} />,
-        label: 'AI漫剧工作台',
       },
       {
         key: '/ai-character',
