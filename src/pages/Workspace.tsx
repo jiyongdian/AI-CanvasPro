@@ -260,8 +260,14 @@ const Workspace: React.FC = () => {
           <div className={styles.centerTopBar}>
             <div className={styles.triggerCard} onClick={() => { if (project && project.script.length > 0) { const ids = new Set<string>(); project.script.forEach(s => (s.availableCharacterIds || []).forEach(id => ids.add(id))); setSelectedCharacterIds(Array.from(ids)); } setCharacterModalVisible(true); }}><UserOutlined className={styles.triggerCardIcon} />角色</div>
             <div className={styles.triggerCard} onClick={() => setSceneManagerVisible(true)}><PictureOutlined className={styles.triggerCardIcon} />场景</div>
-            <Select size="small" value={imageRatio} onChange={setImageRatio} style={{width:110}} options={IMAGE_RATIOS.map(r => ({ label: r, value: r }))} />
-            {previewMode === 'video' && <><Select size="small" value={videoDuration} onChange={setVideoDuration} style={{width:80}} options={getVideoPreset(selVideoModel).durations.map(d => ({ label: `${d}秒`, value: d }))} /><Select size="small" value={videoQuality} onChange={setVideoQuality} style={{width:100}} options={getVideoPreset(selVideoModel).qualities.map(q => ({ label: q, value: q }))} /></>}
+            <Select size="small" className={styles.inlineSelect} value={imageRatio} onChange={setImageRatio} style={{width:110}}
+              options={IMAGE_RATIOS.map(r => ({ label: r, value: r }))} />
+            {previewMode === 'video' && <>
+              <Select size="small" className={styles.inlineSelect} value={videoDuration} onChange={setVideoDuration} style={{width:72}}
+                options={getVideoPreset(selVideoModel).durations.map(d => ({ label: `${d}秒`, value: d }))} />
+              <Select size="small" className={styles.inlineSelect} value={videoQuality} onChange={setVideoQuality} style={{width:96}}
+                options={getVideoPreset(selVideoModel).qualities.map(q => ({ label: q, value: q }))} />
+            </>}
             <div className={styles.toggleMode}><button className={`${styles.toggleBtn} ${previewMode === 'image' ? styles.toggleBtnActive : ''}`} onClick={() => setPreviewMode('image')}>图片</button><button className={`${styles.toggleBtn} ${previewMode === 'video' ? styles.toggleBtnActive : ''}`} onClick={() => setPreviewMode('video')}>视频</button></div>
           </div>
 
