@@ -105,8 +105,8 @@ input, textarea, [contenteditable="true"] {
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -114,20 +114,20 @@ input, textarea, [contenteditable="true"] {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #b0b8c4;
-  border-radius: 3px;
+  background: rgba(128, 128, 128, 0.20);
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgba(128, 128, 128, 0.38);
 }
 
 :root[data-theme='dark'] ::-webkit-scrollbar-thumb {
-  background: #3a7bd5;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 :root[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
-  background: #4a8be5;
+  background: rgba(255, 255, 255, 0.24);
 }
 
 ::selection {

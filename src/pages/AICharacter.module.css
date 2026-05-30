@@ -18,12 +18,11 @@
   gap: 20px;
   padding: 24px;
   background: var(--panel-bg-gradient);
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid var(--panel-border);
-  box-shadow: 
-    0 10px 40px var(--shadow-base),
-    0 2px 10px var(--shadow-light),
-    inset 0 1px 0 var(--glass-border);
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.06),
+    0 0 0 1px rgba(139,92,246,0.02);
 }
 
 .title {
