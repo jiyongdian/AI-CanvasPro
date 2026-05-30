@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { message, Spin, Empty, Button, Modal, Progress, Select } from 'antd';
+import { message, Spin, Empty, Button, Modal, Progress, Select, Input } from 'antd';
 import {
   UserOutlined, PictureOutlined, ArrowLeftOutlined, PlayCircleOutlined,
   PlusOutlined, DeleteOutlined, ThunderboltOutlined, BulbOutlined,
@@ -138,6 +138,43 @@ const Workspace: React.FC = () => {
     src.forEach(p => p.models.forEach(m => { if (m.category === 'text' && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
     return r;
   }, [providers, selPlatform]);
+
+  // 自定义视频模型
+  const [customVideoModels, setCustomVideoModels] = useState<Array<{id:string; durations:number[]; qualities:string[]}>>(
+    () => { try { const v = localStorage.getItem('ws_custom_video_models'); return v ? JSON.parse(v) : []; } catch { return []; } }
+  );
+  const [customVideoOpen, setCustomVideoOpen] = useState(false);
+  const [customVideoName, setCustomVideoName] = useState('');
+  const [customVideoDurations, setCustomVideoDurations] = useState<number[]>([5,8,10]);
+  const [customVideoQualities, setCustomVideoQualities] = useState<string[]>(['720p 高清','1080p 全高清']);
+
+  // 合并provider模型+自定义模型
+  const allVideoModels = useMemo(() => {
+    const seen = new Set<string>(); const r: ProviderModel[] = [];
+    const src = selPlatform ? [selPlatform] : providers;
+    src.forEach(p => p.models.forEach(m => { if (m.category === 'video' && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    customVideoModels.forEach(c => { if (!seen.has(c.id)) { seen.add(c.id); r.push({ id: c.id, name: c.id, category: 'video' }); } });
+    return r;
+  }, [providers, selPlatform, customVideoModels]);
+
+  const saveCustomVideo = () => {
+    if (!customVideoName.trim()) { message.warning('请输入模型名称'); return; }
+    const exists = customVideoModels.some(c => c.id === customVideoName.trim());
+    if (exists) { message.warning('该模型已存在'); return; }
+    const updated = [...customVideoModels, { id: customVideoName.trim(), durations: customVideoDurations, qualities: customVideoQualities }];
+    setCustomVideoModels(updated);
+    localStorage.setItem('ws_custom_video_models', JSON.stringify(updated));
+    // 更新preset
+    VIDEO_MODEL_PRESETS[customVideoName.trim()] = { durations: customVideoDurations, qualities: customVideoQualities };
+    setSelVideoModel(customVideoName.trim());
+    setVideoDuration(customVideoDurations[0]);
+    setVideoQuality(customVideoQualities[customVideoQualities.length - 1]);
+    setCustomVideoOpen(false);
+    setCustomVideoName('');
+    setCustomVideoDurations([5,8,10]);
+    setCustomVideoQualities(['720p 高清','1080p 全高清']);
+    message.success(`已添加视频模型: ${customVideoName.trim()}`);
+  };
 
   // 获取当前选中模型对应的provider
   const getProviderForModel = useCallback((modelId: string) => {
@@ -378,9 +415,10 @@ const Workspace: React.FC = () => {
               const preset = getVideoPreset(v);
               if (!preset.durations.includes(videoDuration)) setVideoDuration(preset.durations[0]);
               if (!preset.qualities.includes(videoQuality)) setVideoQuality(preset.qualities[preset.qualities.length - 1]);
-            }} placeholder={videoModels.length > 0 ? '选择视频模型' : (providers.length === 0 ? '请先在设置页配置API' : '该平台无视频模型')}
+            }} placeholder={allVideoModels.length > 0 ? '选择视频模型' : '无视频模型，请手动添加'}
               allowClear style={{width:'100%'}}
-              options={videoModels.map(m => ({ label: m.id, value: m.id }))} />
+              options={allVideoModels.map(m => ({ label: m.id, value: m.id }))}
+              dropdownRender={menu => (<>{menu}<div style={{borderTop:'1px solid var(--divider-color)',padding:'6px 8px'}}><Button type="link" size="small" icon={<PlusOutlined />} onClick={() => { setModelSettingsOpen(false); setTimeout(() => setCustomVideoOpen(true), 100); }} style={{width:'100%'}}>+ 手动添加视频模型</Button></div></>)} />
             <div style={{display:'flex',gap:8,marginTop:6}}>
               <div style={{flex:1}}><div className={styles.selectorLabel} style={{marginBottom:4}}>秒数</div>
                 <Select size="small" value={videoDuration} onChange={setVideoDuration} style={{width:'100%'}}
@@ -402,6 +440,35 @@ const Workspace: React.FC = () => {
           </div>
         </div>
         <div className={styles.tplModalFooter}><Button type="primary" onClick={() => setModelSettingsOpen(false)}>完成</Button></div>
+      </Modal>
+
+      {/* 自定义添加视频模型弹窗（顶层） */}
+      <Modal title={null} open={customVideoOpen} onCancel={() => setCustomVideoOpen(false)} footer={null}
+        width={500} centered zIndex={1100} className={styles.tplModal}>
+        <div className={styles.tplModalHead}><VideoCameraOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>手动添加视频模型</span></div>
+        <div className={styles.tplModalBody}>
+          <div className={styles.tplGroup}>
+            <div className={styles.tplGroupTitle}>模型名称</div>
+            <Input placeholder="输入视频模型名称，如 doubao-seedance-2.0" value={customVideoName}
+              onChange={e => setCustomVideoName(e.target.value)} />
+          </div>
+          <div className={styles.tplGroup}>
+            <div className={styles.tplGroupTitle}>支持的秒数（多选）</div>
+            <Select mode="multiple" size="small" value={customVideoDurations} onChange={setCustomVideoDurations}
+              style={{width:'100%'}} placeholder="选择秒数"
+              options={VIDEO_DURATIONS_ALL.map(d => ({ label: `${d}秒`, value: d }))} />
+          </div>
+          <div className={styles.tplGroup}>
+            <div className={styles.tplGroupTitle}>支持的清晰度（多选）</div>
+            <Select mode="multiple" size="small" value={customVideoQualities} onChange={setCustomVideoQualities}
+              style={{width:'100%'}} placeholder="选择清晰度"
+              options={VIDEO_QUALITIES_ALL.map(q => ({ label: q, value: q }))} />
+          </div>
+        </div>
+        <div className={styles.tplModalFooter}>
+          <Button onClick={() => setCustomVideoOpen(false)}>取消</Button>
+          <Button type="primary" onClick={saveCustomVideo}>添加</Button>
+        </div>
       </Modal>
 
       {/* 其他弹窗保持不变 */}
