@@ -1,72 +1,30 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Project, Character, Style, PromptTemplate } from '../types';
 
-// 内部函数：直接从数据库获取媒体数据（避免循环依赖 mediaService）
 async function getMediaFromDB(database: IDBPDatabase<ZhexianDB>, type: 'character' | 'style', ownerId: string): Promise<string | null> {
   const mediaId = `${type}_${ownerId}`;
-  try {
-    const mediaRecord = await database.get('media', mediaId);
-    return mediaRecord?.base64 || null;
-  } catch {
-    return null;
-  }
+  try { const r = await database.get('media', mediaId); return r?.base64 || null; } catch { return null; }
 }
 
 interface GeneratedCharacterRecord {
-  id: string;
-  prompt: string;
-  imageUrl: string;
-  status: 'generating' | 'completed' | 'failed';
-  createdAt: Date;
-  aspectRatio?: string;
-  imageSize?: string;
+  id: string; prompt: string; imageUrl: string;
+  status: 'generating' | 'completed' | 'failed'; createdAt: Date;
+  aspectRatio?: string; imageSize?: string;
 }
 
-// 媒体记录接口 - 用于持久化存储角色和风格的参考图
 export interface MediaRecord {
-  id: string;  // 格式: "{type}_{id}"，支持 character / style
-  type: 'character' | 'style';
-  ownerId: string;  // 关联的角色/风格/管线元素ID
-  base64: string;  // Base64 格式的图片数据（持久化存储）
-  mimeType: string;  // 图片MIME类型
-  size: number;  // 原始文件大小（字节）
-  createdAt: Date;
-  updatedAt: Date;
+  id: string; type: 'character' | 'style'; ownerId: string;
+  base64: string; mimeType: string; size: number; createdAt: Date; updatedAt: Date;
 }
 
 interface ZhexianDB extends DBSchema {
-  projects: {
-    key: string;
-    value: Project;
-    indexes: { 'by-updated': Date };
-  };
-  characters: {
-    key: string;
-    value: Character;
-    indexes: { 'by-name': string };
-  };
-  styles: {
-    key: string;
-    value: Style;
-    indexes: { 'by-name': string };
-  };
-  ai_character_history: {
-    key: string;
-    value: GeneratedCharacterRecord;
-    indexes: { 'by-created': Date };
-  };
-  // 独立的媒体存储，用于持久化角色和风格的参考图
-  media: {
-    key: string;
-    value: MediaRecord;
-    indexes: { 'by-type': string; 'by-owner': string };
-  };
-  // 版本6：提示词库
-  prompt_templates: {
-    key: string;
-    value: PromptTemplate;
-    indexes: { 'by-updated': Date };
-  };
+  projects: { key: string; value: Project; indexes: { 'by-updated': Date } };
+  characters: { key: string; value: Character; indexes: { 'by-name': string } };
+  styles: { key: string; value: Style; indexes: { 'by-name': string } };
+  ai_character_history: { key: string; value: GeneratedCharacterRecord; indexes: { 'by-created': Date } };
+  media: { key: string; value: MediaRecord; indexes: { 'by-type': string; 'by-owner': string } };
+  prompt_templates: { key: string; value: PromptTemplate; indexes: { 'by-updated': Date } };
+  api_providers: { key: string; value: import('../types').ApiProvider };
 }
 
 let db: IDBPDatabase<ZhexianDB> | null = null;
@@ -74,248 +32,89 @@ let dbPromise: Promise<IDBPDatabase<ZhexianDB>> | null = null;
 
 export async function initDatabase(): Promise<IDBPDatabase<ZhexianDB>> {
   if (db) return db;
-  
   if (dbPromise) return dbPromise;
-  
-  dbPromise = openDB<ZhexianDB>('zhexian-comic-studio', 6, {
+  dbPromise = openDB<ZhexianDB>('zhexian-comic-studio', 7, {
     upgrade(database, oldVersion) {
-      if (oldVersion < 1) {
-        const projectStore = database.createObjectStore('projects', { keyPath: 'id' });
-        projectStore.createIndex('by-updated', 'updatedAt');
-
-        const characterStore = database.createObjectStore('characters', { keyPath: 'id' });
-        characterStore.createIndex('by-name', 'name');
-      }
-      if (oldVersion < 2) {
-        const styleStore = database.createObjectStore('styles', { keyPath: 'id' });
-        styleStore.createIndex('by-name', 'name');
-      }
-      if (oldVersion < 3) {
-        const aiCharacterStore = database.createObjectStore('ai_character_history', { keyPath: 'id' });
-        aiCharacterStore.createIndex('by-created', 'createdAt');
-      }
-      // 版本4：添加独立的媒体存储
-      if (oldVersion < 4) {
-        const mediaStore = database.createObjectStore('media', { keyPath: 'id' });
-        mediaStore.createIndex('by-type', 'type');
-        mediaStore.createIndex('by-owner', 'ownerId');
-      }
-      // 版本6：添加提示词库
-      if (oldVersion < 6) {
-        const templateStore = database.createObjectStore('prompt_templates', { keyPath: 'id' });
-        templateStore.createIndex('by-updated', 'updated_at');
-      }
+      if (oldVersion < 1) { const s = database.createObjectStore('projects', { keyPath: 'id' }); s.createIndex('by-updated', 'updatedAt'); const c = database.createObjectStore('characters', { keyPath: 'id' }); c.createIndex('by-name', 'name'); }
+      if (oldVersion < 2) { const s = database.createObjectStore('styles', { keyPath: 'id' }); s.createIndex('by-name', 'name'); }
+      if (oldVersion < 3) { const s = database.createObjectStore('ai_character_history', { keyPath: 'id' }); s.createIndex('by-created', 'createdAt'); }
+      if (oldVersion < 4) { const s = database.createObjectStore('media', { keyPath: 'id' }); s.createIndex('by-type', 'type'); s.createIndex('by-owner', 'ownerId'); }
+      if (oldVersion < 6) { const s = database.createObjectStore('prompt_templates', { keyPath: 'id' }); s.createIndex('by-updated', 'updated_at'); }
+      if (oldVersion < 7) { database.createObjectStore('api_providers', { keyPath: 'id' }); }
     },
   });
-  
   db = await dbPromise;
   return db;
 }
 
-export function getDatabase(): IDBPDatabase<ZhexianDB> | null {
-  return db;
-}
+export function getDatabase(): IDBPDatabase<ZhexianDB> | null { return db; }
+export async function openDatabase(): Promise<IDBPDatabase<ZhexianDB>> { return initDatabase(); }
 
-// 获取数据库实例（别名，兼容旧代码）
-export async function openDatabase(): Promise<IDBPDatabase<ZhexianDB>> {
-  return initDatabase();
-}
+export async function getAllProjects(): Promise<Project[]> { const d = await initDatabase(); return d.getAllFromIndex('projects', 'by-updated'); }
+export async function getProject(id: string): Promise<Project | undefined> { const d = await initDatabase(); return d.get('projects', id); }
+export async function saveProject(project: Project): Promise<void> { const d = await initDatabase(); await d.put('projects', project); }
+export async function deleteProject(id: string): Promise<void> { const d = await initDatabase(); await d.delete('projects', id); }
 
-// 项目操作
-export async function getAllProjects(): Promise<Project[]> {
-  const database = await initDatabase();
-  return database.getAllFromIndex('projects', 'by-updated');
-}
-
-export async function getProject(id: string): Promise<Project | undefined> {
-  const database = await initDatabase();
-  return database.get('projects', id);
-}
-
-export async function saveProject(project: Project): Promise<void> {
-  const database = await initDatabase();
-  await database.put('projects', project);
-}
-
-export async function deleteProject(id: string): Promise<void> {
-  const database = await initDatabase();
-  await database.delete('projects', id);
-}
-
-// 角色操作
 export async function getAllCharacters(): Promise<Character[]> {
-  const database = await initDatabase();
-  const characters = await database.getAllFromIndex('characters', 'by-name');
-  
-  // 从媒体服务恢复失效的参考图
-  for (const char of characters) {
-    // 如果参考图为空、是 blob: URL（刷新后失效）、或是远程 URL（可能过期）
-    const needsRestore = !char.referenceImage || 
-      char.referenceImage.startsWith('blob:') ||
-      char.referenceImage.startsWith('http://') ||
-      char.referenceImage.startsWith('https://');
-    
-    if (needsRestore) {
-      try {
-        const media = await getMediaFromDB(database, 'character', char.id);
-        if (media) {
-          char.referenceImage = media;
-          // 更新数据库中的记录
-          await database.put('characters', char);
-          console.log(`[Database] 从媒体服务恢复角色参考图: ${char.name}`);
-        }
-      } catch (error) {
-        console.warn(`[Database] 恢复角色 ${char.name} 的参考图失败:`, error);
-      }
-    }
+  const d = await initDatabase();
+  const chars = await d.getAllFromIndex('characters', 'by-name');
+  for (const c of chars) {
+    const needs = !c.referenceImage || c.referenceImage.startsWith('blob:') || c.referenceImage.startsWith('http');
+    if (needs) { try { const m = await getMediaFromDB(d, 'character', c.id); if (m) { c.referenceImage = m; await d.put('characters', c); } } catch {} }
   }
-  
-  return characters;
+  return chars;
 }
+export async function getCharacter(id: string): Promise<Character | undefined> { return (await initDatabase()).get('characters', id); }
+export async function saveCharacter(c: Character): Promise<void> { await (await initDatabase()).put('characters', c); }
+export async function deleteCharacter(id: string): Promise<void> { await (await initDatabase()).delete('characters', id); }
 
-export async function getCharacter(id: string): Promise<Character | undefined> {
-  const database = await initDatabase();
-  return database.get('characters', id);
-}
-
-export async function saveCharacter(character: Character): Promise<void> {
-  const database = await initDatabase();
-  await database.put('characters', character);
-}
-
-export async function deleteCharacter(id: string): Promise<void> {
-  const database = await initDatabase();
-  await database.delete('characters', id);
-}
-
-// 风格操作
 export async function getAllStyles(): Promise<Style[]> {
-  const database = await initDatabase();
-  const styles = await database.getAllFromIndex('styles', 'by-name');
-  
-  // 从媒体服务恢复失效的参考图
-  for (const style of styles) {
-    // 如果参考图为空、是 blob: URL（刷新后失效）、或是远程 URL（可能过期）
-    const needsRestore = !style.referenceImage || 
-      style.referenceImage.startsWith('blob:') ||
-      style.referenceImage.startsWith('http://') ||
-      style.referenceImage.startsWith('https://');
-    
-    if (needsRestore) {
-      try {
-        const media = await getMediaFromDB(database, 'style', style.id);
-        if (media) {
-          style.referenceImage = media;
-          // 更新数据库中的记录
-          await database.put('styles', style);
-          console.log(`[Database] 从媒体服务恢复风格参考图: ${style.name}`);
-        }
-      } catch (error) {
-        console.warn(`[Database] 恢复风格 ${style.name} 的参考图失败:`, error);
-      }
-    }
+  const d = await initDatabase();
+  const styles = await d.getAllFromIndex('styles', 'by-name');
+  for (const s of styles) {
+    const needs = !s.referenceImage || s.referenceImage.startsWith('blob:') || s.referenceImage.startsWith('http');
+    if (needs) { try { const m = await getMediaFromDB(d, 'style', s.id); if (m) { s.referenceImage = m; await d.put('styles', s); } } catch {} }
   }
-  
   return styles;
 }
+export async function getStyle(id: string): Promise<Style | undefined> { return (await initDatabase()).get('styles', id); }
+export async function saveStyle(s: Style): Promise<void> { await (await initDatabase()).put('styles', s); }
+export async function deleteStyle(id: string): Promise<void> { await (await initDatabase()).delete('styles', id); }
 
-export async function getStyle(id: string): Promise<Style | undefined> {
-  const database = await initDatabase();
-  return database.get('styles', id);
-}
-
-export async function saveStyle(style: Style): Promise<void> {
-  const database = await initDatabase();
-  await database.put('styles', style);
-}
-
-export async function deleteStyle(id: string): Promise<void> {
-  const database = await initDatabase();
-  await database.delete('styles', id);
-}
-
-// 媒体文件操作（图片/视频永久保存）
 export async function saveMediaBlob(key: string, blob: Blob): Promise<void> {
-  // 使用 localStorage 存储小文件，大文件使用 IndexedDB
-  // 这里简化处理，直接存储到 IndexedDB 的 projects 中
-  // 实际生产环境可能需要单独的 media store
-  const reader = new FileReader();
-  return new Promise((resolve, reject) => {
-    reader.onloadend = () => {
-      try {
-        localStorage.setItem(`media_${key}`, reader.result as string);
-        resolve();
-      } catch (e) {
-        // localStorage 满了，忽略错误
-        console.warn('localStorage full, media not saved:', e);
-        resolve();
-      }
-    };
-    reader.onerror = reject;
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => { try { localStorage.setItem(`media_${key}`, reader.result as string); } catch {} resolve(); };
+    reader.onerror = () => resolve();
     reader.readAsDataURL(blob);
   });
 }
+export async function getMediaBlob(key: string): Promise<string | null> { return localStorage.getItem(`media_${key}`); }
+export async function deleteMediaBlob(key: string): Promise<void> { localStorage.removeItem(`media_${key}`); }
 
-export async function getMediaBlob(key: string): Promise<string | null> {
-  return localStorage.getItem(`media_${key}`);
-}
-
-export async function deleteMediaBlob(key: string): Promise<void> {
-  localStorage.removeItem(`media_${key}`);
-}
-
-// 下载媒体文件到本地
 export async function downloadMedia(url: string, filename: string): Promise<void> {
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    const downloadUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(downloadUrl);
-  } catch (error) {
-    console.error('下载媒体文件失败:', error);
-    throw error;
-  }
+  const r = await fetch(url); const blob = await r.blob();
+  const u = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = u; a.download = filename; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(u);
 }
-
-// 将URL转换为Blob并保存
 export async function saveUrlAsBlob(url: string, key: string): Promise<Blob | null> {
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    await saveMediaBlob(key, blob);
-    return blob;
-  } catch (error) {
-    console.error('保存媒体文件失败:', error);
-    return null;
-  }
+  try { const r = await fetch(url); const blob = await r.blob(); await saveMediaBlob(key, blob); return blob; } catch { return null; }
 }
 
-// ============================================================
-// 提示词库 (Prompt Template) 操作 — v6 新增
-// ============================================================
+export async function getAllPromptTemplates(): Promise<PromptTemplate[]> { return (await initDatabase()).getAllFromIndex('prompt_templates', 'by-updated'); }
+export async function getPromptTemplate(id: string): Promise<PromptTemplate | undefined> { return (await initDatabase()).get('prompt_templates', id); }
+export async function savePromptTemplate(t: PromptTemplate): Promise<void> { await (await initDatabase()).put('prompt_templates', t); }
+export async function deletePromptTemplate(id: string): Promise<void> { await (await initDatabase()).delete('prompt_templates', id); }
 
-export async function getAllPromptTemplates(): Promise<PromptTemplate[]> {
-  const database = await initDatabase();
-  return database.getAllFromIndex('prompt_templates', 'by-updated');
+// v7: API提供商 IndexedDB (无限容量)
+export async function getAllApiProviders(): Promise<import('../types').ApiProvider[]> {
+  try { return await (await initDatabase()).getAll('api_providers'); } catch { return []; }
 }
-
-export async function getPromptTemplate(id: string): Promise<PromptTemplate | undefined> {
-  const database = await initDatabase();
-  return database.get('prompt_templates', id);
-}
-
-export async function savePromptTemplate(template: PromptTemplate): Promise<void> {
-  const database = await initDatabase();
-  await database.put('prompt_templates', template);
-}
-
-export async function deletePromptTemplate(id: string): Promise<void> {
-  const database = await initDatabase();
-  await database.delete('prompt_templates', id);
+export async function saveAllApiProviders(providers: import('../types').ApiProvider[]): Promise<void> {
+  const d = await initDatabase();
+  const tx = d.transaction('api_providers', 'readwrite');
+  await tx.store.clear();
+  for (const p of providers) await tx.store.put(p);
+  await tx.done;
 }

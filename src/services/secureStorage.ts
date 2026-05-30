@@ -171,31 +171,29 @@ async function getTauriProvidersStore() {
 export async function saveApiProviders(providers: import('../types').ApiProvider[]): Promise<void> {
   const store = await getTauriProvidersStore();
 
-  // 序列化时保留日期字段
-  const serializable = providers.map(p => ({
-    ...p,
-    createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
-    updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : p.updatedAt,
-  }));
-
   if (store) {
+    const serializable = providers.map(p => ({
+      ...p,
+      createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+      updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : p.updatedAt,
+    }));
     await store.set('providers', serializable);
     await store.save();
   } else {
+    // 浏览器: 使用 IndexedDB 永久存储 (无限容量)
     try {
-      const encrypted = obfuscate(JSON.stringify(serializable));
-      localStorage.setItem(PROVIDERS_LOCAL_KEY, encrypted);
-    } catch (e) {
-      // localStorage 配额满或其他错误，尝试清理旧数据后重试
-      console.warn('[secureStorage] 保存失败，尝试清理后重试:', e);
+      const { saveAllApiProviders } = await import('./database');
+      await saveAllApiProviders(providers);
+      // 同步备份到 localStorage (兼容旧版)
       try {
-        localStorage.removeItem('api_config_secure');
-        localStorage.removeItem('api_config');
-        const encrypted = obfuscate(JSON.stringify(serializable));
-        localStorage.setItem(PROVIDERS_LOCAL_KEY, encrypted);
-      } catch (e2) {
-        console.error('[secureStorage] 重试保存仍失败:', e2);
-      }
+        const serializable = providers.map(p => ({
+          ...p, createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+          updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : p.updatedAt,
+        }));
+        localStorage.setItem(PROVIDERS_LOCAL_KEY, obfuscate(JSON.stringify(serializable)));
+      } catch {}
+    } catch (e) {
+      throw new Error('IndexedDB 存储失败: ' + (e instanceof Error ? e.message : '未知错误'));
     }
   }
 }
@@ -224,7 +222,14 @@ export async function loadApiProviders(): Promise<import('../types').ApiProvider
     return [];
   }
 
-  // 浏览器环境
+  // 浏览器: 优先从 IndexedDB 读取
+  try {
+    const { getAllApiProviders } = await import('./database');
+    const dbProviders = await getAllApiProviders();
+    if (dbProviders.length > 0) return parseProviders(dbProviders);
+  } catch { /* IndexedDB 不可用 */ }
+
+  // 回退: localStorage
   const secure = localStorage.getItem(PROVIDERS_LOCAL_KEY);
   if (secure) {
     try {
@@ -233,7 +238,7 @@ export async function loadApiProviders(): Promise<import('../types').ApiProvider
     } catch { /* ignore */ }
   }
 
-  // 迁移旧单配置为多provider格式（如果存在旧配置但没有providers）
+  // 迁移旧单配置为多provider格式
   const legacyConfig = localStorage.getItem('api_config_secure') || localStorage.getItem('api_config');
   if (legacyConfig) {
     try {
