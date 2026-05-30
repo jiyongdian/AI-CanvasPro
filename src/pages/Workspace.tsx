@@ -4,7 +4,8 @@ import { message, Spin, Empty, Button, Modal, Progress, Select } from 'antd';
 import {
   UserOutlined, PictureOutlined, ArrowLeftOutlined, PlayCircleOutlined,
   PlusOutlined, DeleteOutlined, ThunderboltOutlined, BulbOutlined,
-  EyeOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SettingOutlined, FileTextOutlined,
+  EyeOutlined, MenuFoldOutlined, MenuUnfoldOutlined, FileTextOutlined,
+  ApiOutlined, VideoCameraOutlined,
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRecoilState, useSetRecoilState } from 'recoil';
@@ -13,8 +14,9 @@ import { getProject, saveProject, getAllCharacters, getAllStyles, getAllPromptTe
 import { migrateOldMediaData, preloadMedia } from '../services/mediaService';
 import CharacterSelectCard from '../components/workspace/CharacterSelectCard';
 import SceneManagerModal from '../components/workspace/SceneManagerModal';
-import { Project, Scene, Style, GenerationMode, Character, PromptTemplate } from '../types';
+import { Project, Scene, Style, GenerationMode, Character, PromptTemplate, ApiProvider, ProviderModel } from '../types';
 import { aiService } from '../services/aiService';
+import { loadApiProviders } from '../services/secureStorage';
 import styles from './Workspace.module.css';
 
 export type GridMode = 4 | 6 | 9;
@@ -24,6 +26,10 @@ const TEMPLATE_TYPE_LABELS: Record<string, string> = { image: '图片模板', vi
 const TEMPLATE_TYPE_ICONS: Record<string, React.ReactNode> = {
   image: <PictureOutlined />, video: <PlayCircleOutlined />, director: <BulbOutlined />,
 };
+
+const IMAGE_RATIOS = ['1:1 方形', '3:2 标准', '4:3 经典', '16:9 宽屏', '9:16 竖屏', '2:3 肖像', '3:4', '21:9 超宽'];
+const VIDEO_DURATIONS = [4, 5, 6, 8, 10, 15, 20, 30, 60];
+const VIDEO_QUALITIES = ['480p 标清', '720p 高清', '1080p 全高清'];
 
 const Workspace: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -60,50 +66,77 @@ const Workspace: React.FC = () => {
   const [promptText, setPromptText] = useState('');
   const [generating, setGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
-
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
   const [directorPreviewOpen, setDirectorPreviewOpen] = useState(false);
   const [directorResult, setDirectorResult] = useState('');
   const [directorLoading, setDirectorLoading] = useState(false);
-
   const [templateSelectOpen, setTemplateSelectOpen] = useState(false);
-
-  // 添加/删除确认弹窗
   const [addConfirmOpen, setAddConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-
-  // 左栏滚动位置记忆
   const leftListRef = useRef<HTMLDivElement>(null);
+
+  // ===== 模型关联 =====
+  const [providers, setProviders] = useState<ApiProvider[]>([]);
+  const [modelSettingsOpen, setModelSettingsOpen] = useState(false);
+  const [selImageModel, setSelImageModel] = useState<string | undefined>(
+    () => localStorage.getItem('ws_image_model') || undefined
+  );
+  const [selVideoModel, setSelVideoModel] = useState<string | undefined>(
+    () => localStorage.getItem('ws_video_model') || undefined
+  );
+  const [selTextModel, setSelTextModel] = useState<string | undefined>(
+    () => localStorage.getItem('ws_text_model') || undefined
+  );
+  const [imageRatio, setImageRatio] = useState<string>(
+    () => localStorage.getItem('ws_image_ratio') || '16:9 宽屏'
+  );
+  const [videoDuration, setVideoDuration] = useState<number>(
+    () => parseInt(localStorage.getItem('ws_video_duration') || '5')
+  );
+  const [videoQuality, setVideoQuality] = useState<string>(
+    () => localStorage.getItem('ws_video_quality') || '1080p 全高清'
+  );
+
+  // 从providers中提取分类模型
+  const imageModels = useMemo(() => {
+    const seen = new Set<string>(); const r: ProviderModel[] = [];
+    providers.forEach(p => p.models.forEach(m => { if (m.category === 'image' && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    return r;
+  }, [providers]);
+  const videoModels = useMemo(() => {
+    const seen = new Set<string>(); const r: ProviderModel[] = [];
+    providers.forEach(p => p.models.forEach(m => { if (m.category === 'video' && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    return r;
+  }, [providers]);
+  const textModels = useMemo(() => {
+    const seen = new Set<string>(); const r: ProviderModel[] = [];
+    providers.forEach(p => p.models.forEach(m => { if (m.category === 'text' && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    return r;
+  }, [providers]);
+
+  // 获取当前选中模型对应的provider
+  const getProviderForModel = useCallback((modelId: string) => {
+    return providers.find(p => p.models.some(m => m.id === modelId));
+  }, [providers]);
 
   useEffect(() => { getAllPromptTemplates().then(d => setPromptTemplates(d)).catch(() => {}); }, []);
 
   const activeScene = useMemo(() => project?.script.find(s => s.id === activeSceneId) || null, [project, activeSceneId]);
   const selectedStyle = useMemo(() => styleList.find(s => s.id === selectedStyleId), [styleList, selectedStyleId]);
-
-  // 模板按类型分组
   const templatesByType = useMemo(() => ({
     image: promptTemplates.filter(t => t.type === 'image'),
     video: promptTemplates.filter(t => t.type === 'video'),
     director: promptTemplates.filter(t => t.type === 'director'),
   }), [promptTemplates]);
-
-  const getSelectedTemplateId = (type: string) => {
-    if (type === 'image') return selectedImageTemplateId;
-    if (type === 'video') return selectedVideoTemplateId;
-    return selectedDirectorTemplateId;
-  };
+  const getSelectedTemplateId = (type: string) => type === 'image' ? selectedImageTemplateId : type === 'video' ? selectedVideoTemplateId : selectedDirectorTemplateId;
   const setSelectedTemplateId = (type: string, id: string | undefined) => {
     if (type === 'image') setSelectedImageTemplateId(id);
     else if (type === 'video') setSelectedVideoTemplateId(id);
     else setSelectedDirectorTemplateId(id);
   };
 
-  const handleBack = () => {
-    setProject(null as any);
-    navigate('/projects');
-  };
-
+  const handleBack = () => { setProject(null as any); navigate('/projects'); };
   const openCharacterModal = () => {
     if (project && project.script.length > 0) {
       const ids = new Set<string>();
@@ -115,10 +148,8 @@ const Workspace: React.FC = () => {
   const toggleCharacterSelection = useCallback((id: string) => setSelectedCharacterIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]), []);
   const confirmCharacterSelection = async () => {
     if (!project) return;
-    const script = project.script.map(s => ({ ...s, availableCharacterIds: selectedCharacterIds }));
-    await handleUpdateProject({ ...project, script });
+    await handleUpdateProject({ ...project, script: project.script.map(s => ({ ...s, availableCharacterIds: selectedCharacterIds })) });
     setCharacterModalVisible(false);
-    message.success('角色已应用到所有分镜');
   };
   const isCharSelected = useCallback((id: string) => selectedCharacterIds.includes(id), [selectedCharacterIds]);
 
@@ -134,18 +165,12 @@ const Workspace: React.FC = () => {
         if (c) return;
         if (!lp) { message.error('项目不存在'); navigate('/projects'); return; }
         setProject(lp); setCharacters(lc); setCharactersLocal(lc); setStyleList(ls);
-
-        // 恢复上次选中的分镜
         const savedSceneId = sessionStorage.getItem(`ws_active_${projectId}`);
         const initialScene = savedSceneId ? lp.script.find(s => s.id === savedSceneId) : lp.script[0];
-        if (initialScene) {
-          setActiveSceneId(initialScene.id);
-          setPromptText(initialScene.prompt || '');
-        } else if (lp.script.length > 0) {
-          setActiveSceneId(lp.script[0].id);
-          setPromptText(lp.script[0].prompt || '');
-        }
-
+        if (initialScene) { setActiveSceneId(initialScene.id); setPromptText(initialScene.prompt || ''); }
+        else if (lp.script.length > 0) { setActiveSceneId(lp.script[0].id); setPromptText(lp.script[0].prompt || ''); }
+        // 加载模型
+        try { const p = await loadApiProviders(); setProviders(p.filter(x => x.enabled !== false)); } catch {}
         const items: Array<{type:'character'|'style';ownerId:string}> = [...lc.map(x=>({type:'character' as const,ownerId:x.id})), ...ls.map(x=>({type:'style' as const,ownerId:x.id}))];
         if (items.length > 0) preloadMedia(items).catch(()=>{});
       } catch (e) { if (!c) { message.error('加载失败'); navigate('/projects'); } }
@@ -154,117 +179,28 @@ const Workspace: React.FC = () => {
     return () => { c = true; };
   }, [projectId]);
 
-  // 恢复滚动位置
-  useEffect(() => {
-    if (!loading && leftListRef.current && projectId) {
-      const saved = sessionStorage.getItem(`ws_scroll_${projectId}`);
-      if (saved) leftListRef.current.scrollTop = parseInt(saved, 10);
-    }
-  }, [loading, projectId]);
-
-  // 保存滚动位置
-  const handleLeftScroll = useCallback(() => {
-    if (leftListRef.current && projectId) {
-      sessionStorage.setItem(`ws_scroll_${projectId}`, String(leftListRef.current.scrollTop));
-    }
-  }, [projectId]);
-
+  useEffect(() => { if (!loading && leftListRef.current && projectId) { const s = sessionStorage.getItem(`ws_scroll_${projectId}`); if (s) leftListRef.current.scrollTop = parseInt(s, 10); } }, [loading, projectId]);
+  const handleLeftScroll = useCallback(() => { if (leftListRef.current && projectId) sessionStorage.setItem(`ws_scroll_${projectId}`, String(leftListRef.current.scrollTop)); }, [projectId]);
   useEffect(() => { if (selectedStyleId) localStorage.setItem('workspace_selected_style', selectedStyleId); else localStorage.removeItem('workspace_selected_style'); }, [selectedStyleId]);
   useEffect(() => { localStorage.setItem('workspace_generation_mode', generationMode); }, [generationMode]);
+  useEffect(() => { if (selImageModel) localStorage.setItem('ws_image_model', selImageModel); else localStorage.removeItem('ws_image_model'); }, [selImageModel]);
+  useEffect(() => { if (selVideoModel) localStorage.setItem('ws_video_model', selVideoModel); else localStorage.removeItem('ws_video_model'); }, [selVideoModel]);
+  useEffect(() => { if (selTextModel) localStorage.setItem('ws_text_model', selTextModel); else localStorage.removeItem('ws_text_model'); }, [selTextModel]);
+  useEffect(() => { localStorage.setItem('ws_image_ratio', imageRatio); }, [imageRatio]);
+  useEffect(() => { localStorage.setItem('ws_video_duration', String(videoDuration)); }, [videoDuration]);
+  useEffect(() => { localStorage.setItem('ws_video_quality', videoQuality); }, [videoQuality]);
 
   // ==================== 项目操作 ====================
-  const handleUpdateProject = useCallback(async (p: Project) => {
-    const toSave = { ...p, updatedAt: new Date() };
-    setProject(toSave);
-    try { await saveProject(toSave); } catch { message.error('保存失败'); }
-  }, [setProject]);
+  const handleUpdateProject = useCallback(async (p: Project) => { const ts = { ...p, updatedAt: new Date() }; setProject(ts); try { await saveProject(ts); } catch {} }, [setProject]);
+  const handleUpdateScene = useCallback((sid: string, updates: Partial<Scene>) => { setProject(prev => { if (!prev) return prev; const script = prev.script.map(s => s.id === sid ? { ...s, ...updates } : s); const np = { ...prev, script, updatedAt: new Date() }; saveProject(np).catch(()=>{}); return np; }); }, [setProject]);
+  const doAddScene = async () => { if (!project || !activeSceneId) return; const idx = project.script.findIndex(s => s.id === activeSceneId); const ns: Scene = { id: crypto.randomUUID(), order: idx + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' }; const script = [...project.script.slice(0, idx + 1), ns, ...project.script.slice(idx + 1)].map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); setActiveSceneId(ns.id); setPromptText(''); sessionStorage.setItem(`ws_active_${projectId}`, ns.id); setAddConfirmOpen(false); };
+  const doDeleteScene = async () => { if (!project || !activeSceneId) return; if (project.script.length <= 1) { message.warning('至少保留一个分镜'); return; } const script = project.script.filter(s => s.id !== activeSceneId).map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); const nextId = script[0]?.id || null; setActiveSceneId(nextId); setPromptText(script[0]?.prompt || ''); if (nextId) sessionStorage.setItem(`ws_active_${projectId}`, nextId); setDeleteConfirmOpen(false); };
+  const selectScene = (sid: string) => { setActiveSceneId(sid); const s = project?.script.find(x => x.id === sid); setPromptText(s?.prompt || ''); setPreviewMode('image'); sessionStorage.setItem(`ws_active_${projectId}`, sid); };
 
-  const handleUpdateScene = useCallback((sid: string, updates: Partial<Scene>) => {
-    setProject(prev => {
-      if (!prev) return prev;
-      const script = prev.script.map(s => s.id === sid ? { ...s, ...updates } : s);
-      const np = { ...prev, script, updatedAt: new Date() };
-      saveProject(np).catch(()=>{});
-      return np;
-    });
-  }, [setProject]);
-
-  const doAddScene = async () => {
-    if (!project || !activeSceneId) return;
-    const idx = project.script.findIndex(s => s.id === activeSceneId);
-    const ns: Scene = { id: crypto.randomUUID(), order: idx + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' };
-    const script = [...project.script.slice(0, idx + 1), ns, ...project.script.slice(idx + 1)].map((s, i) => ({ ...s, order: i }));
-    await handleUpdateProject({ ...project, script });
-    setActiveSceneId(ns.id);
-    setPromptText('');
-    sessionStorage.setItem(`ws_active_${projectId}`, ns.id);
-    setAddConfirmOpen(false);
-  };
-
-  const doDeleteScene = async () => {
-    if (!project || !activeSceneId) return;
-    if (project.script.length <= 1) { message.warning('至少保留一个分镜'); return; }
-    const script = project.script.filter(s => s.id !== activeSceneId).map((s, i) => ({ ...s, order: i }));
-    await handleUpdateProject({ ...project, script });
-    const nextId = script[0]?.id || null;
-    setActiveSceneId(nextId);
-    setPromptText(script[0]?.prompt || '');
-    if (nextId) sessionStorage.setItem(`ws_active_${projectId}`, nextId);
-    setDeleteConfirmOpen(false);
-  };
-
-  const selectScene = (sid: string) => {
-    setActiveSceneId(sid);
-    const s = project?.script.find(x => x.id === sid);
-    setPromptText(s?.prompt || '');
-    setPreviewMode('image');
-    sessionStorage.setItem(`ws_active_${projectId}`, sid);
-  };
-
-  // ==================== 推理 / AI导演 / 预览 ====================
-  const handleInfer = async () => {
-    if (!activeScene || !project) return;
-    setGenerating(true); setGenProgress(0);
-    try {
-      const prompt = promptText || activeScene.prompt || activeScene.description;
-      if (!prompt) { message.warning('请输入提示词'); setGenerating(false); return; }
-      setGenProgress(30);
-      const result = await aiService.generateImage(activeScene, undefined, { style: selectedStyle, generationMode });
-      setGenProgress(100);
-      handleUpdateScene(activeScene.id, {
-        images: { ...activeScene.images, keyFrame: result },
-        imagePrompt: promptText || undefined,
-        status: 'completed', imageStatus: 'completed',
-      });
-      message.success('推理完成');
-    } catch (e: any) { message.error(e.message || '推理失败'); }
-    finally { setGenerating(false); setGenProgress(0); }
-  };
-
-  const handleDirector = async () => {
-    if (!activeScene || !project) return;
-    setDirectorLoading(true);
-    try {
-      const template = selectedDirectorTemplateId ? promptTemplates.find(t => t.id === selectedDirectorTemplateId) : undefined;
-      const result = await aiService.generatePrompt(
-        activeScene, 'image', undefined, undefined, undefined, selectedStyle,
-        project.script.map(s => s.description),
-        template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined
-      );
-      setDirectorResult(result);
-      setDirectorPreviewOpen(true);
-      message.success('AI导演优化完成');
-    } catch (e: any) { message.error(e.message || 'AI导演失败'); }
-    finally { setDirectorLoading(false); }
-  };
-
-  const applyDirectorResult = () => {
-    if (!activeScene) return;
-    setPromptText(directorResult);
-    handleUpdateScene(activeScene.id, { prompt: directorResult });
-    setDirectorPreviewOpen(false);
-    message.success('已应用优化提示词');
-  };
+  // ==================== 推理 / AI导演 ====================
+  const handleInfer = async () => { if (!activeScene || !project) return; setGenerating(true); setGenProgress(0); try { const prompt = promptText || activeScene.prompt || activeScene.description; if (!prompt) { message.warning('请输入提示词'); return; } const provider = selTextModel ? getProviderForModel(selTextModel) : undefined; setGenProgress(30); const result = await aiService.generateImage(activeScene, undefined, { style: selectedStyle, generationMode }); setGenProgress(100); handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: result }, imagePrompt: promptText || undefined, status: 'completed', imageStatus: 'completed' }); message.success('推理完成'); } catch (e: any) { message.error(e.message || '推理失败'); } finally { setGenerating(false); setGenProgress(0); } };
+  const handleDirector = async () => { if (!activeScene || !project) return; setDirectorLoading(true); try { const template = selectedDirectorTemplateId ? promptTemplates.find(t => t.id === selectedDirectorTemplateId) : undefined; const result = await aiService.generatePrompt(activeScene, 'image', undefined, undefined, undefined, selectedStyle, project.script.map(s => s.description), template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined); setDirectorResult(result); setDirectorPreviewOpen(true); } catch (e: any) { message.error(e.message || 'AI导演失败'); } finally { setDirectorLoading(false); } };
+  const applyDirectorResult = () => { if (!activeScene) return; setPromptText(directorResult); handleUpdateScene(activeScene.id, { prompt: directorResult }); setDirectorPreviewOpen(false); };
 
   // ==================== 生成 ====================
   const handleGenerate = async () => {
@@ -273,19 +209,19 @@ const Workspace: React.FC = () => {
     try {
       if (previewMode === 'image') {
         const prompt = promptText || activeScene.prompt || activeScene.description;
-        if (!prompt) { message.warning('请输入提示词'); setGenerating(false); return; }
+        if (!prompt) { message.warning('请输入提示词'); return; }
+        const provider = selImageModel ? getProviderForModel(selImageModel) : undefined;
         setGenProgress(30);
-        const result = await aiService.generateImage(activeScene, undefined, { style: selectedStyle, generationMode });
-        setGenProgress(100);
-        handleUpdateScene(activeScene.id, {
-          images: { ...activeScene.images, keyFrame: result },
-          imagePrompt: promptText || undefined,
-          status: 'completed', imageStatus: 'completed',
+        const result = await aiService.generateImage(activeScene, undefined, {
+          style: selectedStyle, generationMode,
+          aspectRatio: imageRatio.split(' ')[0],
         });
+        setGenProgress(100);
+        handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: result }, imagePrompt: promptText || undefined, status: 'completed', imageStatus: 'completed' });
         message.success('图片生成完成');
       } else {
         const prompt = activeScene.videoPrompt || activeScene.jiMengPrompt || activeScene.prompt;
-        if (!prompt) { message.warning('请输入视频提示词'); setGenerating(false); return; }
+        if (!prompt) { message.warning('请输入视频提示词'); return; }
         await aiService.generateVideo(activeScene);
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined, videoStatus: 'generating' });
         message.success('视频生成任务已提交');
@@ -293,11 +229,7 @@ const Workspace: React.FC = () => {
     } catch (e: any) { message.error(e.message || '生成失败'); }
     finally { setGenerating(false); setGenProgress(0); }
   };
-
-  const savePrompt = useCallback(() => {
-    if (!activeScene) return;
-    handleUpdateScene(activeScene.id, { prompt: promptText });
-  }, [activeScene, promptText, handleUpdateScene]);
+  const savePrompt = useCallback(() => { if (!activeScene) return; handleUpdateScene(activeScene.id, { prompt: promptText }); }, [activeScene, promptText, handleUpdateScene]);
 
   // ==================== RENDER ====================
   if (loading) return <div className={styles.loadingContainer}><Spin size="large" /></div>;
@@ -309,7 +241,6 @@ const Workspace: React.FC = () => {
 
   return (
     <div className={styles.workspace}>
-      {/* 顶部栏 */}
       <div className={styles.topBar}>
         <div className={styles.topBarLeft}>
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={handleBack} className={styles.backBtn}>返回</Button>
@@ -320,38 +251,24 @@ const Workspace: React.FC = () => {
           <Button type="primary" icon={<PlayCircleOutlined />} loading={generating} onClick={handleGenerate} size="small">
             {previewMode === 'image' ? '生成图片' : '生成视频'}
           </Button>
-          <Button type="text" size="small"
-            icon={rightCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setRightCollapsed(!rightCollapsed)} />
+          <Button type="text" size="small" icon={rightCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setRightCollapsed(!rightCollapsed)} />
         </div>
       </div>
 
       <div className={styles.mainArea}>
         {/* 左栏 */}
         <div className={styles.leftCol}>
-          <div className={styles.leftColHead}>
-            <span>分镜列表</span>
+          <div className={styles.leftColHead}><span>分镜列表</span>
             <div className={styles.leftColActions}>
-              <Button type="text" size="small" icon={<PlusOutlined />}
-                onClick={() => setAddConfirmOpen(true)} title="在当前分镜后添加" />
-              <Button type="text" size="small" danger icon={<DeleteOutlined />}
-                onClick={() => setDeleteConfirmOpen(true)} title="删除当前分镜"
-                disabled={project.script.length <= 1} />
+              <Button type="text" size="small" icon={<PlusOutlined />} onClick={() => setAddConfirmOpen(true)} />
+              <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => setDeleteConfirmOpen(true)} disabled={project.script.length <= 1} />
             </div>
           </div>
           <div className={styles.leftColList} ref={leftListRef} onScroll={handleLeftScroll}>
             {project.script.map((s, i) => (
-              <div key={s.id} className={`${styles.sceneThumb} ${s.id === activeSceneId ? styles.sceneThumbActive : ''}`}
-                onClick={() => selectScene(s.id)}>
-                <div className={styles.sceneThumbImg}>
-                  {s.images?.keyFrame ? <img src={s.images.keyFrame} alt="" />
-                    : <PictureOutlined className={styles.sceneThumbImgEmpty} />}
-                  <span className={styles.sceneThumbNum}>{String(i + 1).padStart(2, '0')}</span>
-                </div>
-                <div className={styles.sceneThumbInfo}>
-                  <div className={styles.sceneThumbTitle}>分镜 {i + 1}</div>
-                  <div className={styles.sceneThumbMeta}>{s.description?.slice(0, 20) || '无描述'}</div>
-                </div>
+              <div key={s.id} className={`${styles.sceneThumb} ${s.id === activeSceneId ? styles.sceneThumbActive : ''}`} onClick={() => selectScene(s.id)}>
+                <div className={styles.sceneThumbImg}>{s.images?.keyFrame ? <img src={s.images.keyFrame} alt="" /> : <PictureOutlined className={styles.sceneThumbImgEmpty} />}<span className={styles.sceneThumbNum}>{String(i + 1).padStart(2, '0')}</span></div>
+                <div className={styles.sceneThumbInfo}><div className={styles.sceneThumbTitle}>分镜 {i + 1}</div><div className={styles.sceneThumbMeta}>{s.description?.slice(0, 20) || '无描述'}</div></div>
               </div>
             ))}
           </div>
@@ -360,49 +277,27 @@ const Workspace: React.FC = () => {
         {/* 中栏 */}
         <div className={styles.centerCol}>
           <div className={styles.centerTopBar}>
-            <div className={styles.triggerCard} onClick={openCharacterModal}>
-              <UserOutlined className={styles.triggerCardIcon} />角色
-            </div>
-            <div className={styles.triggerCard} onClick={() => setSceneManagerVisible(true)}>
-              <PictureOutlined className={styles.triggerCardIcon} />场景
-            </div>
+            <div className={styles.triggerCard} onClick={openCharacterModal}><UserOutlined className={styles.triggerCardIcon} />角色</div>
+            <div className={styles.triggerCard} onClick={() => setSceneManagerVisible(true)}><PictureOutlined className={styles.triggerCardIcon} />场景</div>
             <div className={styles.toggleMode}>
-              <button className={`${styles.toggleBtn} ${previewMode === 'image' ? styles.toggleBtnActive : ''}`}
-                onClick={() => setPreviewMode('image')}>图片</button>
-              <button className={`${styles.toggleBtn} ${previewMode === 'video' ? styles.toggleBtnActive : ''}`}
-                onClick={() => setPreviewMode('video')}>视频</button>
+              <button className={`${styles.toggleBtn} ${previewMode === 'image' ? styles.toggleBtnActive : ''}`} onClick={() => setPreviewMode('image')}>图片</button>
+              <button className={`${styles.toggleBtn} ${previewMode === 'video' ? styles.toggleBtnActive : ''}`} onClick={() => setPreviewMode('video')}>视频</button>
             </div>
           </div>
 
-          {/* 预览区 */}
           <div className={`${styles.previewArea} ${activeScene ? styles.previewActive : ''}`}>
-            {generating ? (
-              <div className={styles.previewLoading}><Spin size="large" /><Progress percent={genProgress} size="small" style={{width:200}} /></div>
-            ) : previewMode === 'image' ? (
-              previewImg ? <img src={previewImg} className={styles.previewImage} alt="" />
-                : <div className={styles.previewEmpty}><PictureOutlined className={styles.previewEmptyIcon} /><span>选择分镜并生成图片</span></div>
-            ) : (
-              previewVid ? <video src={previewVid} className={styles.previewVideo} controls />
-                : <div className={styles.previewEmpty}><PlayCircleOutlined className={styles.previewEmptyIcon} /><span>选择分镜并生成视频</span></div>
-            )}
+            {generating ? <div className={styles.previewLoading}><Spin size="large" /><Progress percent={genProgress} size="small" style={{width:200}} /></div>
+            : previewMode === 'image' ? (previewImg ? <img src={previewImg} className={styles.previewImage} alt="" /> : <div className={styles.previewEmpty}><PictureOutlined className={styles.previewEmptyIcon} /><span>选择分镜并生成图片</span></div>)
+            : (previewVid ? <video src={previewVid} className={styles.previewVideo} controls /> : <div className={styles.previewEmpty}><PlayCircleOutlined className={styles.previewEmptyIcon} /><span>选择分镜并生成视频</span></div>)}
           </div>
 
-          {/* 提示词区 */}
           <div className={styles.promptArea}>
-            <div className={styles.promptAreaHead}>
-              <span>提示词输入</span>
-              <span style={{marginLeft:'auto',fontSize:11,color:'var(--text-tertiary)'}}>
-                {activeScene ? `分镜 ${activeIdx + 1}` : '未选择'}
-              </span>
-            </div>
-            <textarea className={styles.promptInput} placeholder="输入提示词描述..." value={promptText}
-              onChange={e => setPromptText(e.target.value)} onBlur={savePrompt} />
+            <div className={styles.promptAreaHead}><span>提示词输入</span><span style={{marginLeft:'auto',fontSize:11,color:'var(--text-tertiary)'}}>{activeScene ? `分镜 ${activeIdx + 1}` : '未选择'}</span></div>
+            <textarea className={styles.promptInput} placeholder="输入提示词描述..." value={promptText} onChange={e => setPromptText(e.target.value)} onBlur={savePrompt} />
             <div className={styles.promptActions}>
               <Button size="small" icon={<ThunderboltOutlined />} onClick={handleInfer} loading={generating}>推理</Button>
               <Button size="small" icon={<BulbOutlined />} onClick={handleDirector} loading={directorLoading}>AI导演</Button>
-              {directorResult && (
-                <Button size="small" icon={<EyeOutlined />} onClick={() => setDirectorPreviewOpen(true)}>预览</Button>
-              )}
+              {directorResult && <Button size="small" icon={<EyeOutlined />} onClick={() => setDirectorPreviewOpen(true)}>预览</Button>}
             </div>
           </div>
         </div>
@@ -410,123 +305,69 @@ const Workspace: React.FC = () => {
         {/* 右栏 */}
         {!rightCollapsed && (
           <div className={styles.rightCol}>
-            <div className={styles.selectorGroup}>
-              <div className={styles.selectorLabel}>风格</div>
-              <Select size="small" value={selectedStyleId} onChange={setSelectedStyleId}
-                placeholder="选择风格" allowClear style={{width:'100%'}}
-                options={styleList.map(s => ({ label: s.name, value: s.id }))} />
+            <div className={styles.selectorGroup}><div className={styles.selectorLabel}>风格</div>
+              <Select size="small" value={selectedStyleId} onChange={setSelectedStyleId} placeholder="选择风格" allowClear style={{width:'100%'}} options={styleList.map(s => ({ label: s.name, value: s.id }))} />
             </div>
-            <div className={styles.selectorGroup}>
-              <div className={styles.selectorLabel}>生成模式</div>
-              <Select size="small" value={generationMode} onChange={setGenerationMode}
-                style={{width:'100%'}}
-                options={[
-                  { label: '文生视频', value: 'text-to-video' as GenerationMode },
-                  { label: '图生视频', value: 'image-to-video' as GenerationMode },
-                ]} />
+            <div className={styles.selectorGroup}><div className={styles.selectorLabel}>生成模式</div>
+              <Select size="small" value={generationMode} onChange={setGenerationMode} style={{width:'100%'}} options={[{ label: '文生视频', value: 'text-to-video' as GenerationMode }, { label: '图生视频', value: 'image-to-video' as GenerationMode }]} />
             </div>
-            <div className={styles.selectorGroup}>
-              <div className={styles.selectorLabel}>提示词模板</div>
+            <div className={styles.selectorGroup}><div className={styles.selectorLabel}>API模型</div>
               <div className={styles.chipRow}>
-                <div className={styles.chip} onClick={() => setTemplateSelectOpen(true)}>
-                  <FileTextOutlined /> 选择模板
-                </div>
+                <div className={styles.chip} onClick={() => setModelSettingsOpen(true)}><ApiOutlined /> 模型设置</div>
               </div>
+            </div>
+            <div className={styles.selectorGroup}><div className={styles.selectorLabel}>提示词模板</div>
+              <div className={styles.chipRow}><div className={styles.chip} onClick={() => setTemplateSelectOpen(true)}><FileTextOutlined /> 选择模板</div></div>
             </div>
           </div>
         )}
       </div>
 
-      {/* 添加分镜确认弹窗 */}
-      <Modal title="添加分镜" open={addConfirmOpen} onCancel={() => setAddConfirmOpen(false)}
-        onOk={doAddScene} okText="确认添加" cancelText="取消" centered width={400}>
-        <p style={{color:'var(--body-color)',fontSize:14}}>
-          在当前分镜 <strong style={{color:'#6366f1'}}>分镜 {activeIdx + 1}</strong> 之后插入一个新分镜？
-        </p>
-      </Modal>
-
-      {/* 删除分镜确认弹窗 */}
-      <Modal title="删除分镜" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)}
-        onOk={doDeleteScene} okText="确认删除" cancelText="取消" okButtonProps={{danger:true}} centered width={400}>
-        <p style={{color:'var(--body-color)',fontSize:14}}>
-          确定要删除 <strong style={{color:'#ef4444'}}>分镜 {activeIdx + 1}</strong> 吗？此操作不可撤销。
-        </p>
-      </Modal>
-
-      {/* 角色弹窗 */}
-      <Modal title="选择角色" open={characterModalVisible} onCancel={()=>setCharacterModalVisible(false)} onOk={confirmCharacterSelection}
-        okText="确认" cancelText="取消" width="45%" centered className={styles.charModal}>
-        <div className={styles.charGrid}>
-          {characters.length === 0 ? <Empty description="暂无角色" /> :
-            characters.map(c => <CharacterSelectCard key={c.id} character={c} isSelected={isCharSelected(c.id)} onToggle={toggleCharacterSelection} />)}
-        </div>
-      </Modal>
-
-      {/* 场景弹窗 */}
-      <SceneManagerModal visible={sceneManagerVisible} scenes={project.script} selectedStyle={selectedStyle}
-        savedSceneLocations={project.sceneLocations}
-        onClose={() => setSceneManagerVisible(false)}
-        onImportToScene={(ids, url) => {
-          const idList = ids.split(',').filter(Boolean);
-          const script = project.script.map(s => idList.includes(s.id) ? { ...s, images: { ...s.images, keyFrame: url, storyboard: url } } : s);
-          const np = { ...project, script, updatedAt: new Date() };
-          setProject(np); handleUpdateProject(np);
-        }}
-        onSaveSceneLocations={locs => handleUpdateProject({ ...project, sceneLocations: locs })}
-        onApplyPromptToScenes={(ids, prompt) => {
-          const script = project.script.map(s => ids.includes(s.id) ? { ...s, jiMengPrompt: `【场景提示词】${prompt}${s.actionDescription?`\n【动作描述】${s.actionDescription}`:''}${s.dialogue?`\n【对话】\n${s.dialogue}`:''}` } : s);
-          const np = { ...project, script, updatedAt: new Date() };
-          setProject(np); saveProject(np).catch(()=>{});
-        }} />
-
-      {/* AI导演预览弹窗 */}
-      <Modal title="AI导演优化结果" open={directorPreviewOpen} onCancel={() => setDirectorPreviewOpen(false)}
-        footer={[
-          <Button key="cancel" onClick={() => setDirectorPreviewOpen(false)}>取消</Button>,
-          <Button key="apply" type="primary" onClick={applyDirectorResult}>应用到提示词</Button>,
-        ]} width={700} centered>
-        <pre style={{whiteSpace:'pre-wrap',fontSize:13,lineHeight:1.7,color:'var(--body-color)',maxHeight:'50vh',overflow:'auto',padding:16,background:'var(--input-bg)',borderRadius:10}}>
-          {directorResult}
-        </pre>
-      </Modal>
-
-      {/* 模板选择弹窗 — 三分类 */}
-      <Modal title={null} open={templateSelectOpen} onCancel={() => setTemplateSelectOpen(false)} footer={null}
-        width={500} centered className={styles.tplModal}>
-        <div className={styles.tplModalHead}>
-          <FileTextOutlined style={{fontSize:16,color:'#8b5cf6'}} />
-          <span>提示词模板</span>
-        </div>
+      {/* 模型设置弹窗 */}
+      <Modal title={null} open={modelSettingsOpen} onCancel={() => setModelSettingsOpen(false)} footer={null} width={560} centered className={styles.tplModal}>
+        <div className={styles.tplModalHead}><ApiOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>模型设置</span></div>
         <div className={styles.tplModalBody}>
-          {(['image','video','director'] as const).map(type => {
-            const templates = templatesByType[type];
-            const selId = getSelectedTemplateId(type);
-            return (
-              <div key={type} className={styles.tplGroup}>
-                <div className={styles.tplGroupTitle}>
-                  <span className={styles.tplGroupIcon}>{TEMPLATE_TYPE_ICONS[type]}</span>
-                  {TEMPLATE_TYPE_LABELS[type]}
-                </div>
-                {templates.length === 0 ? (
-                  <div className={styles.tplEmpty}>暂无{type==='image'?'图片':type==='video'?'视频':'导演'}模板</div>
-                ) : (
-                  <Select
-                    size="small"
-                    value={selId}
-                    onChange={(v) => setSelectedTemplateId(type, v)}
-                    placeholder={`选择${TEMPLATE_TYPE_LABELS[type]}`}
-                    allowClear
-                    style={{ width: '100%' }}
-                    options={templates.map(t => ({ label: t.name, value: t.id }))}
-                  />
-                )}
+          {/* 图片模型 */}
+          <div className={styles.tplGroup}>
+            <div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><PictureOutlined /></span>图片模型</div>
+            <Select size="small" value={selImageModel} onChange={setSelImageModel} placeholder={imageModels.length > 0 ? '选择图片模型' : '请先在设置页拉取模型'} allowClear style={{width:'100%'}} options={imageModels.map(m => ({ label: `${m.id}${m.owned_by ? ` (${m.owned_by})` : ''}`, value: m.id }))} />
+            <div style={{marginTop:6}}>
+              <div className={styles.selectorLabel} style={{marginBottom:4}}>图片比例</div>
+              <Select size="small" value={imageRatio} onChange={setImageRatio} style={{width:'100%'}} options={IMAGE_RATIOS.map(r => ({ label: r, value: r }))} />
+            </div>
+          </div>
+          {/* 视频模型 */}
+          <div className={styles.tplGroup}>
+            <div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><VideoCameraOutlined /></span>视频模型</div>
+            <Select size="small" value={selVideoModel} onChange={setSelVideoModel} placeholder={videoModels.length > 0 ? '选择视频模型' : '请先在设置页拉取模型'} allowClear style={{width:'100%'}} options={videoModels.map(m => ({ label: `${m.id}${m.owned_by ? ` (${m.owned_by})` : ''}`, value: m.id }))} />
+            <div style={{display:'flex',gap:8,marginTop:6}}>
+              <div style={{flex:1}}><div className={styles.selectorLabel} style={{marginBottom:4}}>视频秒数</div>
+                <Select size="small" value={videoDuration} onChange={setVideoDuration} style={{width:'100%'}} options={VIDEO_DURATIONS.map(d => ({ label: `${d}秒`, value: d }))} />
               </div>
-            );
-          })}
+              <div style={{flex:1}}><div className={styles.selectorLabel} style={{marginBottom:4}}>清晰度</div>
+                <Select size="small" value={videoQuality} onChange={setVideoQuality} style={{width:'100%'}} options={VIDEO_QUALITIES.map(q => ({ label: q, value: q }))} />
+              </div>
+            </div>
+          </div>
+          {/* 文本模型（推理/AI导演） */}
+          <div className={styles.tplGroup}>
+            <div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ThunderboltOutlined /></span>文本模型（推理·AI导演）</div>
+            <Select size="small" value={selTextModel} onChange={setSelTextModel} placeholder={textModels.length > 0 ? '选择文本模型' : '请先在设置页拉取模型'} allowClear style={{width:'100%'}} options={textModels.map(m => ({ label: `${m.id}${m.owned_by ? ` (${m.owned_by})` : ''}`, value: m.id }))} />
+          </div>
         </div>
-        <div className={styles.tplModalFooter}>
-          <Button onClick={() => setTemplateSelectOpen(false)}>完成</Button>
-        </div>
+        <div className={styles.tplModalFooter}><Button type="primary" onClick={() => setModelSettingsOpen(false)}>完成</Button></div>
+      </Modal>
+
+      {/* 其他弹窗保持不变 */}
+      <Modal title="添加分镜" open={addConfirmOpen} onCancel={() => setAddConfirmOpen(false)} onOk={doAddScene} okText="确认添加" cancelText="取消" centered width={400}><p style={{color:'var(--body-color)',fontSize:14}}>在当前分镜 <strong style={{color:'#6366f1'}}>分镜 {activeIdx + 1}</strong> 之后插入一个新分镜？</p></Modal>
+      <Modal title="删除分镜" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={doDeleteScene} okText="确认删除" cancelText="取消" okButtonProps={{danger:true}} centered width={400}><p style={{color:'var(--body-color)',fontSize:14}}>确定要删除 <strong style={{color:'#ef4444'}}>分镜 {activeIdx + 1}</strong> 吗？</p></Modal>
+      <Modal title="选择角色" open={characterModalVisible} onCancel={()=>setCharacterModalVisible(false)} onOk={confirmCharacterSelection} okText="确认" cancelText="取消" width="45%" centered className={styles.charModal}><div className={styles.charGrid}>{characters.length === 0 ? <Empty description="暂无角色" /> : characters.map(c => <CharacterSelectCard key={c.id} character={c} isSelected={isCharSelected(c.id)} onToggle={toggleCharacterSelection} />)}</div></Modal>
+      <SceneManagerModal visible={sceneManagerVisible} scenes={project.script} selectedStyle={selectedStyle} savedSceneLocations={project.sceneLocations} onClose={() => setSceneManagerVisible(false)} onImportToScene={(ids, url) => { const idList = ids.split(',').filter(Boolean); const script = project.script.map(s => idList.includes(s.id) ? { ...s, images: { ...s.images, keyFrame: url, storyboard: url } } : s); setProject(prev => prev ? { ...prev, script, updatedAt: new Date() } : prev); handleUpdateProject({ ...project, script }); }} onSaveSceneLocations={locs => handleUpdateProject({ ...project, sceneLocations: locs })} onApplyPromptToScenes={(ids, prompt) => { const script = project.script.map(s => ids.includes(s.id) ? { ...s, jiMengPrompt: `【场景提示词】${prompt}${s.actionDescription?`\n【动作描述】${s.actionDescription}`:''}${s.dialogue?`\n【对话】\n${s.dialogue}`:''}` } : s); setProject(prev => prev ? { ...prev, script, updatedAt: new Date() } : prev); saveProject({ ...project, script }).catch(()=>{}); }} />
+      <Modal title="AI导演优化结果" open={directorPreviewOpen} onCancel={() => setDirectorPreviewOpen(false)} footer={[<Button key="cancel" onClick={() => setDirectorPreviewOpen(false)}>取消</Button>,<Button key="apply" type="primary" onClick={applyDirectorResult}>应用到提示词</Button>]} width={700} centered><pre style={{whiteSpace:'pre-wrap',fontSize:13,lineHeight:1.7,color:'var(--body-color)',maxHeight:'50vh',overflow:'auto',padding:16,background:'var(--input-bg)',borderRadius:10}}>{directorResult}</pre></Modal>
+      <Modal title={null} open={templateSelectOpen} onCancel={() => setTemplateSelectOpen(false)} footer={null} width={500} centered className={styles.tplModal}>
+        <div className={styles.tplModalHead}><FileTextOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>提示词模板</span></div>
+        <div className={styles.tplModalBody}>{(['image','video','director'] as const).map(type => { const templates = templatesByType[type]; const selId = getSelectedTemplateId(type); return (<div key={type} className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}>{TEMPLATE_TYPE_ICONS[type]}</span>{TEMPLATE_TYPE_LABELS[type]}</div>{templates.length === 0 ? <div className={styles.tplEmpty}>暂无{type==='image'?'图片':type==='video'?'视频':'导演'}模板</div> : <Select size="small" value={selId} onChange={(v) => setSelectedTemplateId(type, v)} placeholder={`选择${TEMPLATE_TYPE_LABELS[type]}`} allowClear style={{width:'100%'}} options={templates.map(t => ({ label: t.name, value: t.id }))} />}</div>); })}</div>
+        <div className={styles.tplModalFooter}><Button onClick={() => setTemplateSelectOpen(false)}>完成</Button></div>
       </Modal>
     </div>
   );
