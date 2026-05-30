@@ -1,9 +1,13 @@
 import * as React from 'react';
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { message, Spin, Empty, Select, Button, Modal, Progress, Input } from 'antd';
-import { UserOutlined, PictureOutlined, ArrowLeftOutlined, PlayCircleOutlined, SwapOutlined } from '@ant-design/icons';
+import { message, Spin, Empty, Select, Button, Modal, Progress } from 'antd';
+import {
+  UserOutlined, PictureOutlined, ArrowLeftOutlined, PlayCircleOutlined,
+  PlusOutlined, DeleteOutlined, ThunderboltOutlined, BulbOutlined,
+  EyeOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SettingOutlined,
+} from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useRecoilState } from 'recoil';
+import { useRecoilState, useSetRecoilState } from 'recoil';
 import { currentProjectState, characterListState } from '../store/projectStore';
 import { getProject, saveProject, getAllCharacters, getAllStyles, getAllPromptTemplates } from '../services/database';
 import { migrateOldMediaData, preloadMedia } from '../services/mediaService';
@@ -20,11 +24,9 @@ const Workspace: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [project, setProject] = useRecoilState(currentProjectState);
-  const [, setCharacters] = useRecoilState(characterListState);
+  const setCharacters = useSetRecoilState(characterListState);
   const [loading, setLoading] = useState(true);
 
-  // 选择器状态
-  const [gridMode, setGridMode] = useState<GridMode>(6);
   const [styleList, setStyleList] = useState<Style[]>([]);
   const [selectedStyleId, setSelectedStyleId] = useState<string | undefined>(
     () => localStorage.getItem('workspace_selected_style') || undefined
@@ -43,7 +45,6 @@ const Workspace: React.FC = () => {
     () => localStorage.getItem('workspace_director_template_id') || undefined
   );
 
-  // 角色/场景弹窗
   const [characterModalVisible, setCharacterModalVisible] = useState(false);
   const [characters, setCharactersLocal] = useState<Character[]>([]);
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([]);
@@ -56,10 +57,29 @@ const Workspace: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
 
+  // 右侧栏收起
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+
+  // AI导演预览弹窗
+  const [directorPreviewOpen, setDirectorPreviewOpen] = useState(false);
+  const [directorResult, setDirectorResult] = useState('');
+  const [directorLoading, setDirectorLoading] = useState(false);
+
+  // 右侧选择弹窗
+  const [styleSelectOpen, setStyleSelectOpen] = useState(false);
+  const [genModeSelectOpen, setGenModeSelectOpen] = useState(false);
+  const [templateSelectOpen, setTemplateSelectOpen] = useState(false);
+
   useEffect(() => { getAllPromptTemplates().then(d => setPromptTemplates(d)).catch(() => {}); }, []);
 
   const activeScene = useMemo(() => project?.script.find(s => s.id === activeSceneId) || null, [project, activeSceneId]);
   const selectedStyle = useMemo(() => styleList.find(s => s.id === selectedStyleId), [styleList, selectedStyleId]);
+
+  // ==================== 离开工作台清理导航 ====================
+  const handleBack = () => {
+    setProject(null as any);
+    navigate('/projects');
+  };
 
   const openCharacterModal = () => {
     if (project && project.script.length > 0) {
@@ -77,8 +97,7 @@ const Workspace: React.FC = () => {
     setCharacterModalVisible(false);
     message.success('角色已应用到所有分镜');
   };
-  const selectedCharacterIdSet = useMemo(() => new Set(selectedCharacterIds), [selectedCharacterIds]);
-  const isCharSelected = useCallback((id: string) => selectedCharacterIdSet.has(id), [selectedCharacterIdSet]);
+  const isCharSelected = useCallback((id: string) => selectedCharacterIds.includes(id), [selectedCharacterIds]);
 
   // ==================== 加载 ====================
   useEffect(() => {
@@ -103,7 +122,6 @@ const Workspace: React.FC = () => {
 
   useEffect(() => { if (selectedStyleId) localStorage.setItem('workspace_selected_style', selectedStyleId); else localStorage.removeItem('workspace_selected_style'); }, [selectedStyleId]);
   useEffect(() => { localStorage.setItem('workspace_generation_mode', generationMode); }, [generationMode]);
-  useEffect(() => { characters.forEach(c => { if (c.referenceImage) { const i = new Image(); i.src = c.referenceImage; } }); }, [characters]);
 
   // ==================== 项目操作 ====================
   const handleUpdateProject = useCallback(async (p: Project) => {
@@ -122,18 +140,25 @@ const Workspace: React.FC = () => {
     });
   }, [setProject]);
 
-  const handleAddScene = async (afterIndex: number) => {
-    if (!project) return;
-    const ns: Scene = { id: crypto.randomUUID(), order: afterIndex + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' };
-    const script = [...project.script.slice(0, afterIndex + 1), ns, ...project.script.slice(afterIndex + 1)].map((s, i) => ({ ...s, order: i }));
-    await handleUpdateProject({ ...project, script });
+  const handleAddScene = async () => {
+    if (!project || !activeSceneId) return;
+    const idx = project.script.findIndex(s => s.id === activeSceneId);
+    const ns: Scene = { id: crypto.randomUUID(), order: idx + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' };
+    const script = [...project.script.slice(0, idx + 1), ns, ...project.script.slice(idx + 1)].map((s, i) => ({ ...s, order: i }));
+    const np = { ...project, script };
+    await handleUpdateProject(np);
+    setActiveSceneId(ns.id);
+    setPromptText('');
   };
 
-  const handleDeleteScene = async (sid: string) => {
-    if (!project) return;
-    const script = project.script.filter(s => s.id !== sid).map((s, i) => ({ ...s, order: i }));
-    await handleUpdateProject({ ...project, script });
-    if (activeSceneId === sid) setActiveSceneId(script[0]?.id || null);
+  const handleDeleteScene = async () => {
+    if (!project || !activeSceneId) return;
+    if (project.script.length <= 1) { message.warning('至少保留一个分镜'); return; }
+    const script = project.script.filter(s => s.id !== activeSceneId).map((s, i) => ({ ...s, order: i }));
+    const np = { ...project, script };
+    await handleUpdateProject(np);
+    setActiveSceneId(script[0]?.id || null);
+    setPromptText(script[0]?.prompt || '');
   };
 
   const selectScene = (sid: string) => {
@@ -141,6 +166,51 @@ const Workspace: React.FC = () => {
     const s = project?.script.find(x => x.id === sid);
     setPromptText(s?.prompt || '');
     setPreviewMode('image');
+  };
+
+  // ==================== 推理 / AI导演 / 预览 ====================
+  const handleInfer = async () => {
+    if (!activeScene || !project) return;
+    setGenerating(true); setGenProgress(0);
+    try {
+      const prompt = promptText || activeScene.prompt || activeScene.description;
+      if (!prompt) { message.warning('请输入提示词'); setGenerating(false); return; }
+      setGenProgress(30);
+      const result = await aiService.generateImage(activeScene, undefined, { style: selectedStyle, generationMode });
+      setGenProgress(100);
+      handleUpdateScene(activeScene.id, {
+        images: { ...activeScene.images, keyFrame: result },
+        imagePrompt: promptText || undefined,
+        status: 'completed', imageStatus: 'completed',
+      });
+      message.success('推理完成');
+    } catch (e: any) { message.error(e.message || '推理失败'); }
+    finally { setGenerating(false); setGenProgress(0); }
+  };
+
+  const handleDirector = async () => {
+    if (!activeScene || !project) return;
+    setDirectorLoading(true);
+    try {
+      const template = selectedDirectorTemplateId ? promptTemplates.find(t => t.id === selectedDirectorTemplateId) : undefined;
+      const result = await aiService.generatePrompt(
+        activeScene, 'image', undefined, undefined, undefined, selectedStyle,
+        project.script.map(s => s.description),
+        template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined
+      );
+      setDirectorResult(result);
+      setDirectorPreviewOpen(true);
+      message.success('AI导演优化完成');
+    } catch (e: any) { message.error(e.message || 'AI导演失败'); }
+    finally { setDirectorLoading(false); }
+  };
+
+  const applyDirectorResult = () => {
+    if (!activeScene) return;
+    setPromptText(directorResult);
+    handleUpdateScene(activeScene.id, { prompt: directorResult });
+    setDirectorPreviewOpen(false);
+    message.success('已应用优化提示词');
   };
 
   // ==================== 生成 ====================
@@ -152,8 +222,7 @@ const Workspace: React.FC = () => {
         const prompt = promptText || activeScene.prompt || activeScene.description;
         if (!prompt) { message.warning('请输入提示词'); setGenerating(false); return; }
         setGenProgress(30);
-        // 使用 aiService 生成图片
-        const result = await aiService.generateImage(activeScene, undefined, { style: selectedStyle, generationMode, gridMode });
+        const result = await aiService.generateImage(activeScene, undefined, { style: selectedStyle, generationMode });
         setGenProgress(100);
         handleUpdateScene(activeScene.id, {
           images: { ...activeScene.images, keyFrame: result },
@@ -164,20 +233,14 @@ const Workspace: React.FC = () => {
       } else {
         const prompt = activeScene.videoPrompt || activeScene.jiMengPrompt || activeScene.prompt;
         if (!prompt) { message.warning('请输入视频提示词'); setGenerating(false); return; }
-        setGenProgress(30);
         await aiService.generateVideo(activeScene);
-        setGenProgress(100);
-        handleUpdateScene(activeScene.id, {
-          videoPrompt: promptText || undefined,
-          videoStatus: 'generating',
-        });
+        handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined, videoStatus: 'generating' });
         message.success('视频生成任务已提交');
       }
     } catch (e: any) { message.error(e.message || '生成失败'); }
     finally { setGenerating(false); setGenProgress(0); }
   };
 
-  // 同步 promptText 到场景
   const savePrompt = useCallback(() => {
     if (!activeScene) return;
     handleUpdateScene(activeScene.id, { prompt: promptText });
@@ -189,28 +252,41 @@ const Workspace: React.FC = () => {
 
   const previewImg = activeScene?.images?.keyFrame;
   const previewVid = activeScene?.videos?.[activeScene.videos.length - 1];
+  const activeIdx = project.script.findIndex(s => s.id === activeSceneId);
 
   return (
     <div className={styles.workspace}>
       {/* 顶部栏 */}
       <div className={styles.topBar}>
         <div className={styles.topBarLeft}>
-          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/projects')} className={styles.backBtn}>返回</Button>
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={handleBack} className={styles.backBtn}>返回</Button>
           <span className={styles.topBarTitle}>{project.name}</span>
           <span style={{fontSize:12,color:'var(--text-tertiary)'}}>{project.script.length} 个分镜</span>
         </div>
-        <div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <Button type="primary" icon={<PlayCircleOutlined />} loading={generating} onClick={handleGenerate} size="small">
             {previewMode === 'image' ? '生成图片' : '生成视频'}
           </Button>
+          <Button
+            type="text" size="small"
+            icon={rightCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={() => setRightCollapsed(!rightCollapsed)}
+            title={rightCollapsed ? '展开右侧栏' : '收起右侧栏'}
+          />
         </div>
       </div>
 
       {/* 三栏主体 */}
       <div className={styles.mainArea}>
-        {/* 左栏：分镜列表 */}
+        {/* 左栏：分镜列表 + 添加/删除 */}
         <div className={styles.leftCol}>
-          <div className={styles.leftColHead}>分镜列表</div>
+          <div className={styles.leftColHead}>
+            <span>分镜列表</span>
+            <div className={styles.leftColActions}>
+              <Button type="text" size="small" icon={<PlusOutlined />} onClick={handleAddScene} title="添加分镜" />
+              <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={handleDeleteScene} title="删除当前分镜" disabled={project.script.length <= 1} />
+            </div>
+          </div>
           <div className={styles.leftColList}>
             {project.script.map((s, i) => (
               <div key={s.id} className={`${styles.sceneThumb} ${s.id === activeSceneId ? styles.sceneThumbActive : ''}`}
@@ -218,6 +294,7 @@ const Workspace: React.FC = () => {
                 <div className={styles.sceneThumbImg}>
                   {s.images?.keyFrame ? <img src={s.images.keyFrame} alt="" />
                     : <PictureOutlined className={styles.sceneThumbImgEmpty} />}
+                  <span className={styles.sceneThumbNum}>{String(i + 1).padStart(2, '0')}</span>
                 </div>
                 <div className={styles.sceneThumbInfo}>
                   <div className={styles.sceneThumbTitle}>分镜 {i + 1}</div>
@@ -228,9 +305,8 @@ const Workspace: React.FC = () => {
           </div>
         </div>
 
-        {/* 中栏：预览 + 提示词 */}
+        {/* 中栏 */}
         <div className={styles.centerCol}>
-          {/* 角色/场景卡片 + 切换 */}
           <div className={styles.centerTopBar}>
             <div className={styles.triggerCard} onClick={openCharacterModal}>
               <UserOutlined className={styles.triggerCardIcon} />角色
@@ -246,8 +322,8 @@ const Workspace: React.FC = () => {
             </div>
           </div>
 
-          {/* 预览区域 */}
-          <div className={styles.previewArea}>
+          {/* 预览区 */}
+          <div className={`${styles.previewArea} ${activeScene ? styles.previewActive : ''}`}>
             {generating ? (
               <div className={styles.previewLoading}>
                 <Spin size="large" />
@@ -262,12 +338,12 @@ const Workspace: React.FC = () => {
             )}
           </div>
 
-          {/* 提示词输入区 */}
+          {/* 提示词区 */}
           <div className={styles.promptArea}>
             <div className={styles.promptAreaHead}>
               <span>提示词输入</span>
               <span style={{marginLeft:'auto',fontSize:11,color:'var(--text-tertiary)'}}>
-                {activeScene ? `分镜 ${(project.script.findIndex(s=>s.id===activeSceneId)||0)+1}` : '未选择'}
+                {activeScene ? `分镜 ${activeIdx + 1}` : '未选择'}
               </span>
             </div>
             <textarea className={styles.promptInput}
@@ -277,40 +353,39 @@ const Workspace: React.FC = () => {
               onBlur={savePrompt}
             />
             <div className={styles.promptActions}>
-              <Select size="small" value={gridMode} onChange={v => setGridMode(v)} style={{ width: 110 }}
-                options={[{label:'2×2 (4格)',value:4},{label:'2×3 (6格)',value:6},{label:'3×3 (9格)',value:9}]} />
-              <Select size="small" value={selectedStyleId} onChange={v => setSelectedStyleId(v)} style={{ width: 120 }} placeholder="风格" allowClear
-                options={styleList.map(s => ({ label: s.name, value: s.id }))} />
-              <Select size="small" value={generationMode} onChange={v => setGenerationMode(v)} style={{ width: 110 }}
-                options={[{label:'文生视频',value:'text-to-video'},{label:'图生视频',value:'image-to-video'}]} />
+              <Button size="small" icon={<ThunderboltOutlined />} onClick={handleInfer} loading={generating}>推理</Button>
+              <Button size="small" icon={<BulbOutlined />} onClick={handleDirector} loading={directorLoading}>AI导演</Button>
+              {directorResult && (
+                <Button size="small" icon={<EyeOutlined />} onClick={() => setDirectorPreviewOpen(true)}>预览</Button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* 右栏：选择器 */}
-        <div className={styles.rightCol}>
-          <div className={styles.selectorGroup}>
-            <div className={styles.selectorLabel}>提示词模板</div>
-            {promptTemplates.filter(t=>t.type==='image').length > 0 && (
-              <Select size="small" value={selectedImageTemplateId} placeholder="图片模板" allowClear style={{width:'100%'}}
-                onClear={()=>{setSelectedImageTemplateId(undefined);localStorage.removeItem('workspace_image_template')}}
-                onChange={v=>{setSelectedImageTemplateId(v);if(v)localStorage.setItem('workspace_image_template',v);else localStorage.removeItem('workspace_image_template')}}
-                options={promptTemplates.filter(t=>t.type==='image').map(t=>({label:t.name,value:t.id}))} />
-            )}
-            {promptTemplates.filter(t=>t.type==='video').length > 0 && (
-              <Select size="small" value={selectedVideoTemplateId} placeholder="视频模板" allowClear style={{width:'100%',marginTop:4}}
-                onClear={()=>{setSelectedVideoTemplateId(undefined);localStorage.removeItem('workspace_video_template_id')}}
-                onChange={v=>{setSelectedVideoTemplateId(v);if(v)localStorage.setItem('workspace_video_template_id',v);else localStorage.removeItem('workspace_video_template_id')}}
-                options={promptTemplates.filter(t=>t.type==='video').map(t=>({label:t.name,value:t.id}))} />
-            )}
-            {promptTemplates.filter(t=>t.type==='director').length > 0 && (
-              <Select size="small" value={selectedDirectorTemplateId} placeholder="导演模板" allowClear style={{width:'100%',marginTop:4}}
-                onClear={()=>{setSelectedDirectorTemplateId(undefined);localStorage.removeItem('workspace_director_template_id')}}
-                onChange={v=>{setSelectedDirectorTemplateId(v);if(v)localStorage.setItem('workspace_director_template_id',v);else localStorage.removeItem('workspace_director_template_id')}}
-                options={promptTemplates.filter(t=>t.type==='director').map(t=>({label:t.name,value:t.id}))} />
-            )}
+        {/* 右栏 */}
+        {!rightCollapsed && (
+          <div className={styles.rightCol}>
+            <div className={styles.selectorGroup}>
+              <div className={styles.selectorLabel}>生成设置</div>
+              <div className={styles.chipRow}>
+                <div className={styles.chip} onClick={() => setStyleSelectOpen(true)}>
+                  <SettingOutlined /> {selectedStyle ? selectedStyle.name : '选择风格'}
+                </div>
+                <div className={styles.chip} onClick={() => setGenModeSelectOpen(true)}>
+                  {generationMode === 'text-to-video' ? '文生视频' : '图生视频'}
+                </div>
+              </div>
+            </div>
+            <div className={styles.selectorGroup}>
+              <div className={styles.selectorLabel}>提示词模板</div>
+              <div className={styles.chipRow}>
+                <div className={styles.chip} onClick={() => setTemplateSelectOpen(true)}>
+                  选择模板
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 角色弹窗 */}
@@ -339,6 +414,68 @@ const Workspace: React.FC = () => {
           const np = { ...project, script, updatedAt: new Date() };
           setProject(np); saveProject(np).catch(()=>{});
         }} />
+
+      {/* AI导演预览弹窗 */}
+      <Modal title="AI导演优化结果" open={directorPreviewOpen} onCancel={() => setDirectorPreviewOpen(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setDirectorPreviewOpen(false)}>取消</Button>,
+          <Button key="apply" type="primary" onClick={applyDirectorResult}>应用到提示词</Button>,
+        ]} width={700} centered>
+        <pre style={{whiteSpace:'pre-wrap',fontSize:13,lineHeight:1.7,color:'var(--body-color)',maxHeight:'50vh',overflow:'auto',padding:16,background:'var(--input-bg)',borderRadius:10}}>
+          {directorResult}
+        </pre>
+      </Modal>
+
+      {/* 风格选择弹窗 */}
+      <Modal title="选择风格" open={styleSelectOpen} onCancel={() => setStyleSelectOpen(false)} footer={null} width={400} centered>
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          <div className={styles.chip} style={{borderColor:'transparent',cursor:'default'}}
+            onClick={() => { setSelectedStyleId(undefined); setStyleSelectOpen(false); }}>
+            无风格
+          </div>
+          {styleList.map(s => (
+            <div key={s.id} className={`${styles.chip} ${s.id===selectedStyleId?styles.chipActive:''}`}
+              onClick={() => { setSelectedStyleId(s.id); setStyleSelectOpen(false); }}>
+              {s.name}
+            </div>
+          ))}
+        </div>
+      </Modal>
+
+      {/* 生成模式选择弹窗 */}
+      <Modal title="生成模式" open={genModeSelectOpen} onCancel={() => setGenModeSelectOpen(false)} footer={null} width={360} centered>
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {(['text-to-video','image-to-video'] as GenerationMode[]).map(m => (
+            <div key={m} className={`${styles.chip} ${m===generationMode?styles.chipActive:''}`}
+              onClick={() => { setGenerationMode(m); setGenModeSelectOpen(false); }}>
+              {m === 'text-to-video' ? '文生视频' : '图生视频'}
+            </div>
+          ))}
+        </div>
+      </Modal>
+
+      {/* 模板选择弹窗 */}
+      <Modal title="提示词模板" open={templateSelectOpen} onCancel={() => setTemplateSelectOpen(false)} footer={null} width={400} centered>
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {promptTemplates.map(t => {
+            const isActive = (t.type==='image' && t.id===selectedImageTemplateId) ||
+              (t.type==='video' && t.id===selectedVideoTemplateId) ||
+              (t.type==='director' && t.id===selectedDirectorTemplateId);
+            return (
+              <div key={t.id} className={`${styles.chip} ${isActive?styles.chipActive:''}`}
+                onClick={() => {
+                  if (t.type==='image') setSelectedImageTemplateId(t.id);
+                  else if (t.type==='video') setSelectedVideoTemplateId(t.id);
+                  else setSelectedDirectorTemplateId(t.id);
+                  setTemplateSelectOpen(false);
+                }}>
+                <span style={{fontSize:11,color:'var(--text-tertiary)'}}>{t.type==='image'?'图片':t.type==='video'?'视频':'导演'}</span>
+                <span>{t.name}</span>
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
     </div>
   );
 };
