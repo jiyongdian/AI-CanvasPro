@@ -86,18 +86,11 @@
   color: var(--body-color) !important;
   font-size: 14px !important;
   line-height: 1.8 !important;
-  box-shadow: 
-    inset 0 2px 4px var(--shadow-light),
-    0 1px 0 var(--glass-border) !important;
   transition: all 0.25s ease !important;
 }
-
 .novelInput:focus {
   border-color: #8b5cf6 !important;
-  box-shadow: 
-    inset 0 2px 4px var(--shadow-light),
-    0 0 0 3px rgba(139, 92, 246, 0.2),
-    0 0 15px rgba(139, 92, 246, 0.1) !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15) !important;
 }
 
 .modeSelector {
@@ -118,7 +111,6 @@
   border-radius: 12px;
   max-height: 300px;
   overflow-y: auto;
-  box-shadow: inset 0 2px 4px var(--shadow-light);
 }
 
 .logItem {
@@ -132,24 +124,31 @@
   margin-bottom: 0;
 }
 
-/* 项目卡片 */
+/* 项目卡片 — 3D 层次 */
 .projectCard {
+  position: relative;
   background: var(--panel-bg-gradient) !important;
   border: 1px solid var(--panel-border) !important;
   border-radius: 18px !important;
   overflow: hidden;
   box-shadow:
-    0 1px 3px rgba(0,0,0,0.06),
-    0 0 0 1px rgba(139,92,246,0.02);
-  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1) !important;
+    0 1px 2px rgba(0,0,0,0.04), 0 3px 8px rgba(0,0,0,0.06),
+    0 8px 24px rgba(0,0,0,0.05), 0 0 0 1px rgba(139,92,246,0.015);
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
-
+.projectCard::before {
+  content:''; position:absolute; inset:0; border-radius:18px; pointer-events:none; z-index:0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 40%);
+}
+:root[data-theme='dark'] .projectCard::before {
+  background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 50%);
+}
 .projectCard:hover {
-  border-color: rgba(34, 197, 94, 0.25) !important;
-  transform: translateY(-4px);
+  border-color: rgba(34, 197, 94, 0.22) !important;
+  transform: translateY(-3px);
   box-shadow:
-    0 8px 32px rgba(0,0,0,0.14),
-    0 0 0 1px rgba(34,197,94,0.08);
+    0 2px 4px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.10),
+    0 16px 40px rgba(0,0,0,0.08), 0 0 0 1px rgba(34,197,94,0.12);
 }
 
 /* 卡片内容区域 */
@@ -265,18 +264,11 @@
   color: var(--body-color) !important;
   font-size: 14px !important;
   line-height: 1.8 !important;
-  box-shadow:
-    inset 0 2px 4px var(--shadow-light),
-    0 0 0 0 transparent !important;
   transition: all 0.25s ease !important;
 }
-
 .customReqInput:focus {
   border-color: #a855f7 !important;
-  box-shadow:
-    inset 0 2px 4px var(--shadow-light),
-    0 0 0 3px rgba(168, 85, 247, 0.2),
-    0 0 15px rgba(168, 85, 247, 0.1) !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2) !important;
 }
 
 .customReqInput::placeholder {
