@@ -492,6 +492,12 @@ class AIGenerationService {
     return parseFloat(this.getConfig().temperature) || 0.6;
   }
 
+  private async throwApiError(response: Response): Promise<never> {
+    const errData = await response.json().catch(() => ({}));
+    const msg = (errData as any).error?.message || response.statusText || `HTTP ${response.status}`;
+    throw new Error(`API 请求失败 (${response.status}): ${msg}`);
+  }
+
   private getHeaders() {
     const config = this.getConfig();
     return {
@@ -565,7 +571,11 @@ ${requirementBlock}`;
         })
       });
 
-      if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const errMsg = (errData as any).error?.message || response.statusText || `HTTP ${response.status}`;
+        throw new Error(`API 请求失败 (${response.status}): ${errMsg}`);
+      }
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content || '[]';
       try { return JSON.parse(content); } catch {
@@ -1726,9 +1736,7 @@ ${hasConnectionPrompt ? '3. Grid 2必须承接前一个分镜末尾镜头确保�
       })
     });
 
-    if (!response.ok) {
-      throw new Error(`API error: ${response.statusText}`);
-    }
+    if (!response.ok) { await this.throwApiError(response); }
 
     const data = await response.json();
     return data.choices?.[0]?.message?.content || '';
