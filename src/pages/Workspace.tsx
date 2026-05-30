@@ -28,8 +28,24 @@ const TEMPLATE_TYPE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const IMAGE_RATIOS = ['1:1 方形', '3:2 标准', '4:3 经典', '16:9 宽屏', '9:16 竖屏', '2:3 肖像', '3:4', '21:9 超宽'];
-const VIDEO_DURATIONS = [4, 5, 6, 8, 10, 15, 20, 30, 60];
-const VIDEO_QUALITIES = ['480p 标清', '720p 高清', '1080p 全高清'];
+const VIDEO_DURATIONS_ALL = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,20,30,60];
+const VIDEO_QUALITIES_ALL = ['480p 标清','540p','720p 高清','1080p 全高清'];
+// 已知视频模型的默认参数
+const VIDEO_MODEL_PRESETS: Record<string, { durations: number[]; qualities: string[] }> = {
+  'doubao-seedance-2.0': { durations: Array.from({length:15},(_,i)=>i+1), qualities: ['480p 标清','720p 高清','1080p 全高清'] },
+  'viduq3': { durations: [5,8,10,16], qualities: ['540p','720p 高清','1080p 全高清'] },
+  'veo-3': { durations: [5,8,10], qualities: ['720p 高清','1080p 全高清'] },
+  'veo-2': { durations: [5,8], qualities: ['720p 高清','1080p 全高清'] },
+  'sora-2': { durations: [5,10,15], qualities: ['480p 标清','720p 高清','1080p 全高清'] },
+  'kling': { durations: [5,10], qualities: ['720p 高清','1080p 全高清'] },
+};
+const getVideoPreset = (modelId: string | undefined) => {
+  if (!modelId) return { durations: [5,8,10], qualities: ['720p 高清','1080p 全高清'] };
+  for (const [key, preset] of Object.entries(VIDEO_MODEL_PRESETS)) {
+    if (modelId.toLowerCase().includes(key)) return preset;
+  }
+  return { durations: [5,8,10], qualities: ['720p 高清','1080p 全高清'] };
+};
 
 const Workspace: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -78,6 +94,9 @@ const Workspace: React.FC = () => {
 
   // ===== 模型关联 =====
   const [providers, setProviders] = useState<ApiProvider[]>([]);
+  const [selPlatformId, setSelPlatformId] = useState<string | undefined>(
+    () => localStorage.getItem('ws_platform_id') || undefined
+  );
   const [modelSettingsOpen, setModelSettingsOpen] = useState(false);
   const [selImageModel, setSelImageModel] = useState<string | undefined>(
     () => localStorage.getItem('ws_image_model') || undefined
@@ -98,22 +117,27 @@ const Workspace: React.FC = () => {
     () => localStorage.getItem('ws_video_quality') || '1080p 全高清'
   );
 
-  // 从providers中提取分类模型
+  // 当前选中的平台
+  const selPlatform = useMemo(() => providers.find(p => p.id === selPlatformId), [providers, selPlatformId]);
+  // 从providers中提取分类模型（按选中平台过滤）
   const imageModels = useMemo(() => {
     const seen = new Set<string>(); const r: ProviderModel[] = [];
-    providers.forEach(p => p.models.forEach(m => { if (m.category === 'image' && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    const src = selPlatform ? [selPlatform] : providers;
+    src.forEach(p => p.models.forEach(m => { if (m.category === 'image' && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
     return r;
-  }, [providers]);
+  }, [providers, selPlatform]);
   const videoModels = useMemo(() => {
     const seen = new Set<string>(); const r: ProviderModel[] = [];
-    providers.forEach(p => p.models.forEach(m => { if (m.category === 'video' && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    const src = selPlatform ? [selPlatform] : providers;
+    src.forEach(p => p.models.forEach(m => { if (m.category === 'video' && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
     return r;
-  }, [providers]);
+  }, [providers, selPlatform]);
   const textModels = useMemo(() => {
     const seen = new Set<string>(); const r: ProviderModel[] = [];
-    providers.forEach(p => p.models.forEach(m => { if (m.category === 'text' && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    const src = selPlatform ? [selPlatform] : providers;
+    src.forEach(p => p.models.forEach(m => { if (m.category === 'text' && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
     return r;
-  }, [providers]);
+  }, [providers, selPlatform]);
 
   // 获取当前选中模型对应的provider
   const getProviderForModel = useCallback((modelId: string) => {
@@ -186,6 +210,7 @@ const Workspace: React.FC = () => {
   useEffect(() => { if (selImageModel) localStorage.setItem('ws_image_model', selImageModel); else localStorage.removeItem('ws_image_model'); }, [selImageModel]);
   useEffect(() => { if (selVideoModel) localStorage.setItem('ws_video_model', selVideoModel); else localStorage.removeItem('ws_video_model'); }, [selVideoModel]);
   useEffect(() => { if (selTextModel) localStorage.setItem('ws_text_model', selTextModel); else localStorage.removeItem('ws_text_model'); }, [selTextModel]);
+  useEffect(() => { if (selPlatformId) localStorage.setItem('ws_platform_id', selPlatformId); else localStorage.removeItem('ws_platform_id'); }, [selPlatformId]);
   useEffect(() => { localStorage.setItem('ws_image_ratio', imageRatio); }, [imageRatio]);
   useEffect(() => { localStorage.setItem('ws_video_duration', String(videoDuration)); }, [videoDuration]);
   useEffect(() => { localStorage.setItem('ws_video_quality', videoQuality); }, [videoQuality]);
@@ -327,32 +352,53 @@ const Workspace: React.FC = () => {
       <Modal title={null} open={modelSettingsOpen} onCancel={() => setModelSettingsOpen(false)} footer={null} width={560} centered className={styles.tplModal}>
         <div className={styles.tplModalHead}><ApiOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>模型设置</span></div>
         <div className={styles.tplModalBody}>
+          {/* 平台选择器 */}
+          <div className={styles.tplGroup}>
+            <div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ApiOutlined /></span>API平台</div>
+            <Select size="small" value={selPlatformId} onChange={(v) => { setSelPlatformId(v); setSelImageModel(undefined); setSelVideoModel(undefined); setSelTextModel(undefined); }}
+              placeholder="全部平台" allowClear style={{width:'100%'}}
+              options={providers.filter(p => p.enabled !== false).map(p => ({ label: p.name, value: p.id }))} />
+          </div>
           {/* 图片模型 */}
           <div className={styles.tplGroup}>
             <div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><PictureOutlined /></span>图片模型</div>
-            <Select size="small" value={selImageModel} onChange={setSelImageModel} placeholder={imageModels.length > 0 ? '选择图片模型' : '请先在设置页拉取模型'} allowClear style={{width:'100%'}} options={imageModels.map(m => ({ label: `${m.id}${m.owned_by ? ` (${m.owned_by})` : ''}`, value: m.id }))} />
-            <div style={{marginTop:6}}>
-              <div className={styles.selectorLabel} style={{marginBottom:4}}>图片比例</div>
-              <Select size="small" value={imageRatio} onChange={setImageRatio} style={{width:'100%'}} options={IMAGE_RATIOS.map(r => ({ label: r, value: r }))} />
-            </div>
+            <Select size="small" value={selImageModel} onChange={setSelImageModel}
+              placeholder={imageModels.length > 0 ? '选择图片模型' : (providers.length === 0 ? '请先在设置页配置API' : '该平台无图片模型')}
+              allowClear style={{width:'100%'}}
+              options={imageModels.map(m => ({ label: m.id, value: m.id }))} />
+            <div style={{marginTop:6}}><div className={styles.selectorLabel} style={{marginBottom:4}}>图片比例</div>
+              <Select size="small" value={imageRatio} onChange={setImageRatio} style={{width:'100%'}}
+                options={IMAGE_RATIOS.map(r => ({ label: r, value: r }))} /></div>
           </div>
           {/* 视频模型 */}
           <div className={styles.tplGroup}>
             <div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><VideoCameraOutlined /></span>视频模型</div>
-            <Select size="small" value={selVideoModel} onChange={setSelVideoModel} placeholder={videoModels.length > 0 ? '选择视频模型' : '请先在设置页拉取模型'} allowClear style={{width:'100%'}} options={videoModels.map(m => ({ label: `${m.id}${m.owned_by ? ` (${m.owned_by})` : ''}`, value: m.id }))} />
+            <Select size="small" value={selVideoModel} onChange={(v) => {
+              setSelVideoModel(v);
+              const preset = getVideoPreset(v);
+              if (!preset.durations.includes(videoDuration)) setVideoDuration(preset.durations[0]);
+              if (!preset.qualities.includes(videoQuality)) setVideoQuality(preset.qualities[preset.qualities.length - 1]);
+            }} placeholder={videoModels.length > 0 ? '选择视频模型' : (providers.length === 0 ? '请先在设置页配置API' : '该平台无视频模型')}
+              allowClear style={{width:'100%'}}
+              options={videoModels.map(m => ({ label: m.id, value: m.id }))} />
             <div style={{display:'flex',gap:8,marginTop:6}}>
-              <div style={{flex:1}}><div className={styles.selectorLabel} style={{marginBottom:4}}>视频秒数</div>
-                <Select size="small" value={videoDuration} onChange={setVideoDuration} style={{width:'100%'}} options={VIDEO_DURATIONS.map(d => ({ label: `${d}秒`, value: d }))} />
+              <div style={{flex:1}}><div className={styles.selectorLabel} style={{marginBottom:4}}>秒数</div>
+                <Select size="small" value={videoDuration} onChange={setVideoDuration} style={{width:'100%'}}
+                  options={getVideoPreset(selVideoModel).durations.map(d => ({ label: `${d}秒`, value: d }))} />
               </div>
               <div style={{flex:1}}><div className={styles.selectorLabel} style={{marginBottom:4}}>清晰度</div>
-                <Select size="small" value={videoQuality} onChange={setVideoQuality} style={{width:'100%'}} options={VIDEO_QUALITIES.map(q => ({ label: q, value: q }))} />
+                <Select size="small" value={videoQuality} onChange={setVideoQuality} style={{width:'100%'}}
+                  options={getVideoPreset(selVideoModel).qualities.map(q => ({ label: q, value: q }))} />
               </div>
             </div>
           </div>
           {/* 文本模型（推理/AI导演） */}
           <div className={styles.tplGroup}>
             <div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ThunderboltOutlined /></span>文本模型（推理·AI导演）</div>
-            <Select size="small" value={selTextModel} onChange={setSelTextModel} placeholder={textModels.length > 0 ? '选择文本模型' : '请先在设置页拉取模型'} allowClear style={{width:'100%'}} options={textModels.map(m => ({ label: `${m.id}${m.owned_by ? ` (${m.owned_by})` : ''}`, value: m.id }))} />
+            <Select size="small" value={selTextModel} onChange={setSelTextModel}
+              placeholder={textModels.length > 0 ? '选择文本模型' : (providers.length === 0 ? '请先在设置页配置API' : '该平台无文本模型')}
+              allowClear style={{width:'100%'}}
+              options={textModels.map(m => ({ label: m.id, value: m.id }))} />
           </div>
         </div>
         <div className={styles.tplModalFooter}><Button type="primary" onClick={() => setModelSettingsOpen(false)}>完成</Button></div>
