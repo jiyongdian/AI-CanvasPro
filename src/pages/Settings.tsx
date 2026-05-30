@@ -89,10 +89,15 @@ const Settings: React.FC = () => {
     try {
       if (editingProvider) {
         await persist(providers.map(p => p.id===editingProvider.id ? {...p, name:editName.trim(), apiUrl:editApiUrl.trim(), apiKey:editApiKey.trim(), models:editModels, updatedAt:now} : p));
+        message.success('API配置已更新');
       } else {
         await persist([...providers, {id:`p-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, name:editName.trim(), apiUrl:editApiUrl.trim(), apiKey:editApiKey.trim(), models:editModels, enabled:true, createdAt:now, updatedAt:now}]);
+        message.success('API平台已添加');
       }
-    } catch {}
+    } catch (e: any) {
+      message.error('保存失败: ' + (e?.message || '存储空间不足，请清理旧数据'));
+      return;
+    }
     setEditOpen(false);
   };
 
