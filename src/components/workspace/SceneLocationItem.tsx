@@ -2,7 +2,7 @@ import * as React from 'react';
 import { memo, useCallback } from 'react';
 import { Input, Button, Spin, Tag } from 'antd';
 import { ThunderboltOutlined, PictureOutlined, ImportOutlined, EyeOutlined, SyncOutlined } from '@ant-design/icons';
-import type { SceneMode } from './SceneManagerModal';
+type SceneMode = 'standard' | 'multiview';
 import styles from './SceneLocationItem.module.css';
 
 const { TextArea } = Input;

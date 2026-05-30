@@ -1,518 +1,323 @@
 import * as React from 'react';
-import { useState, useEffect, useMemo, memo, useCallback, useRef } from 'react';
-import { Modal, message, Empty, Button, Select } from 'antd';
-import { DownloadOutlined } from '@ant-design/icons';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Modal, message, Empty, Button, Input, Spin, Progress } from 'antd';
+import { PlusOutlined, ThunderboltOutlined, PictureOutlined, UploadOutlined, CameraOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import { Scene, Style, SceneLocationData } from '../../types';
 import { aiService } from '../../services/aiService';
 import { preloadImage, blobToBase64 } from '../../utils/imageUtils';
-import { saveImageToLocalFile } from '../../utils/imageUtils';
-import SceneLocationItem from './SceneLocationItem';
 import styles from './SceneManagerModal.module.css';
 
-// 场景生成模式
-export type SceneMode = 'standard' | 'multiview';
-
 interface SceneLocation {
-  sceneLabel: string;  // 场景标识，如"场景A"
+  sceneLabel: string;
   sceneDescription: string;
-  prompt: string;              // 标准模式提示词
-  multiViewPrompt?: string;    // 多视角模式提示词
-  sceneIds: string[];          // 使用该场景的分镜ID列表
-  generatedImage?: string;     // 标准模式生成的图片
-  multiViewImage?: string;     // 多视角模式生成的图片
+  prompt: string;
+  sceneIds: string[];
+  generatedImage?: string;
   isGenerating?: boolean;
-  isOptimizing?: boolean;
-  loadingProgress?: number;    // 图片下载进度
+  loadingProgress?: number;
 }
 
 interface SceneManagerModalProps {
   visible: boolean;
   scenes: Scene[];
   selectedStyle?: Style;
-  savedSceneLocations?: SceneLocationData[];  // 从项目中加载的场景数据
+  savedSceneLocations?: SceneLocationData[];
   onClose: () => void;
   onImportToScene: (sceneId: string, imageUrl: string) => void;
-  onSaveSceneLocations?: (locations: SceneLocationData[]) => void;  // 保存场景数据
-  onApplyPromptToScenes?: (sceneIds: string[], prompt: string) => void;  // 将场景提示词应用到对应分镜
+  onSaveSceneLocations?: (locations: SceneLocationData[]) => void;
+  onApplyPromptToScenes?: (sceneIds: string[], prompt: string) => void;
 }
 
-const SceneManagerModal: React.FC<SceneManagerModalProps> = memo(({
-  visible,
-  scenes,
-  selectedStyle,
-  savedSceneLocations,
-  onClose,
-  onImportToScene,
-  onSaveSceneLocations,
-  onApplyPromptToScenes
+// 6视角场景生成底层提示词
+const MULTIVIEW_PROMPT_TEMPLATE = `【多视角场景参考图 — 6视图全景布局】
+
+你需要在同一张画面中展示"一个固定场景"的6个不同视角，按照3列×2行网格排列，每格尺寸约1:1方形：
+
+视角1【正面 FRONT】左上方格：从正前方面对该场景，展示场景的正面全貌和入口
+视角2【右侧 RIGHT】中上方格：从右侧90度观看该场景  
+视角3【3/4角度 THREE-QUARTER】右上方格：从右前45度角观看，展示场景的立体感
+视角4【背面 BACK】左下方格：从正后方180度观看该场景
+视角5【左侧 LEFT】中下方格：从左侧90度观看该场景
+视角6【俯视 TOP】右下方格：从正上方鸟瞰，展示整体布局
+
+【核心原则 — 必须严格遵守】
+1. 所有6个视角必须是【同一个场景】，不能是不同的场景
+2. 场景中的所有物体、建筑、道具、光线必须在6个视角中完全一致
+3. 每个格子底部居中标注视角名称（英文大写，如 FRONT / RIGHT / THREE-QUARTER / BACK / LEFT / TOP）
+4. 画面干净、专业，适合作为AI绘画参考图
+5. 不要在任何格子中放置人物`;
+
+const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
+  visible, scenes, selectedStyle, savedSceneLocations,
+  onClose, onImportToScene, onSaveSceneLocations, onApplyPromptToScenes,
 }) => {
   const [sceneLocations, setSceneLocations] = useState<SceneLocation[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [sceneMode, setSceneMode] = useState<SceneMode>('standard');
-  
-  // 修复 #10: 使用 ref 存储最新的 sceneLocations，避免 useCallback 依赖导致频繁重建
-  const sceneLocationsRef = useRef(sceneLocations);
-  sceneLocationsRef.current = sceneLocations;
+  const initializedRef = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 用于跟踪是否已初始化场景数据 - 使用字符串标记当前会话
-  const initializedSessionRef = useRef<string | null>(null);
-  // 跟踪上一次的 visible 状态
-  const prevVisibleRef = useRef(visible);
-  
-  // 从分镜中提取并去重场景，同时恢复已保存的数据
-  // 修复问题#1: 只在弹窗首次打开时初始化，避免导入后重新提取导致场景消失
-  // 修复问题#2: 移除 sceneLocations 依赖，使用 ref 避免循环依赖
+  // 创建场景弹窗
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createDesc, setCreateDesc] = useState('');
+  const [createPrompt, setCreatePrompt] = useState('');
+  const [createOptimizing, setCreateOptimizing] = useState(false);
+  const [createGenerating, setCreateGenerating] = useState(false);
+  const [createGenProgress, setCreateGenProgress] = useState(0);
+  const [createImage, setCreateImage] = useState<string | null>(null);
+
+  // ==================== 加载场景 ====================
   useEffect(() => {
-    // 生成当前会话ID（弹窗打开时生成）
-    const sessionId = visible ? 'session-' + Date.now() : null;
-    
-    console.log('[SceneManagerModal] useEffect 触发, visible:', visible, 
-      'prevVisible:', prevVisibleRef.current,
-      'initializedSession:', initializedSessionRef.current,
-      'sceneLocations.length:', sceneLocationsRef.current.length);
-    
-    // 检测弹窗从打开变为关闭
-    if (!visible && prevVisibleRef.current) {
-      // 弹窗关闭时重置初始化标记，下次打开时重新提取
-      initializedSessionRef.current = null;
-      prevVisibleRef.current = visible;
-      return;
-    }
-    
-    prevVisibleRef.current = visible;
-    
-    if (!visible) {
-      return;
-    }
-    
-    // 如果已经初始化过（当前会话有数据），不再重新提取
-    // 关键修复：检查 sceneLocationsRef.current.length > 0 来判断是否已有数据
-    if (initializedSessionRef.current && sceneLocationsRef.current.length > 0) {
-      console.log('[SceneManagerModal] 已初始化且有数据，跳过重新提取');
-      return;
-    }
-    
+    if (!visible) { initializedRef.current = false; return; }
+    if (initializedRef.current && sceneLocations.length > 0) return;
     if (scenes.length === 0) return;
 
     const sceneMap = new Map<string, SceneLocation>();
-    // 正则匹配"场景X：描述"格式，只有带冒号和描述的才是完整场景定义
-    const sceneDefRegex = /^场景([A-Z])[:：](.+)$/;
+    const savedMap = new Map<string, SceneLocationData>();
+    if (savedSceneLocations) savedSceneLocations.forEach(s => savedMap.set(s.sceneLabel, s));
 
-    // 创建已保存数据的查找映射
-    const savedDataMap = new Map<string, SceneLocationData>();
-    if (savedSceneLocations) {
-      console.log('[SceneManagerModal] 从项目恢复场景数据:', savedSceneLocations);
-      console.log('[SceneManagerModal] 场景图片URL:', savedSceneLocations.map(s => ({ label: s.sceneLabel, image: s.generatedImage?.substring(0, 50) })));
-      savedSceneLocations.forEach(saved => {
-        savedDataMap.set(saved.sceneLabel, saved);
-      });
-    } else {
-      console.log('[SceneManagerModal] 没有已保存的场景数据');
-    }
-    
-    // 使用 ref 获取当前 sceneLocations，避免将其作为依赖项
-    const currentDataMap = new Map<string, SceneLocation>();
-    sceneLocationsRef.current.forEach(loc => {
-      currentDataMap.set(loc.sceneLabel, loc);
-    });
-
-    // 第一遍：先处理所有完整场景定义（场景X：描述）
+    const regex = /^场景([A-Z])[:：](.+)$/;
     scenes.forEach(scene => {
       const desc = scene.description?.trim() || '';
-      if (!desc) return;
-
-      const match = desc.match(sceneDefRegex);
+      const match = desc.match(regex);
       if (match) {
-        const sceneLabel = `场景${match[1]}`;  // 如"场景A"
-        const sceneContent = match[2].trim();   // 场景描述内容
-        
-        if (sceneMap.has(sceneLabel)) {
-          // 已存在，添加分镜ID
-          const existing = sceneMap.get(sceneLabel)!;
-          existing.sceneIds.push(scene.id);
-        } else {
-          // 新场景 - 优先从当前状态恢复，其次从已保存数据恢复
-          const currentData = currentDataMap.get(sceneLabel);
-          const savedData = savedDataMap.get(sceneLabel);
-          sceneMap.set(sceneLabel, {
-            sceneLabel,  // 场景标识，如"场景A"
-            sceneDescription: `${sceneLabel}：${sceneContent}`,
-            prompt: currentData?.prompt || savedData?.prompt || sceneContent,
-            multiViewPrompt: currentData?.multiViewPrompt || savedData?.multiViewPrompt,
+        const label = `场景${match[1]}`;
+        const content = match[2].trim();
+        const saved = savedMap.get(label);
+        if (!sceneMap.has(label)) {
+          sceneMap.set(label, {
+            sceneLabel: label,
+            sceneDescription: `${label}：${content}`,
+            prompt: saved?.prompt || content,
             sceneIds: [scene.id],
-            generatedImage: currentData?.generatedImage || savedData?.generatedImage,
-            multiViewImage: currentData?.multiViewImage || savedData?.multiViewImage,
-            isGenerating: currentData?.isGenerating || false,
-            isOptimizing: currentData?.isOptimizing || false,
-            loadingProgress: currentData?.loadingProgress
+            generatedImage: saved?.generatedImage || undefined,
           });
+        } else {
+          sceneMap.get(label)!.sceneIds.push(scene.id);
+        }
+      } else if (/^场景[A-Z]$/.test(desc)) {
+        const existing = sceneMap.get(desc);
+        if (existing && !existing.sceneIds.includes(scene.id)) {
+          existing.sceneIds.push(scene.id);
         }
       }
     });
 
-    // 第二遍：处理重复引用（场景X）
-    scenes.forEach(scene => {
-      const desc = scene.description?.trim() || '';
-      if (!desc) return;
+    setSceneLocations(Array.from(sceneMap.values()));
+    initializedRef.current = true;
+  }, [visible, scenes, savedSceneLocations]);
 
-      // 只处理重复引用格式
-      if (/^场景[A-Z]$/.test(desc)) {
-        const sceneLabel = desc;
-        if (sceneMap.has(sceneLabel)) {
-          const existing = sceneMap.get(sceneLabel)!;
-          // 避免重复添加（如果已经在第一遍中添加过）
-          if (!existing.sceneIds.includes(scene.id)) {
-            existing.sceneIds.push(scene.id);
-          }
-        }
-      }
-    });
-
-    const result = Array.from(sceneMap.values());
-    console.log('[SceneManagerModal] 场景提取结果:', result);
-    console.log('[SceneManagerModal] 分镜描述列表:', scenes.map(s => ({ id: s.id, description: s.description })));
-    setSceneLocations(result);
-    initializedSessionRef.current = 'initialized';
-  }, [visible, scenes, savedSceneLocations]); // 移除 sceneLocations 依赖
-
-    // 保存场景数据到项目（包含多视角数据）
-  const saveSceneData = useCallback((locations: SceneLocation[]) => {
+  const saveData = useCallback((locs: SceneLocation[]) => {
     if (!onSaveSceneLocations) return;
-
-    const dataToSave: SceneLocationData[] = locations.map(loc => ({
-      sceneLabel: loc.sceneLabel,
-      sceneDescription: loc.sceneDescription,
-      prompt: loc.prompt,
-      multiViewPrompt: loc.multiViewPrompt,
-      generatedImage: loc.generatedImage,
-      multiViewImage: loc.multiViewImage,
-    } as SceneLocationData));
-
-    onSaveSceneLocations(dataToSave);
+    onSaveSceneLocations(locs.map(l => ({
+      sceneLabel: l.sceneLabel, sceneDescription: l.sceneDescription,
+      prompt: l.prompt, generatedImage: l.generatedImage,
+    })));
   }, [onSaveSceneLocations]);
 
-  // 防抖保存 timer
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // 更新场景提示词（根据当前模式写入对应字段）+ 防抖持久化
-  const handlePromptChange = useCallback((index: number, newPrompt: string) => {
-    setSceneLocations(prev => {
-      const updated = [...prev];
-      if (sceneMode === 'multiview') {
-        updated[index] = { ...updated[index], multiViewPrompt: newPrompt };
-      } else {
-        updated[index] = { ...updated[index], prompt: newPrompt };
-      }
-      // 防抖保存（500ms 无输入后自动持久化）
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => {
-        saveSceneData(updated);
-      }, 500);
-      return updated;
-    });
-  }, [sceneMode, saveSceneData]);
-
-  // 组件卸载时清除定时器
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, []);
-
-  // 获取当前模式下的提示词
-  const getCurrentPrompt = useCallback((location: SceneLocation): string => {
-    if (sceneMode === 'multiview') {
-      return location.multiViewPrompt || location.prompt;
-    }
-    return location.prompt;
-  }, [sceneMode]);
-
-  // 获取当前模式下的生成图片
-  const getCurrentImage = useCallback((location: SceneLocation): string | undefined => {
-    if (sceneMode === 'multiview') {
-      return location.multiViewImage || location.generatedImage;
-    }
-    return location.generatedImage;
-  }, [sceneMode]);
-
-  // AI优化场景提示词（根据当前模式调用不同方法）
-  const handleOptimizePrompt = async (index: number) => {
-    const location = sceneLocationsRef.current[index];
-    const currentPrompt = sceneMode === 'multiview'
-      ? (location.multiViewPrompt || location.prompt)
-      : location.prompt;
-
-    setSceneLocations(prev => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], isOptimizing: true };
-      return updated;
-    });
-
+  // ==================== 创建场景 ====================
+  const handleOptimizeDesc = async () => {
+    if (!createDesc.trim()) { message.warning('请输入场景描述'); return; }
+    setCreateOptimizing(true);
     try {
-      const optimizedPrompt = sceneMode === 'multiview'
-        ? await aiService.optimizeSceneMultiViewPrompt(currentPrompt)
-        : await aiService.optimizeScenePrompt(currentPrompt);
-
-      setSceneLocations(prev => {
-        const updated = [...prev];
-        if (sceneMode === 'multiview') {
-          updated[index] = { ...updated[index], multiViewPrompt: optimizedPrompt, isOptimizing: false };
-        } else {
-          updated[index] = { ...updated[index], prompt: optimizedPrompt, isOptimizing: false };
-        }
-        saveSceneData(updated);
-        return updated;
-      });
-
-      message.success(sceneMode === 'multiview' ? '多视角全景提示词优化成功' : '提示词优化成功');
-    } catch (error) {
-      console.error('优化提示词失败:', error);
-      message.error('优化提示词失败');
-
-      setSceneLocations(prev => {
-        const updated = [...prev];
-        updated[index] = { ...updated[index], isOptimizing: false };
-        return updated;
-      });
-    }
+      const result = await aiService.optimizeScenePrompt(createDesc.trim());
+      setCreatePrompt(result);
+      message.success('场景描述已优化');
+    } catch (e: any) { message.error(e.message || '优化失败'); }
+    finally { setCreateOptimizing(false); }
   };
 
-  // 生成场景图片 - 根据当前模式使用对应的提示词和图片字段
-  const handleGenerateImage = useCallback(async (index: number) => {
-    const location = sceneLocationsRef.current[index];
-    const currentPrompt = sceneMode === 'multiview'
-      ? (location.multiViewPrompt || location.prompt)
-      : location.prompt;
-
-    console.log('[SceneManagerModal] 生成场景图片，当前模式:', sceneMode);
-    console.log('[SceneManagerModal] 当前风格:', selectedStyle);
-
-    setSceneLocations(prev => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], isGenerating: true, loadingProgress: 0 };
-      return updated;
-    });
-
+  const handleGenerateScene = async () => {
+    const prompt = createPrompt || createDesc;
+    if (!prompt.trim()) { message.warning('请先输入场景描述并优化'); return; }
+    setCreateGenerating(true); setCreateGenProgress(0);
     try {
-      // 多视角模式使用 1:1 方形比例，标准模式使用 16:9
-      const aspectRatio = sceneMode === 'multiview' ? '1:1' : '16:9';
-
-      const tempScene: Scene = {
-        id: 'temp-scene',
-        order: 0,
-        description: location.sceneDescription,
-        prompt: currentPrompt,
-        generationMode: 'text-to-image',
-        images: {},
-        videos: [],
-        status: 'pending'
-      };
-
-      const imageUrl = await aiService.generateImage(
-        tempScene,
-        undefined,
-        {
-          aspectRatio,
-          style: selectedStyle
-        }
-      );
-
-      await preloadImage(imageUrl, (progress) => {
-        setSceneLocations(prev => {
-          const updated = [...prev];
-          updated[index] = { ...updated[index], loadingProgress: progress };
-          return updated;
-        });
-      });
-
-      let finalImage = imageUrl;
+      const fullPrompt = `${MULTIVIEW_PROMPT_TEMPLATE}\n\n【场景内容】\n${prompt.trim()}`;
+      const tempScene: Scene = { id: 'temp', order: 0, description: createDesc, prompt: fullPrompt, generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' };
+      setCreateGenProgress(20);
+      const imageUrl = await aiService.generateImage(tempScene, undefined, { aspectRatio: '1:1', style: selectedStyle });
+      setCreateGenProgress(70);
+      await preloadImage(imageUrl, (p) => setCreateGenProgress(20 + Math.round(p * 0.5)));
+      // 转 Base64 永久存储
       try {
-        console.log('[SceneManagerModal] 开始转换图片为 Base64...');
-        const response = await fetch(imageUrl);
-        if (response.ok) {
-          const blob = await response.blob();
-          finalImage = await blobToBase64(blob);
-          console.log('[SceneManagerModal] 图片已转换为 Base64，长度:', finalImage.length);
-        }
-      } catch (err) {
-        console.warn('[SceneManagerModal] 转换图片为 Base64 失败，使用原始 URL:', err);
-      }
+        const resp = await fetch(imageUrl);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const b64 = await blobToBase64(blob);
+          setCreateImage(b64);
+        } else { setCreateImage(imageUrl); }
+      } catch { setCreateImage(imageUrl); }
+      setCreateGenProgress(100);
+      message.success('6视角场景图生成完成');
+    } catch (e: any) { message.error(e.message || '生成失败'); }
+    finally { setCreateGenerating(false); }
+  };
 
-      // 更新到对应模式的图片字段
-      const updatedLocations = sceneLocationsRef.current.map((loc, i) =>
-        i === index
-          ? {
-              ...loc,
-              ...(sceneMode === 'multiview'
-                ? { multiViewImage: finalImage }
-                : { generatedImage: finalImage }),
-              isGenerating: false,
-              loadingProgress: undefined
-            }
-          : loc
-      );
+  const handleImportLocal = () => {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const b64 = await blobToBase64(file);
+        setCreateImage(b64);
+        message.success('本地图片已导入');
+      } catch { message.error('导入失败'); }
+    };
+    input.click();
+  };
 
-      setSceneLocations(updatedLocations);
+  const handleSaveScene = () => {
+    if (!createImage) { message.warning('请先生成或导入场景图片'); return; }
+    if (!createDesc.trim()) { message.warning('请输入场景名称/描述'); return; }
+    const label = `场景${String.fromCharCode(65 + sceneLocations.length)}`;
+    const newLoc: SceneLocation = {
+      sceneLabel: label,
+      sceneDescription: `${label}：${createDesc.trim()}`,
+      prompt: createPrompt || createDesc.trim(),
+      sceneIds: [],
+      generatedImage: createImage,
+    };
+    const updated = [...sceneLocations, newLoc];
+    setSceneLocations(updated);
+    saveData(updated);
+    setCreateOpen(false);
+    setCreateDesc(''); setCreatePrompt(''); setCreateImage(null);
+    message.success(`场景已保存: ${label}`);
+  };
 
-      console.log('[SceneManagerModal] 保存场景数据到项目...');
-      saveSceneData(updatedLocations);
+  // ==================== 生成/导入场景图片 ====================
+  const handleGenerateImage = useCallback(async (index: number) => {
+    const loc = sceneLocations[index];
+    setSceneLocations(prev => { const u = [...prev]; u[index] = { ...u[index], isGenerating: true, loadingProgress: 0 }; return u; });
+    try {
+      const tempScene: Scene = { id: 'temp', order: 0, description: loc.sceneDescription, prompt: loc.prompt, generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' };
+      const imageUrl = await aiService.generateImage(tempScene, undefined, { aspectRatio: '16:9', style: selectedStyle });
+      await preloadImage(imageUrl, (p) => setSceneLocations(prev => { const u = [...prev]; u[index] = { ...u[index], loadingProgress: p }; return u; }));
+      let final = imageUrl;
+      try { const r = await fetch(imageUrl); if (r.ok) final = await blobToBase64(await r.blob()); } catch {}
+      const updated = sceneLocations.map((l, i) => i === index ? { ...l, generatedImage: final, isGenerating: false, loadingProgress: undefined } : l);
+      setSceneLocations(updated);
+      saveData(updated);
+      message.success('场景图生成完成');
+    } catch (e: any) { message.error(e.message || '生成失败'); setSceneLocations(prev => { const u = [...prev]; u[index] = { ...u[index], isGenerating: false }; return u; }); }
+  }, [sceneLocations, selectedStyle, saveData]);
 
-      message.success(sceneMode === 'multiview' ? '多视角全景场景图生成成功' : '场景图片生成成功');
-    } catch (error) {
-      console.error('生成场景图片失败:', error);
-      message.error('生成场景图片失败');
-
-      setSceneLocations(prev => {
-        const updated = [...prev];
-        updated[index] = { ...updated[index], isGenerating: false, loadingProgress: undefined };
-        return updated;
-      });
-    }
-  }, [selectedStyle, saveSceneData, sceneMode]);
-
-  // 导入场景图片到分镜 - 根据当前模式使用对应的图片
   const handleImport = useCallback((index: number) => {
-    const location = sceneLocationsRef.current[index];
-    const currentImage = sceneMode === 'multiview' ? location.multiViewImage : location.generatedImage;
+    const loc = sceneLocations[index];
+    if (!loc.generatedImage) { message.warning('请先生成场景图片'); return; }
+    if (loc.sceneIds.length === 0) { message.warning('该场景没有关联的分镜'); return; }
+    onImportToScene(loc.sceneIds.join(','), loc.generatedImage);
+    message.success(`已导入到 ${loc.sceneIds.length} 个分镜`);
+  }, [onImportToScene]);
 
-    console.log('[SceneManagerModal] 导入场景:', location, '模式:', sceneMode);
-
-    if (!currentImage) {
-      message.warning(sceneMode === 'multiview' ? '请先生成多视角全景场景图' : '请先生成场景图片');
-      return;
-    }
-
-    if (location.sceneIds.length === 0) {
-      message.warning('该场景没有关联的分镜');
-      return;
-    }
-
-    onImportToScene(location.sceneIds.join(','), currentImage);
-
-    message.success(sceneMode === 'multiview'
-      ? `已导入多视角全景图到 ${location.sceneIds.length} 个分镜`
-      : `已导入到 ${location.sceneIds.length} 个分镜`);
-  }, [onImportToScene, sceneMode]);
-
-  // 将场景提示词应用到全部分镜 - 根据当前模式使用对应的 prompt
   const handleApplyToScenes = useCallback((index: number) => {
-    const location = sceneLocationsRef.current[index];
-    if (!location) return;
+    const loc = sceneLocations[index];
+    if (!loc || !onApplyPromptToScenes) return;
+    onApplyPromptToScenes(loc.sceneIds, loc.prompt);
+    message.success(`已应用到 ${loc.sceneIds.length} 个分镜`);
+  }, [onApplyPromptToScenes]);
 
-    const currentPrompt = sceneMode === 'multiview'
-      ? (location.multiViewPrompt || location.prompt)
-      : location.prompt;
-
-    if (onApplyPromptToScenes) {
-      onApplyPromptToScenes(location.sceneIds, currentPrompt);
-      message.success(sceneMode === 'multiview'
-        ? `已将多视角全景提示词应用到 ${location.sceneIds.length} 个分镜`
-        : `已将场景提示词应用到 ${location.sceneIds.length} 个分镜`);
-    }
-  }, [onApplyPromptToScenes, sceneMode]);
-
-  // 预览图片
-  const handlePreview = useCallback((imageUrl: string) => {
-    setPreviewImage(imageUrl);
-  }, []);
+  const handleDeleteScene = useCallback((index: number) => {
+    const updated = sceneLocations.filter((_, i) => i !== index);
+    setSceneLocations(updated);
+    saveData(updated);
+  }, [sceneLocations, saveData]);
 
   return (
     <>
-      <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span>场景管理</span>
-            <Select
-              value={sceneMode}
-              onChange={(value: SceneMode) => setSceneMode(value)}
-              style={{ width: 160 }}
-              options={[
-                { label: '📷 标准场景', value: 'standard' },
-                { label: '🔮 多视角全景', value: 'multiview' },
-              ]}
-            />
-          </div>
-        }
-        open={visible}
-        onCancel={onClose}
-        footer={null}
-        width="80vw"
-        style={{ top: '10vh' }}
-        styles={{ body: { height: '70vh', overflow: 'auto' } }}
-        forceRender
-        destroyOnClose={false}
-        className={styles.sceneManagerModal}
-      >
+      <Modal title="场景管理" open={visible} onCancel={onClose} footer={null}
+        width="85vw" style={{ top: '5vh' }} bodyStyle={{ height: '72vh', overflow: 'auto' }}
+        forceRender destroyOnClose={false} className={styles.modal}>
+        <div className={styles.headerBar}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>创建场景</Button>
+          <span style={{fontSize:13,color:'var(--text-tertiary)',marginLeft:12}}>{sceneLocations.length} 个场景</span>
+        </div>
         {sceneLocations.length === 0 ? (
-          <Empty description="暂无场景数据" />
+          <Empty description="暂无场景，点击「创建场景」开始" style={{marginTop:60}} />
         ) : (
-          <div className={styles.sceneList}>
-            {sceneLocations.map((location, index) => (
-              <SceneLocationItem
-                key={index}
-                index={index}
-                sceneLabel={location.sceneLabel}
-                sceneDescription={location.sceneDescription}
-                prompt={getCurrentPrompt(location)}
-                sceneCount={location.sceneIds.length}
-                generatedImage={getCurrentImage(location)}
-                isGenerating={location.isGenerating || false}
-                isOptimizing={location.isOptimizing || false}
-                loadingProgress={location.loadingProgress}
-                sceneMode={sceneMode}
-                onPromptChange={handlePromptChange}
-                onOptimize={handleOptimizePrompt}
-                onGenerate={handleGenerateImage}
-                onImport={handleImport}
-                onPreview={handlePreview}
-                onApplyToScenes={handleApplyToScenes}
-              />
+          <div className={styles.grid}>
+            {sceneLocations.map((loc, i) => (
+              <div key={i} className={styles.card}>
+                <div className={styles.cardPreview}
+                  onClick={() => { if (loc.generatedImage) setPreviewImage(loc.generatedImage); }}>
+                  {loc.generatedImage ? <img src={loc.generatedImage} alt="" />
+                    : <div className={styles.cardPlaceholder}><CameraOutlined style={{fontSize:32,opacity:0.2}} /></div>}
+                  {loc.isGenerating && <div className={styles.cardLoading}><Spin /><Progress percent={loc.loadingProgress || 0} size="small" style={{width:100}} /></div>}
+                </div>
+                <div className={styles.cardBody}>
+                  <div className={styles.cardLabel}>{loc.sceneLabel}</div>
+                  <div className={styles.cardDesc}>{loc.sceneDescription.slice(loc.sceneLabel.length + 1).slice(0, 40)}</div>
+                  <div className={styles.cardMeta}>{loc.sceneIds.length} 个分镜</div>
+                </div>
+                <div className={styles.cardActions}>
+                  {!loc.generatedImage ? (
+                    <Button size="small" type="primary" icon={<ThunderboltOutlined />} loading={loc.isGenerating}
+                      onClick={() => handleGenerateImage(i)}>生成</Button>
+                  ) : (
+                    <>
+                      <Button size="small" icon={<EyeOutlined />} onClick={() => { if (loc.generatedImage) setPreviewImage(loc.generatedImage); }} />
+                      <Button size="small" icon={<PictureOutlined />} onClick={() => handleImport(i)}>导入</Button>
+                      <Button size="small" icon={<DeleteOutlined />} danger onClick={() => handleDeleteScene(i)} />
+                    </>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         )}
       </Modal>
 
-      {/* 图片预览弹窗 */}
-      <Modal
-        open={!!previewImage}
-        onCancel={() => setPreviewImage(null)}
-        footer={null}
-        width="auto"
-        centered
-        forceRender
-        destroyOnClose={false}
-        className={styles.previewModal}
-        title={
-          previewImage ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>场景图片预览</span>
-              <Button
-                type="primary"
-                icon={<DownloadOutlined />}
-                onClick={async () => {
-                  try {
-                    await saveImageToLocalFile(previewImage, `场景图_${Date.now()}`);
-                    message.success('图片已保存到本地');
-                  } catch (err) {
-                    message.error('保存失败');
-                    console.error(err);
-                  }
-                }}
-              >
-                保存到本地
-              </Button>
+      {/* 创建场景弹窗 */}
+      <Modal title="创建场景" open={createOpen} onCancel={() => setCreateOpen(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setCreateOpen(false)}>取消</Button>,
+          <Button key="save" type="primary" onClick={handleSaveScene} disabled={!createImage}>保存场景</Button>,
+        ]} width={680} centered forceRender destroyOnClose={false}>
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          <div>
+            <label style={s.label}>场景描述</label>
+            <Input.TextArea rows={2} placeholder="输入场景描述，如：古代宫殿大殿，金碧辉煌，龙柱林立..."
+              value={createDesc} onChange={e => setCreateDesc(e.target.value)} />
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <Button icon={<ThunderboltOutlined />} loading={createOptimizing} onClick={handleOptimizeDesc}>
+              AI优化描述
+            </Button>
+            <Button icon={<CameraOutlined />} loading={createGenerating} onClick={handleGenerateScene}
+              disabled={!(createPrompt || createDesc).trim()} type="primary">
+              生成6视角场景
+            </Button>
+            <Button icon={<UploadOutlined />} onClick={handleImportLocal}>导入本地图片</Button>
+          </div>
+          {createPrompt && (
+            <div style={s.promptBox}>
+              <div style={s.miniLabel}>优化后的提示词</div>
+              <pre style={s.pre}>{createPrompt}</pre>
             </div>
-          ) : undefined
-        }
-      >
-        {previewImage && (
-          <img src={previewImage} alt="场景预览" className={styles.previewFullImage} />
-        )}
+          )}
+          {createGenerating && <Progress percent={createGenProgress} size="small" />}
+          {createImage && (
+            <div style={{textAlign:'center',background:'var(--input-bg)',borderRadius:12,padding:12}}>
+              <img src={createImage} alt="" style={{maxWidth:'100%',maxHeight:300,borderRadius:8}} />
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* 图片预览 */}
+      <Modal open={!!previewImage} onCancel={() => setPreviewImage(null)} footer={null} width="auto" centered>
+        {previewImage && <img src={previewImage} alt="" style={{maxWidth:'80vw',maxHeight:'80vh',borderRadius:8}} />}
       </Modal>
     </>
   );
-});
+};
 
-SceneManagerModal.displayName = 'SceneManagerModal';
+const s: Record<string, React.CSSProperties> = {
+  label: { display:'block',marginBottom:6,fontSize:12,fontWeight:600,color:'var(--text-label)',textTransform:'uppercase',letterSpacing:0.4 },
+  miniLabel: { fontSize:11,fontWeight:600,color:'var(--text-label)',marginBottom:6 },
+  pre: { margin:0,whiteSpace:'pre-wrap',fontSize:12,lineHeight:1.6,color:'var(--body-color)',maxHeight:120,overflow:'auto' },
+  promptBox: { padding:12,background:'var(--input-bg)',border:'1px solid var(--panel-border)',borderRadius:10 },
+};
 
 export default SceneManagerModal;

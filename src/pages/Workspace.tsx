@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { message, Spin, Empty, Button, Modal, Progress, Select, Input } from 'antd';
 import {
   UserOutlined, PictureOutlined, ArrowLeftOutlined, PlayCircleOutlined,
-  PlusOutlined, DeleteOutlined, ThunderboltOutlined, BulbOutlined,
+  PlusOutlined, DeleteOutlined, ThunderboltOutlined, BulbOutlined, UploadOutlined,
   EyeOutlined, MenuFoldOutlined, MenuUnfoldOutlined, FileTextOutlined,
   ApiOutlined, VideoCameraOutlined,
 } from '@ant-design/icons';
@@ -89,6 +89,7 @@ const Workspace: React.FC = () => {
   const [directorLoading, setDirectorLoading] = useState(false);
   const [templateSelectOpen, setTemplateSelectOpen] = useState(false);
   const [addConfirmOpen, setAddConfirmOpen] = useState(false);
+  const [previewImportOpen, setPreviewImportOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const leftListRef = useRef<HTMLDivElement>(null);
 
@@ -359,7 +360,8 @@ const Workspace: React.FC = () => {
             </div>
           </div>
 
-          <div className={`${styles.previewArea} ${activeScene ? styles.previewActive : ''}`}>
+          <div className={`${styles.previewArea} ${activeScene ? styles.previewActive : ''}`}
+            onClick={() => activeScene && setPreviewImportOpen(true)}>
             {generating ? <div className={styles.previewLoading}><Spin size="large" /><Progress percent={genProgress} size="small" style={{width:200}} /></div>
             : previewMode === 'image' ? (previewImg ? <img src={previewImg} className={styles.previewImage} alt="" /> : <div className={styles.previewEmpty}><PictureOutlined className={styles.previewEmptyIcon} /><span>选择分镜并生成图片</span></div>)
             : (previewVid ? <video src={previewVid} className={styles.previewVideo} controls /> : <div className={styles.previewEmpty}><PlayCircleOutlined className={styles.previewEmptyIcon} /><span>选择分镜并生成视频</span></div>)}
@@ -489,6 +491,30 @@ const Workspace: React.FC = () => {
       <Modal title="选择角色" open={characterModalVisible} onCancel={()=>setCharacterModalVisible(false)} onOk={confirmCharacterSelection} okText="确认" cancelText="取消" width="45%" centered className={styles.charModal}><div className={styles.charGrid}>{characters.length === 0 ? <Empty description="暂无角色" /> : characters.map(c => <CharacterSelectCard key={c.id} character={c} isSelected={isCharSelected(c.id)} onToggle={toggleCharacterSelection} />)}</div></Modal>
       <SceneManagerModal visible={sceneManagerVisible} scenes={project.script} selectedStyle={selectedStyle} savedSceneLocations={project.sceneLocations} onClose={() => setSceneManagerVisible(false)} onImportToScene={(ids, url) => { const idList = ids.split(',').filter(Boolean); const script = project.script.map(s => idList.includes(s.id) ? { ...s, images: { ...s.images, keyFrame: url, storyboard: url } } : s); setProject(prev => prev ? { ...prev, script, updatedAt: new Date() } : prev); handleUpdateProject({ ...project, script }); }} onSaveSceneLocations={locs => handleUpdateProject({ ...project, sceneLocations: locs })} onApplyPromptToScenes={(ids, prompt) => { const script = project.script.map(s => ids.includes(s.id) ? { ...s, jiMengPrompt: `【场景提示词】${prompt}${s.actionDescription?`\n【动作描述】${s.actionDescription}`:''}${s.dialogue?`\n【对话】\n${s.dialogue}`:''}` } : s); setProject(prev => prev ? { ...prev, script, updatedAt: new Date() } : prev); saveProject({ ...project, script }).catch(()=>{}); }} />
       <Modal title="AI导演优化结果" open={directorPreviewOpen} onCancel={() => setDirectorPreviewOpen(false)} footer={[<Button key="cancel" onClick={() => setDirectorPreviewOpen(false)}>取消</Button>,<Button key="apply" type="primary" onClick={applyDirectorResult}>应用到提示词</Button>]} width={700} centered><pre style={{whiteSpace:'pre-wrap',fontSize:13,lineHeight:1.7,color:'var(--body-color)',maxHeight:'50vh',overflow:'auto',padding:16,background:'var(--input-bg)',borderRadius:10}}>{directorResult}</pre></Modal>
+      {/* 预览区导入弹窗 */}
+      <Modal title="导入到预览框" open={previewImportOpen} onCancel={() => setPreviewImportOpen(false)} footer={null} width={440} centered>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <Button block icon={<UploadOutlined />} onClick={() => {
+            const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+            inp.onchange = async () => {
+              const f = inp.files?.[0]; if (!f) return;
+              try {
+                const b64 = await new Promise<string>((resolve, reject) => {
+                  const r = new FileReader(); r.onload = () => resolve(r.result as string);
+                  r.onerror = reject; r.readAsDataURL(f);
+                });
+                if (activeScene) handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: b64 } });
+                setPreviewImportOpen(false); message.success('图片已导入');
+              } catch { message.error('导入失败'); }
+            }; inp.click();
+          }}>📁 从本地导入图片</Button>
+          <Button block icon={<PictureOutlined />} onClick={() => {
+            setPreviewImportOpen(false);
+            setTimeout(() => setSceneManagerVisible(true), 200);
+          }}>🎬 从场景库选择（已生成的场景图）</Button>
+        </div>
+      </Modal>
+
       <Modal title={null} open={templateSelectOpen} onCancel={() => setTemplateSelectOpen(false)} footer={null} width={500} centered className={styles.tplModal}>
         <div className={styles.tplModalHead}><FileTextOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>提示词模板</span></div>
         <div className={styles.tplModalBody}>{(['image','video','director'] as const).map(type => { const templates = templatesByType[type]; const selId = getSelectedTemplateId(type); return (<div key={type} className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}>{TEMPLATE_TYPE_ICONS[type]}</span>{TEMPLATE_TYPE_LABELS[type]}</div>{templates.length === 0 ? <div className={styles.tplEmpty}>暂无{type==='image'?'图片':type==='video'?'视频':'导演'}模板</div> : <Select size="small" value={selId} onChange={(v) => setSelectedTemplateId(type, v)} placeholder={`选择${TEMPLATE_TYPE_LABELS[type]}`} allowClear style={{width:'100%'}} options={templates.map(t => ({ label: t.name, value: t.id }))} />}</div>); })}</div>
