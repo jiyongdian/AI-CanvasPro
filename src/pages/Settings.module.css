@@ -1,36 +1,58 @@
 /* ========================================
-   设置页面 - 多API卡片式管理（美化版）
+   设置页面 - Premium 设计升级
+   参考: Linear / Vercel / Raycast 暗色美学
    ======================================== */
 
+/* ---- 页面入场 ---- */
 .container {
   max-width: 1160px;
   margin: 0 auto;
-  padding: 32px 40px 48px;
-  animation: fadeIn 0.5s ease-out;
+  padding: 36px 40px 56px;
+  animation: settingsEnter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes settingsEnter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-/* ========== 通用 Section 头部 ========== */
+/* ---- 滚动条（仅设置页内） ---- */
+.container::-webkit-scrollbar { width: 4px; }
+.container::-webkit-scrollbar-track { background: transparent; }
+.container::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.18);
+  border-radius: 2px;
+}
+.container::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.35);
+}
+
+/* ============================================================
+   SECTION 头部
+   ============================================================ */
 .sectionHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 26px;
 }
 
 .sectionHeaderLeft {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .sectionHeaderIcon {
-  font-size: 20px;
-  color: #6366f1;
+  font-size: 22px;
+  color: #8b5cf6;
+  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.35));
 }
 
 .sectionTitle {
@@ -42,11 +64,12 @@
 }
 
 .providerCount {
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-tertiary);
   background: var(--input-bg);
-  padding: 2px 10px;
-  border-radius: 12px;
+  padding: 3px 12px;
+  border-radius: 20px;
   border: 1px solid var(--divider-color);
 }
 
@@ -55,77 +78,157 @@
   border-radius: 10px !important;
   height: 40px !important;
   padding: 0 22px !important;
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.25) !important;
 }
 
-/* ========== API 平台区域 ========== */
+/* ============================================================
+   API 平台区域
+   ============================================================ */
 .apiSection {
-  margin-bottom: 40px;
+  margin-bottom: 44px;
 }
 
-/* ========== 加载/空状态 ========== */
+/* ---- 加载 ---- */
 .loadingWrap {
   display: flex;
   justify-content: center;
   padding: 80px 0;
 }
 
+/* ---- 空状态（动画图标） ---- */
 .emptyProviders {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 56px 0;
+  padding: 64px 0;
   background: var(--panel-bg-gradient);
   border: 2px dashed var(--panel-border);
-  border-radius: 16px;
+  border-radius: 20px;
 }
 
 .emptyIcon {
   margin-bottom: 8px;
-  opacity: 0.5;
+  opacity: 0.35;
+  animation: emptyFloat 3.2s ease-in-out infinite;
 }
 
-/* ========== 提供商卡片网格 ========== */
+@keyframes emptyFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30%  { transform: translateY(-12px) rotate(3deg); }
+  60%  { transform: translateY(-4px) rotate(-1deg); }
+}
+
+/* ============================================================
+   提供商卡片
+   ============================================================ */
 .providersGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 20px;
+  gap: 22px;
 }
 
 .providerCard {
+  position: relative;
   background: var(--panel-bg-gradient);
   border: 1px solid var(--panel-border);
-  border-radius: 16px;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 2px 12px var(--shadow-light);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.08),
+    0 0 0 1px rgba(139,92,246,0.03);
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---- 卡片悬浮发光 ---- */
+.providerCard::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  background: radial-gradient(
+    600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(139, 92, 246, 0.06),
+    transparent 50%
+  );
+}
+
+.providerCard:hover::after {
+  opacity: 1;
 }
 
 .providerCard:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 30px var(--shadow-base);
-  border-color: var(--item-border-color);
+  transform: translateY(-4px);
+  border-color: rgba(139, 92, 246, 0.25);
+  box-shadow:
+    0 8px 32px rgba(0,0,0,0.18),
+    0 0 0 1px rgba(139,92,246,0.08),
+    0 0 40px -8px rgba(139,92,246,0.10);
 }
 
-/* 卡片顶部渐变 Banner */
+/* ---- 卡片 Banner ---- */
 .providerCardBanner {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 18px 20px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%);
+  padding: 18px 20px 16px;
+  background: linear-gradient(
+    160deg,
+    rgba(99, 102, 241, 0.06) 0%,
+    rgba(139, 92, 246, 0.02) 100%
+  );
   border-bottom: 1px solid var(--divider-color);
 }
 
+/* ---- Logo 容器（旋转渐变边框） ---- */
 .providerLogoCircle {
+  position: relative;
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: 13px;
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.30);
+  z-index: 1;
+}
+
+/* 旋转渐变光环 */
+.providerLogoCircle::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 16px;
+  background: conic-gradient(
+    from 0deg,
+    #6366f1, #8b5cf6, #06b6d4, #6366f1
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 2.5px),
+    #000 calc(100% - 2px)
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 2.5px),
+    #000 calc(100% - 2px)
+  );
+  animation: logoBorderSpin 5s linear infinite;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.providerCard:hover .providerLogoCircle::before {
+  opacity: 1;
+}
+
+@keyframes logoBorderSpin {
+  to { transform: rotate(360deg); }
 }
 
 .providerLogoIcon {
@@ -133,6 +236,7 @@
   color: #fff;
 }
 
+/* ---- 名称区 ---- */
 .providerNameBlock {
   flex: 1;
   display: flex;
@@ -162,17 +266,19 @@
 }
 
 .actionBtn {
-  opacity: 0.6;
-  transition: opacity 0.2s;
+  opacity: 0.5;
+  transition: all 0.2s ease;
+  border-radius: 8px !important;
 }
 
 .actionBtn:hover {
   opacity: 1;
+  background: var(--icon-hover-bg) !important;
 }
 
-/* 卡片内容 */
+/* ---- 卡片 Body ---- */
 .providerCardBody {
-  padding: 16px 20px;
+  padding: 16px 20px 18px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -197,7 +303,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-  font-size: 12px;
+  font-size: 11.5px;
 }
 
 .providerModelsArea {
@@ -239,22 +345,24 @@
   line-height: 20px !important;
 }
 
-/* ========== 系统设置区域 ========== */
+/* ============================================================
+   系统设置卡片区
+   ============================================================ */
 .systemSection {
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .systemSectionHeader {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 22px;
 }
 
 .systemCards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 20px;
+  gap: 22px;
 }
 
 .systemCard {
@@ -262,33 +370,81 @@
   gap: 16px;
   background: var(--panel-bg-gradient);
   border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 12px var(--shadow-light);
-  transition: all 0.25s ease;
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.06),
+    0 0 0 1px rgba(139,92,246,0.02);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 系统卡片悬浮也加微光 */
+.systemCard::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  background: radial-gradient(
+    400px circle at 80% 20%,
+    rgba(99, 102, 241, 0.04),
+    transparent 60%
+  );
+}
+
+.systemCard:hover::after {
+  opacity: 1;
 }
 
 .systemCard:hover {
-  border-color: var(--item-border-color);
-  box-shadow: 0 6px 24px var(--shadow-base);
+  border-color: rgba(139, 92, 246, 0.18);
+  box-shadow:
+    0 6px 24px rgba(0,0,0,0.12),
+    0 0 0 1px rgba(139,92,246,0.05);
 }
 
+/* ---- 系统卡片图标 ---- */
 .systemCardIconWrap {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.08) 100%);
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.10) 0%,
+    rgba(139, 92, 246, 0.06) 100%
+  );
+  border: 1px solid rgba(99, 102, 241, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.systemCard:hover .systemCardIconWrap {
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.16) 0%,
+    rgba(139, 92, 246, 0.10) 100%
+  );
+  border-color: rgba(99, 102, 241, 0.22);
 }
 
 .systemCardIcon {
   font-size: 18px;
   color: #6366f1;
+  transition: transform 0.3s ease;
 }
 
+.systemCard:hover .systemCardIcon {
+  transform: scale(1.1);
+}
+
+/* ---- 系统卡片内容 ---- */
 .systemCardContent {
   flex: 1;
   display: flex;
@@ -305,9 +461,9 @@
   align-items: center;
 }
 
-/* 温度滑块 */
+/* 温度 */
 .tempValue {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: #f59e0b;
   margin-bottom: -2px;
@@ -317,7 +473,7 @@
   margin: 0;
 }
 
-/* 下载路径 */
+/* 下载 */
 .downloadPathRow {
   display: flex;
   gap: 10px;
@@ -331,7 +487,7 @@
   background: var(--input-bg) !important;
   border: 1px solid var(--panel-border) !important;
   border-radius: 10px !important;
-  box-shadow: inset 0 1px 3px var(--shadow-light);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
 }
 
 .downloadPathSet {
@@ -361,8 +517,8 @@
 .updateAvailable {
   margin-top: 8px;
   padding: 12px;
-  background: rgba(245, 158, 11, 0.06);
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.05);
+  border: 1px solid rgba(245, 158, 11, 0.20);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
@@ -386,8 +542,8 @@
 .updateDownloading {
   margin-top: 8px;
   padding: 12px;
-  background: rgba(59, 130, 246, 0.06);
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.20);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
@@ -399,8 +555,8 @@
 .updateReady {
   margin-top: 8px;
   padding: 10px 12px;
-  background: rgba(34, 197, 94, 0.06);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  background: rgba(34, 197, 94, 0.05);
+  border: 1px solid rgba(34, 197, 94, 0.20);
   border-radius: 10px;
   font-size: 13px;
   color: #22c55e;
@@ -415,14 +571,16 @@
 .updateError {
   margin-top: 8px;
   padding: 10px 12px;
-  background: rgba(239, 68, 68, 0.06);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.20);
   border-radius: 10px;
   font-size: 12px;
   color: #ef4444;
 }
 
-/* ========== 编辑弹窗 ========== */
+/* ============================================================
+   编辑 API 弹窗
+   ============================================================ */
 .editModalBody {
   display: flex;
   flex-direction: column;
@@ -436,11 +594,11 @@
 }
 
 .editLabel {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-label);
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
 }
 
 .editActions {
@@ -452,22 +610,24 @@
   flex: 1;
   font-weight: 600 !important;
   border-radius: 10px !important;
-  height: 42px !important;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%) !important;
-  border-color: rgba(99, 102, 241, 0.35) !important;
+  height: 44px !important;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.10) 0%, rgba(139, 92, 246, 0.10) 100%) !important;
+  border-color: rgba(99, 102, 241, 0.30) !important;
   color: #6366f1 !important;
+  transition: all 0.25s ease !important;
 }
 
 .fetchBtn:hover {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22) 0%, rgba(139, 92, 246, 0.22) 100%) !important;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.20) 0%, rgba(139, 92, 246, 0.20) 100%) !important;
   border-color: #6366f1 !important;
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.15) !important;
 }
 
 .editTestBtn {
   flex: 1;
   font-weight: 600 !important;
   border-radius: 10px !important;
-  height: 42px !important;
+  height: 44px !important;
 }
 
 .editModelsPreview {
@@ -504,20 +664,26 @@
 }
 
 .testSuccess {
-  background: rgba(34, 197, 94, 0.06);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  background: rgba(34, 197, 94, 0.05);
+  border: 1px solid rgba(34, 197, 94, 0.20);
   color: #22c55e;
 }
 
 .testFail {
-  background: rgba(239, 68, 68, 0.06);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.20);
   color: #ef4444;
 }
 
-/* ========== 模型选择弹窗（美化版） ========== */
+/* ============================================================
+   模型选择弹窗（Premium 版）
+   ============================================================ */
+.modelSelectModal :global(.ant-modal-content) {
+  border-radius: 20px !important;
+}
+
 .modelSelectModal :global(.ant-modal-header) {
-  padding: 20px 24px 16px !important;
+  padding: 22px 28px 14px !important;
 }
 
 .modelSelectTitle {
@@ -534,6 +700,9 @@
   font-weight: 400;
   color: var(--text-tertiary);
   margin-left: auto;
+  background: var(--input-bg);
+  padding: 3px 12px;
+  border-radius: 16px;
 }
 
 .modelSelectBody {
@@ -542,27 +711,33 @@
   gap: 16px;
 }
 
-/* 搜索栏 */
+/* ---- 搜索栏 ---- */
 .modelSearchWrap {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 11px 18px;
   background: var(--input-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  transition: all 0.2s ease;
+  border: 1.5px solid var(--panel-border);
+  border-radius: 14px;
+  transition: all 0.25s ease;
 }
 
 .modelSearchWrap:focus-within {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.08);
+  background: rgba(139, 92, 246, 0.02);
 }
 
 .modelSearchIcon {
   font-size: 16px;
   color: var(--text-tertiary);
   flex-shrink: 0;
+  transition: color 0.25s;
+}
+
+.modelSearchWrap:focus-within .modelSearchIcon {
+  color: #8b5cf6;
 }
 
 .modelSearchInput {
@@ -583,36 +758,43 @@
   font-size: 12px !important;
   color: var(--text-tertiary) !important;
   flex-shrink: 0;
+  opacity: 0;
+  animation: fadeIn 0.2s ease forwards;
 }
 
-/* 分类列表 */
+/* ---- 分类列表 ---- */
 .modelCategoryList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .modelCategoryBlock {
   border: 1px solid var(--divider-color);
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
-  transition: border-color 0.2s;
+  transition: all 0.25s ease;
+}
+
+.modelCategoryBlock:hover {
+  border-color: rgba(139, 92, 246, 0.15);
 }
 
 .modelCategoryHeader {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.04);
+  padding: 13px 18px;
+  background: rgba(0, 0, 0, 0.03);
+  transition: background 0.2s;
 }
 
 :root[data-theme='dark'] .modelCategoryHeader {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .modelCategoryEmoji {
-  font-size: 16px;
+  font-size: 17px;
   flex-shrink: 0;
 }
 
@@ -623,19 +805,21 @@
 }
 
 .modelCategoryCount {
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--text-tertiary);
   background: var(--input-bg);
-  padding: 1px 8px;
+  padding: 2px 9px;
   border-radius: 10px;
 }
 
 .modelCategoryDot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
   margin-left: auto;
+  box-shadow: 0 0 6px currentColor;
 }
 
 .modelCategoryToggle {
@@ -644,36 +828,37 @@
   font-weight: 500 !important;
 }
 
-/* 模型勾选列表 */
+/* ---- 模型勾选列表 ---- */
 .modelCheckList {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 2px;
-  padding: 10px 14px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 3px;
+  padding: 10px 14px 12px;
 }
 
 .modelCheckItem {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 11px 16px;
   border-radius: 10px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.18s ease;
   font-size: 13px;
   color: var(--body-color);
-  position: relative;
   border: 1px solid transparent;
+  position: relative;
 }
 
 .modelCheckItem:hover {
   background: var(--item-hover-bg);
   border-color: var(--divider-color);
+  transform: translateX(2px);
 }
 
 .modelCheckItemSelected {
-  background: rgba(99, 102, 241, 0.08) !important;
-  border-color: rgba(99, 102, 241, 0.25) !important;
+  background: rgba(99, 102, 241, 0.06) !important;
+  border-color: rgba(99, 102, 241, 0.20) !important;
 }
 
 .modelCheckItem :global(.ant-checkbox-wrapper) {
@@ -690,18 +875,22 @@
 }
 
 .modelCheckMark {
-  font-size: 11px;
+  font-size: 12px;
   color: #6366f1;
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity 0.15s;
+  transform: scale(0.5);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .modelCheckItemSelected .modelCheckMark {
   opacity: 1;
+  transform: scale(1);
 }
 
-/* ========== 删除确认 ========== */
+/* ============================================================
+   删除确认
+   ============================================================ */
 .deleteConfirmBody {
   font-size: 14px;
   color: var(--body-color);
@@ -713,24 +902,20 @@
   color: #ef4444;
 }
 
-/* ========== 响应式 ========== */
+/* ============================================================
+   响应式
+   ============================================================ */
 @media (max-width: 768px) {
   .container {
     padding: 20px 16px;
   }
 
-  .providersGrid {
-    grid-template-columns: 1fr;
-  }
-
+  .providersGrid,
   .systemCards {
     grid-template-columns: 1fr;
   }
 
-  .downloadPathRow {
-    flex-direction: column;
-  }
-
+  .downloadPathRow,
   .updateRow {
     flex-direction: column;
     align-items: flex-start;
@@ -738,5 +923,10 @@
 
   .modelCheckList {
     grid-template-columns: 1fr;
+  }
+
+  .providerCard::after,
+  .systemCard::after {
+    display: none; /* 移动端不加光晕，省性能 */
   }
 }

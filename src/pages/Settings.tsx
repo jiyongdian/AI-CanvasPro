@@ -385,7 +385,7 @@ const Settings: React.FC = () => {
         ) : providers.length === 0 ? (
           <div className={styles.emptyProviders}>
             <div className={styles.emptyIcon}>
-              <ApiOutlined style={{ fontSize: 48, color: 'var(--text-tertiary)' }} />
+              <ApiOutlined style={{ fontSize: 52 }} />
             </div>
             <Empty description="暂无API平台配置" />
             <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal} style={{ marginTop: 16 }}>
