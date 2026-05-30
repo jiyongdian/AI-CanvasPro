@@ -129,7 +129,7 @@ const Workspace: React.FC = () => {
   const setSelectedTemplateId = (type: string, id: string | undefined) => { if (type === 'image') setSelectedImageTemplateId(id); else if (type === 'video') setSelectedVideoTemplateId(id); else setSelectedDirectorTemplateId(id); };
 
   const handleBack = () => { setProject(null as any); navigate('/projects'); };
-  const buildScenePrompt = (s: Scene | undefined): string => { if (!s) return ''; const parts: string[] = []; if (s.description) parts.push(s.description); if (s.actionDescription) parts.push(`【动作】${s.actionDescription}`); if (s.character) parts.push(`【角色】${s.character}`); if (s.dialogue) parts.push(`【对话】${s.dialogue}`); if (s.narration) parts.push(`【旁白】${s.narration}`); return parts.join('\n'); };
+  const buildScenePrompt = (s: Scene | undefined, preferMode?: PreviewMode): string => { if (!s) return ''; const existing = preferMode === 'image' ? s.imagePrompt : preferMode === 'video' ? s.videoPrompt : undefined; if (existing) return existing; const parts: string[] = []; if (s.description) parts.push(s.description); if (s.actionDescription) parts.push(`【动作】${s.actionDescription}`); if (s.character) parts.push(`【角色】${s.character}`); if (s.dialogue) parts.push(`【对话】${s.dialogue}`); if (s.narration) parts.push(`【旁白】${s.narration}`); return parts.join('\n'); };
 
   const addTaskToHistory = useCallback((item: TaskHistoryItem) => {
     setTaskHistory(prev => { const updated = [item, ...prev]; if (projectId) saveTaskHistory(projectId, updated); return updated; });
@@ -154,22 +154,31 @@ const Workspace: React.FC = () => {
   const handleUpdateScene = useCallback((sid: string, updates: Partial<Scene>) => { setProject(prev => { if (!prev) return prev; const script = prev.script.map(s => s.id === sid ? { ...s, ...updates } : s); const np = { ...prev, script, updatedAt: new Date() }; saveProject(np).catch(()=>{}); return np; }); }, [setProject]);
   const doAddScene = async () => { if (!project || !activeSceneId) return; const idx = project.script.findIndex(s => s.id === activeSceneId); const ns: Scene = { id: crypto.randomUUID(), order: idx + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' }; const script = [...project.script.slice(0, idx + 1), ns, ...project.script.slice(idx + 1)].map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); setActiveSceneId(ns.id); setPromptText(''); sessionStorage.setItem(`ws_active_${projectId}`, ns.id); setAddConfirmOpen(false); };
   const doDeleteScene = async () => { if (!project || !activeSceneId) return; if (project.script.length <= 1) { message.warning('至少保留一个分镜'); return; } const script = project.script.filter(s => s.id !== activeSceneId).map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); const nextId = script[0]?.id || null; setActiveSceneId(nextId); setPromptText(buildScenePrompt(script[0])); if (nextId) sessionStorage.setItem(`ws_active_${projectId}`, nextId); setDeleteConfirmOpen(false); };
-  const selectScene = (sid: string) => { setActiveSceneId(sid); const s = project?.script.find(x => x.id === sid); setPromptText(buildScenePrompt(s)); setPreviewMode('image'); sessionStorage.setItem(`ws_active_${projectId}`, sid); };
+  const selectScene = (sid: string) => { setActiveSceneId(sid); const s = project?.script.find(x => x.id === sid); const savedMode = sessionStorage.getItem(`ws_pmode_${sid}`) as PreviewMode | null; const mode = savedMode || 'image'; setPreviewMode(mode); setPromptText(mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s))); sessionStorage.setItem(`ws_active_${projectId}`, sid); };
 
-  // ==================== 推理 (独立loading，绑定图片模板) ====================
+  const switchPreviewMode = (mode: PreviewMode) => {
+    if (activeScene) handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: promptText } as any);
+    setPreviewMode(mode); sessionStorage.setItem(`ws_pmode_${activeSceneId}`, mode);
+    const s = project?.script.find(x => x.id === activeSceneId);
+    setPromptText(mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s)));
+  };
+
+  // ==================== 推理 (文本优化，绑定当前模式模板) ====================
   const handleInfer = async () => {
     if (!activeScene || !project) return;
     setInferLoading(true);
     try {
       const prompt = promptText || activeScene.prompt || activeScene.description;
       if (!prompt) { message.warning('请输入提示词'); return; }
-      const imgTemplate = selectedImageTemplateId ? promptTemplates.find(t => t.id === selectedImageTemplateId) : undefined;
-      const result = await aiService.generateImage(activeScene, undefined, {
-        style: selectedStyle, generationMode, model: selImageModel,
-        aspectRatio: imageRatio.split(' ')[0],
-      });
-      handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: result }, imagePrompt: promptText || undefined, status: 'completed', imageStatus: 'completed' });
-      addTaskToHistory({ id: crypto.randomUUID(), type: 'image', url: result, sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt: promptText, model: selImageModel });
+      const templateId = previewMode === 'image' ? selectedImageTemplateId : selectedVideoTemplateId;
+      const template = templateId ? promptTemplates.find(t => t.id === templateId) : undefined;
+      const result = await aiService.generatePrompt(
+        activeScene, previewMode, undefined, undefined, undefined,
+        selectedStyle, project.script.map(s => s.description),
+        template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined
+      );
+      setPromptText(result);
+      handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: result } as any);
       message.success('推理完成');
     } catch (e: any) { message.error(e.message || '推理失败'); }
     finally { setInferLoading(false); }
@@ -211,7 +220,7 @@ const Workspace: React.FC = () => {
         addTaskToHistory({ id: crypto.randomUUID(), type: 'image', url: result, sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt: promptText, model: selImageModel });
         message.success('图片生成完成');
       } else {
-        const prompt = activeScene.videoPrompt || activeScene.jiMengPrompt || activeScene.prompt;
+        const prompt = promptText || activeScene.videoPrompt || activeScene.jiMengPrompt || activeScene.prompt;
         if (!prompt) { message.warning('请输入视频提示词'); return; }
         const vidTemplate = selectedVideoTemplateId ? promptTemplates.find(t => t.id === selectedVideoTemplateId) : undefined;
         await aiService.generateVideo(activeScene);
@@ -221,7 +230,7 @@ const Workspace: React.FC = () => {
     } catch (e: any) { message.error(e.message || '生成失败'); }
     finally { setGenerating(false); setGenProgress(0); }
   };
-  const savePrompt = useCallback(() => { if (!activeScene) return; handleUpdateScene(activeScene.id, { prompt: promptText }); }, [activeScene, promptText, handleUpdateScene]);
+  const savePrompt = useCallback(() => { if (!activeScene) return; handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: promptText } as any); }, [activeScene, promptText, previewMode, handleUpdateScene]);
 
   // ==================== 提示词展开/收起 ====================
   const togglePromptExpand = () => {
@@ -277,7 +286,7 @@ const Workspace: React.FC = () => {
               <Select size="small" className={styles.inlineSelect} value={videoQuality} onChange={setVideoQuality} style={{width:96}}
                 options={getVideoPreset(selVideoModel).qualities.map(q => ({ label: q, value: q }))} />
             </>}
-            <div className={styles.toggleMode}><button className={`${styles.toggleBtn} ${previewMode === 'image' ? styles.toggleBtnActive : ''}`} onClick={() => setPreviewMode('image')}>图片</button><button className={`${styles.toggleBtn} ${previewMode === 'video' ? styles.toggleBtnActive : ''}`} onClick={() => setPreviewMode('video')}>视频</button></div>
+            <div className={styles.toggleMode}><button className={`${styles.toggleBtn} ${previewMode === 'image' ? styles.toggleBtnActive : ''}`} onClick={() => switchPreviewMode('image')}>图片</button><button className={`${styles.toggleBtn} ${previewMode === 'video' ? styles.toggleBtnActive : ''}`} onClick={() => switchPreviewMode('video')}>视频</button></div>
           </div>
 
           <div className={`${styles.previewArea} ${activeScene ? styles.previewActive : ''}`} onClick={() => activeScene && setPreviewImportOpen(true)} style={{ flex: promptExpanded ? '0 0 0' : 1, overflow: 'hidden', transition: 'flex 0.35s cubic-bezier(0.22,1,0.36,1)' }}>
