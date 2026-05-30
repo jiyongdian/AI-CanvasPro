@@ -18,7 +18,7 @@ const { TextArea } = Input;
 const ProjectList: React.FC = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useRecoilState(projectListState);
-  const [, setCurrentProject] = useRecoilState(currentProjectState);
+  const [currentProject, setCurrentProject] = useRecoilState(currentProjectState);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -178,6 +178,7 @@ const ProjectList: React.FC = () => {
     try {
       await deleteProjectFromDB(projectId);
       setProjects(projects.filter(p => p.id !== projectId));
+      if (currentProject?.id === projectId) setCurrentProject(null as any);
       message.success('项目已删除');
     } catch (error) {
       message.error('删除项目失败');
