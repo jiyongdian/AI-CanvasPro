@@ -249,7 +249,7 @@ const Workspace: React.FC = () => {
       } catch (e) { if (!c) { message.error('加载失败'); navigate('/projects'); } }
       finally { if (!c) setLoading(false); }
     })();
-    return () => { c = true; };
+    return () => { c = true; setProject(null as any); };
   }, [projectId]);
 
   useEffect(() => { if (!loading && leftListRef.current && projectId) { const s = sessionStorage.getItem(`ws_scroll_${projectId}`); if (s) leftListRef.current.scrollTop = parseInt(s, 10); } }, [loading, projectId]);

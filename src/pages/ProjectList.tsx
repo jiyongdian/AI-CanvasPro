@@ -184,12 +184,14 @@ const ProjectList: React.FC = () => {
   };
 
   const handleDeleteProject = async (projectId: string) => {
+    const wasCurrent = currentProject?.id === projectId;
+    if (wasCurrent) setCurrentProject(null as any);
     try {
       await deleteProjectFromDB(projectId);
       setProjects(projects.filter(p => p.id !== projectId));
-      if (currentProject?.id === projectId) setCurrentProject(null as any);
       message.success('项目已删除');
     } catch (error) {
+      if (wasCurrent) setCurrentProject(currentProject);
       message.error('删除项目失败');
       console.error(error);
     }
