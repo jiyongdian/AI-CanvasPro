@@ -222,9 +222,10 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
   const handleImport = useCallback((index: number) => {
     const loc = sceneLocations[index];
     if (!loc.generatedImage) { message.warning('请先生成场景图片'); return; }
-    if (loc.sceneIds.length === 0) { message.warning('该场景没有关联的分镜'); return; }
-    onImportToScene(loc.sceneIds.join(','), loc.generatedImage);
-    message.success(`已导入到 ${loc.sceneIds.length} 个分镜`);
+    // 如果有脚本关联则导入关联分镜，否则导入到当前激活分镜
+    const ids = loc.sceneIds.length > 0 ? loc.sceneIds.join(',') : '__current__';
+    onImportToScene(ids, loc.generatedImage);
+    message.success(loc.sceneIds.length > 0 ? `已导入到 ${loc.sceneIds.length} 个分镜` : '已导入到当前分镜');
   }, [onImportToScene]);
 
   const handleApplyToScenes = useCallback((index: number) => {

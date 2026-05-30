@@ -424,9 +424,6 @@ const Workspace: React.FC = () => {
               placeholder={imageModels.length > 0 ? '选择图片模型' : (providers.length === 0 ? '请先在设置页配置API' : '该平台无图片模型')}
               allowClear style={{width:'100%'}}
               options={imageModels.map(m => ({ label: m.id, value: m.id }))} />
-            <div style={{marginTop:6}}><div className={styles.selectorLabel} style={{marginBottom:4}}>图片比例</div>
-              <Select size="small" value={imageRatio} onChange={setImageRatio} style={{width:'100%'}}
-                options={IMAGE_RATIOS.map(r => ({ label: r, value: r }))} /></div>
           </div>
           {/* 视频模型 */}
           <div className={styles.tplGroup}>
@@ -440,16 +437,6 @@ const Workspace: React.FC = () => {
               allowClear style={{width:'100%'}}
               options={allVideoModels.map(m => ({ label: m.id, value: m.id }))}
               dropdownRender={menu => (<>{menu}<div style={{borderTop:'1px solid var(--divider-color)',padding:'6px 8px'}}><Button type="link" size="small" icon={<PlusOutlined />} onClick={() => { setModelSettingsOpen(false); setTimeout(() => setCustomVideoOpen(true), 100); }} style={{width:'100%'}}>+ 手动添加视频模型</Button></div></>)} />
-            <div style={{display:'flex',gap:8,marginTop:6}}>
-              <div style={{flex:1}}><div className={styles.selectorLabel} style={{marginBottom:4}}>秒数</div>
-                <Select size="small" value={videoDuration} onChange={setVideoDuration} style={{width:'100%'}}
-                  options={getVideoPreset(selVideoModel).durations.map(d => ({ label: `${d}秒`, value: d }))} />
-              </div>
-              <div style={{flex:1}}><div className={styles.selectorLabel} style={{marginBottom:4}}>清晰度</div>
-                <Select size="small" value={videoQuality} onChange={setVideoQuality} style={{width:'100%'}}
-                  options={getVideoPreset(selVideoModel).qualities.map(q => ({ label: q, value: q }))} />
-              </div>
-            </div>
           </div>
           {/* 文本模型（推理/AI导演） */}
           <div className={styles.tplGroup}>
@@ -496,7 +483,7 @@ const Workspace: React.FC = () => {
       <Modal title="添加分镜" open={addConfirmOpen} onCancel={() => setAddConfirmOpen(false)} onOk={doAddScene} okText="确认添加" cancelText="取消" centered width={400}><p style={{color:'var(--body-color)',fontSize:14}}>在当前分镜 <strong style={{color:'#6366f1'}}>分镜 {activeIdx + 1}</strong> 之后插入一个新分镜？</p></Modal>
       <Modal title="删除分镜" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={doDeleteScene} okText="确认删除" cancelText="取消" okButtonProps={{danger:true}} centered width={400}><p style={{color:'var(--body-color)',fontSize:14}}>确定要删除 <strong style={{color:'#ef4444'}}>分镜 {activeIdx + 1}</strong> 吗？</p></Modal>
       <Modal title="选择角色" open={characterModalVisible} onCancel={()=>setCharacterModalVisible(false)} onOk={confirmCharacterSelection} okText="确认" cancelText="取消" width="45%" centered className={styles.charModal}><div className={styles.charGrid}>{characters.length === 0 ? <Empty description="暂无角色" /> : characters.map(c => <CharacterSelectCard key={c.id} character={c} isSelected={isCharSelected(c.id)} onToggle={toggleCharacterSelection} />)}</div></Modal>
-      <SceneManagerModal visible={sceneManagerVisible} scenes={project.script} selectedStyle={selectedStyle} selectedImageModel={selImageModel} savedSceneLocations={project.sceneLocations} onClose={() => setSceneManagerVisible(false)} onImportToScene={(ids, url) => { const idList = ids.split(',').filter(Boolean); const script = project.script.map(s => idList.includes(s.id) ? { ...s, images: { ...s.images, keyFrame: url, storyboard: url } } : s); setProject(prev => prev ? { ...prev, script, updatedAt: new Date() } : prev); handleUpdateProject({ ...project, script }); }} onSaveSceneLocations={locs => handleUpdateProject({ ...project, sceneLocations: locs })} onApplyPromptToScenes={(ids, prompt) => { const script = project.script.map(s => ids.includes(s.id) ? { ...s, jiMengPrompt: `【场景提示词】${prompt}${s.actionDescription?`\n【动作描述】${s.actionDescription}`:''}${s.dialogue?`\n【对话】\n${s.dialogue}`:''}` } : s); setProject(prev => prev ? { ...prev, script, updatedAt: new Date() } : prev); saveProject({ ...project, script }).catch(()=>{}); }} />
+      <SceneManagerModal visible={sceneManagerVisible} scenes={project.script} selectedStyle={selectedStyle} selectedImageModel={selImageModel} savedSceneLocations={project.sceneLocations} onClose={() => setSceneManagerVisible(false)} onImportToScene={(ids, url) => { if (ids === '__current__' && activeSceneId) { handleUpdateScene(activeSceneId, { images: { ...(project.script.find(s=>s.id===activeSceneId)?.images || {}), keyFrame: url, storyboard: url } }); return; } const idList = ids.split(',').filter(Boolean); const script = project.script.map(s => idList.includes(s.id) ? { ...s, images: { ...s.images, keyFrame: url, storyboard: url } } : s); setProject(prev => prev ? { ...prev, script, updatedAt: new Date() } : prev); handleUpdateProject({ ...project, script }); }} onSaveSceneLocations={locs => handleUpdateProject({ ...project, sceneLocations: locs })} onApplyPromptToScenes={(ids, prompt) => { const script = project.script.map(s => ids.includes(s.id) ? { ...s, jiMengPrompt: `【场景提示词】${prompt}${s.actionDescription?`\n【动作描述】${s.actionDescription}`:''}${s.dialogue?`\n【对话】\n${s.dialogue}`:''}` } : s); setProject(prev => prev ? { ...prev, script, updatedAt: new Date() } : prev); saveProject({ ...project, script }).catch(()=>{}); }} />
       <Modal title="AI导演优化结果" open={directorPreviewOpen} onCancel={() => setDirectorPreviewOpen(false)} footer={[<Button key="cancel" onClick={() => setDirectorPreviewOpen(false)}>取消</Button>,<Button key="apply" type="primary" onClick={applyDirectorResult}>应用到提示词</Button>]} width={700} centered><pre style={{whiteSpace:'pre-wrap',fontSize:13,lineHeight:1.7,color:'var(--body-color)',maxHeight:'50vh',overflow:'auto',padding:16,background:'var(--input-bg)',borderRadius:10}}>{directorResult}</pre></Modal>
       {/* 预览区导入弹窗 */}
       <Modal title="导入到预览框" open={previewImportOpen} onCancel={() => setPreviewImportOpen(false)} footer={null} width={440} centered>
