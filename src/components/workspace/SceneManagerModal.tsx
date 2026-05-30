@@ -103,6 +103,21 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
       }
     });
 
+    // 补充保存的手动创建场景（无脚本关联）
+    if (savedSceneLocations) {
+      savedSceneLocations.forEach(saved => {
+        if (!sceneMap.has(saved.sceneLabel)) {
+          sceneMap.set(saved.sceneLabel, {
+            sceneLabel: saved.sceneLabel,
+            sceneDescription: saved.sceneDescription,
+            prompt: saved.prompt,
+            sceneIds: [],
+            generatedImage: saved.generatedImage,
+          });
+        }
+      });
+    }
+
     setSceneLocations(Array.from(sceneMap.values()));
     initializedRef.current = true;
   }, [visible, scenes, savedSceneLocations]);
