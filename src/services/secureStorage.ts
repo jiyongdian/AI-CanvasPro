@@ -182,8 +182,21 @@ export async function saveApiProviders(providers: import('../types').ApiProvider
     await store.set('providers', serializable);
     await store.save();
   } else {
-    const encrypted = obfuscate(JSON.stringify(serializable));
-    localStorage.setItem(PROVIDERS_LOCAL_KEY, encrypted);
+    try {
+      const encrypted = obfuscate(JSON.stringify(serializable));
+      localStorage.setItem(PROVIDERS_LOCAL_KEY, encrypted);
+    } catch (e) {
+      // localStorage 配额满或其他错误，尝试清理旧数据后重试
+      console.warn('[secureStorage] 保存失败，尝试清理后重试:', e);
+      try {
+        localStorage.removeItem('api_config_secure');
+        localStorage.removeItem('api_config');
+        const encrypted = obfuscate(JSON.stringify(serializable));
+        localStorage.setItem(PROVIDERS_LOCAL_KEY, encrypted);
+      } catch (e2) {
+        console.error('[secureStorage] 重试保存仍失败:', e2);
+      }
+    }
   }
 }
 
