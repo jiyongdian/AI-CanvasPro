@@ -107,7 +107,7 @@ const ProjectList: React.FC = () => {
         id: uuidv4(),
         order: s.order || index + 1,
         description: s.sceneDescription,
-        prompt: '',
+        prompt: s.sceneDescription || '',
         generationMode: 'text-to-image' as const,
         images: {},
         videos: [],
@@ -256,7 +256,7 @@ const ProjectList: React.FC = () => {
         id: uuidv4(),
         order: s.order || index + 1,
         description: s.sceneDescription,
-        prompt: '',  // 场景描述不导入到提示词输入框
+        prompt: s.sceneDescription || '',
         generationMode: 'text-to-image' as const,
         images: {},
         videos: [],
