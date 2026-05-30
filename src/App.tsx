@@ -182,13 +182,13 @@ const App: React.FC = () => {
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Navigate to="/projects" replace />} />
             <Route path="projects" element={<ProjectList />} />
-            <Route path="workspace/:projectId" element={<Workspace />} />
             <Route path="ai-character" element={<AICharacter />} />
             <Route path="characters" element={<CharacterLibrary />} />
             <Route path="styles" element={<StyleLibrary />} />
             <Route path="settings" element={<Settings />} />
             <Route path="prompt-templates" element={<PromptTemplates />} />
           </Route>
+          <Route path="workspace/:projectId" element={<Workspace />} />
         </Routes>
       </BrowserRouter>
     </ConfigProvider>
