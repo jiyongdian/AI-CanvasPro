@@ -510,14 +510,15 @@ const Workspace: React.FC = () => {
                 {templates.length === 0 ? (
                   <div className={styles.tplEmpty}>暂无{type==='image'?'图片':type==='video'?'视频':'导演'}模板</div>
                 ) : (
-                  <div className={styles.tplList}>
-                    {templates.map(t => (
-                      <div key={t.id} className={`${styles.chip} ${t.id===selId?styles.chipActive:''}`}
-                        onClick={() => { setSelectedTemplateId(type, t.id === selId ? undefined : t.id); setTemplateSelectOpen(false); }}>
-                        {t.name}
-                      </div>
-                    ))}
-                  </div>
+                  <Select
+                    size="small"
+                    value={selId}
+                    onChange={(v) => setSelectedTemplateId(type, v)}
+                    placeholder={`选择${TEMPLATE_TYPE_LABELS[type]}`}
+                    allowClear
+                    style={{ width: '100%' }}
+                    options={templates.map(t => ({ label: t.name, value: t.id }))}
+                  />
                 )}
               </div>
             );

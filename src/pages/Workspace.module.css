@@ -233,7 +233,6 @@
   background:rgba(99,102,241,0.10); color:#6366f1; font-size:12px;
 }
 .tplEmpty { font-size:12px; color:var(--text-tertiary); font-style:italic; padding:4px 0; }
-.tplList { display:flex; flex-direction:column; gap:4px; }
 .tplModalFooter {
   display:flex; justify-content:flex-end; gap:10px;
   padding:14px 24px; border-top:1px solid var(--modal-header-border);
