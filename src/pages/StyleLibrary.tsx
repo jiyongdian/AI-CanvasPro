@@ -361,6 +361,7 @@ const StyleLibrary: React.FC = () => {
       )}
 
       <Modal
+        className="premium-modal"
         title={editingStyle ? '编辑风格' : '新建风格'}
         open={modalVisible}
         onOk={editingStyle ? handleUpdateStyle : handleCreateStyle}

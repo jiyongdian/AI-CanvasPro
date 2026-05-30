@@ -375,6 +375,7 @@ const ProjectList: React.FC = () => {
       )}
 
       <Modal
+        className="premium-modal"
         title={editingProject ? '编辑项目' : '新建项目'}
         open={modalVisible}
         onCancel={() => {

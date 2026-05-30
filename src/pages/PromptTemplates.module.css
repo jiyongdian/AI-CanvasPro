@@ -101,6 +101,13 @@
   align-items: center;
   justify-content: center;
 }
+.cardCover::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  background: linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.15) 100%);
+}
+:root[data-theme='dark'] .cardCover::after {
+  background: linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.35) 100%);
+}
 
 .cardCoverBg {
   position: absolute;

@@ -261,6 +261,7 @@ const PromptTemplates: React.FC = () => {
       )}
 
       <Modal
+        className="premium-modal"
         title={editingTemplate ? '编辑模板' : '新增模板'}
         open={modalVisible}
         onOk={handleSave}

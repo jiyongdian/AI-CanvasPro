@@ -420,6 +420,7 @@ const CharacterLibrary: React.FC = () => {
       )}
 
       <Modal
+        className={`premium-modal ${styles.editModal}`}
         title={editingCharacter ? '编辑角色' : '新建角色'}
         open={modalVisible}
         onOk={editingCharacter ? handleUpdateCharacter : handleCreateCharacter}
@@ -432,7 +433,6 @@ const CharacterLibrary: React.FC = () => {
         width={600}
         confirmLoading={generating}
         destroyOnClose
-        className={styles.editModal}
       >
         <div className={styles.formItem}>
           <label>角色名称</label>
