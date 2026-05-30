@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { message, Spin, Empty, Button, Modal, Progress } from 'antd';
+import { message, Spin, Empty, Button, Modal, Progress, Select } from 'antd';
 import {
   UserOutlined, PictureOutlined, ArrowLeftOutlined, PlayCircleOutlined,
   PlusOutlined, DeleteOutlined, ThunderboltOutlined, BulbOutlined,
@@ -20,7 +20,10 @@ import styles from './Workspace.module.css';
 export type GridMode = 4 | 6 | 9;
 type PreviewMode = 'image' | 'video';
 
-const TEMPLATE_TYPE_LABELS: Record<string, string> = { image: '🖼️ 图片模板', video: '🎬 视频模板', director: '💡 导演模板' };
+const TEMPLATE_TYPE_LABELS: Record<string, string> = { image: '图片模板', video: '视频模板', director: '导演模板' };
+const TEMPLATE_TYPE_ICONS: Record<string, React.ReactNode> = {
+  image: <PictureOutlined />, video: <PlayCircleOutlined />, director: <BulbOutlined />,
+};
 
 const Workspace: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -64,8 +67,6 @@ const Workspace: React.FC = () => {
   const [directorResult, setDirectorResult] = useState('');
   const [directorLoading, setDirectorLoading] = useState(false);
 
-  const [styleSelectOpen, setStyleSelectOpen] = useState(false);
-  const [genModeSelectOpen, setGenModeSelectOpen] = useState(false);
   const [templateSelectOpen, setTemplateSelectOpen] = useState(false);
 
   // 添加/删除确认弹窗
@@ -410,15 +411,19 @@ const Workspace: React.FC = () => {
         {!rightCollapsed && (
           <div className={styles.rightCol}>
             <div className={styles.selectorGroup}>
-              <div className={styles.selectorLabel}>生成设置</div>
-              <div className={styles.chipRow}>
-                <div className={styles.chip} onClick={() => setStyleSelectOpen(true)}>
-                  <SettingOutlined /> {selectedStyle ? selectedStyle.name : '选择风格'}
-                </div>
-                <div className={styles.chip} onClick={() => setGenModeSelectOpen(true)}>
-                  {generationMode === 'text-to-video' ? '文生视频' : '图生视频'}
-                </div>
-              </div>
+              <div className={styles.selectorLabel}>风格</div>
+              <Select size="small" value={selectedStyleId} onChange={setSelectedStyleId}
+                placeholder="选择风格" allowClear style={{width:'100%'}}
+                options={styleList.map(s => ({ label: s.name, value: s.id }))} />
+            </div>
+            <div className={styles.selectorGroup}>
+              <div className={styles.selectorLabel}>生成模式</div>
+              <Select size="small" value={generationMode} onChange={setGenerationMode}
+                style={{width:'100%'}}
+                options={[
+                  { label: '文生视频', value: 'text-to-video' as GenerationMode },
+                  { label: '图生视频', value: 'image-to-video' as GenerationMode },
+                ]} />
             </div>
             <div className={styles.selectorGroup}>
               <div className={styles.selectorLabel}>提示词模板</div>
@@ -485,29 +490,6 @@ const Workspace: React.FC = () => {
         </pre>
       </Modal>
 
-      {/* 风格选择弹窗 */}
-      <Modal title="选择风格" open={styleSelectOpen} onCancel={() => setStyleSelectOpen(false)} footer={null} width={400} centered>
-        <div style={{display:'flex',flexDirection:'column',gap:6}}>
-          <div className={styles.chip} onClick={() => { setSelectedStyleId(undefined); setStyleSelectOpen(false); }}>无风格</div>
-          {styleList.map(s => (
-            <div key={s.id} className={`${styles.chip} ${s.id===selectedStyleId?styles.chipActive:''}`}
-              onClick={() => { setSelectedStyleId(s.id); setStyleSelectOpen(false); }}>{s.name}</div>
-          ))}
-        </div>
-      </Modal>
-
-      {/* 生成模式弹窗 */}
-      <Modal title="生成模式" open={genModeSelectOpen} onCancel={() => setGenModeSelectOpen(false)} footer={null} width={360} centered>
-        <div style={{display:'flex',flexDirection:'column',gap:6}}>
-          {(['text-to-video','image-to-video'] as GenerationMode[]).map(m => (
-            <div key={m} className={`${styles.chip} ${m===generationMode?styles.chipActive:''}`}
-              onClick={() => { setGenerationMode(m); setGenModeSelectOpen(false); }}>
-              {m === 'text-to-video' ? '文生视频' : '图生视频'}
-            </div>
-          ))}
-        </div>
-      </Modal>
-
       {/* 模板选择弹窗 — 三分类 */}
       <Modal title={null} open={templateSelectOpen} onCancel={() => setTemplateSelectOpen(false)} footer={null}
         width={500} centered className={styles.tplModal}>
@@ -521,7 +503,10 @@ const Workspace: React.FC = () => {
             const selId = getSelectedTemplateId(type);
             return (
               <div key={type} className={styles.tplGroup}>
-                <div className={styles.tplGroupTitle}>{TEMPLATE_TYPE_LABELS[type]}</div>
+                <div className={styles.tplGroupTitle}>
+                  <span className={styles.tplGroupIcon}>{TEMPLATE_TYPE_ICONS[type]}</span>
+                  {TEMPLATE_TYPE_LABELS[type]}
+                </div>
                 {templates.length === 0 ? (
                   <div className={styles.tplEmpty}>暂无{type==='image'?'图片':type==='video'?'视频':'导演'}模板</div>
                 ) : (

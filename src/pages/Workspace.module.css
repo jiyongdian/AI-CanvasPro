@@ -223,7 +223,15 @@
 }
 .tplModalBody { padding:20px 24px; display:flex; flex-direction:column; gap:20px; }
 .tplGroup { display:flex; flex-direction:column; gap:6px; }
-.tplGroupTitle { font-size:12px; font-weight:600; color:var(--text-label); text-transform:uppercase; letter-spacing:0.4px; }
+.tplGroupTitle {
+  font-size:12px; font-weight:600; color:var(--text-label); text-transform:uppercase; letter-spacing:0.4px;
+  display:flex; align-items:center; gap:6px;
+}
+.tplGroupIcon {
+  display:flex; align-items:center; justify-content:center;
+  width:22px; height:22px; border-radius:6px;
+  background:rgba(99,102,241,0.10); color:#6366f1; font-size:12px;
+}
 .tplEmpty { font-size:12px; color:var(--text-tertiary); font-style:italic; padding:4px 0; }
 .tplList { display:flex; flex-direction:column; gap:4px; }
 .tplModalFooter {
