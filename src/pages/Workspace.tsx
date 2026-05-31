@@ -365,19 +365,18 @@ const Workspace: React.FC = () => {
           </div>
 
           <div className={`${styles.promptArea} ${promptExpanded ? styles.promptExpanded : ''}`}>
-            {selectedCharacterIds.length > 0 && (
+            <div className={styles.promptAreaHead}>
+              <span>提示词输入</span>
               <div className={styles.charCards}>
                 {selectedCharacterIds.map(cid => { const ch = characters.find(c => c.id === cid); return ch ? (
                   <div key={cid} className={`${styles.charCard} ${(activeScene?.selectedCharacterIds || []).includes(cid) ? styles.charCardActive : ''}`}
                     onClick={() => { if (!activeScene) return; const cur = activeScene.selectedCharacterIds || []; const next = cur.includes(cid) ? cur.filter(x => x !== cid) : [...cur, cid]; handleUpdateScene(activeScene.id, { selectedCharacterIds: next } as any); }}>
                     {ch.referenceImage ? <img src={ch.referenceImage} className={styles.charCardImg} alt="" /> : <UserOutlined />}
                     <span>{ch.name}</span>
+                    {(activeScene?.selectedCharacterIds || []).includes(cid) && <span style={{color:'#8b5cf6',fontSize:10,marginLeft:2}}>✓</span>}
                   </div>
                 ) : null; })}
               </div>
-            )}
-            <div className={styles.promptAreaHead}>
-              <span>提示词输入</span>
               <button className={styles.expandBtn} onClick={togglePromptExpand} title={promptExpanded ? '收起' : '展开'}>
                 {promptExpanded ? <DownOutlined /> : <UpOutlined />}
               </button>

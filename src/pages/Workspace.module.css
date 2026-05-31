@@ -187,16 +187,20 @@
   border-radius:16px !important; margin:0 !important;
 }
 
-/* 关联角色卡片 */
-.charCards { display:flex; gap:6px; flex-wrap:wrap; padding:4px 18px 0; }
+/* 关联角色卡片-提示词区头部右侧 */
+.charCards { display:flex; gap:6px; align-items:center; margin-left:auto; margin-right:8px; }
 .charCard {
-  display:flex; align-items:center; gap:6px; padding:4px 10px; border-radius:8px;
-  background:var(--input-bg); border:1px solid var(--panel-border);
-  cursor:pointer; font-size:11px; color:var(--body-color); transition:all 0.2s;
+  display:flex; align-items:center; gap:5px; padding:3px 10px; border-radius:14px;
+  background:var(--input-bg); border:1.5px solid var(--panel-border);
+  cursor:pointer; font-size:11px; font-weight:500; color:var(--text-secondary);
+  transition:all 0.2s; white-space:nowrap;
 }
-.charCard:hover { border-color:#8b5cf6; }
-.charCardActive { border-color:#8b5cf6; background:rgba(139,92,246,0.06); }
-.charCardImg { width:22px; height:22px; border-radius:4px; object-fit:cover; }
+.charCard:hover { border-color:#8b5cf6; color:#8b5cf6; transform:translateY(-1px); box-shadow:0 2px 8px rgba(139,92,246,0.08); }
+.charCardActive { 
+  border-color:#8b5cf6 !important; background:linear-gradient(135deg, rgba(139,92,246,0.08), rgba(139,92,246,0.02));
+  color:#8b5cf6 !important; box-shadow:0 0 0 2px rgba(139,92,246,0.10);
+}
+.charCardImg { width:20px; height:20px; border-radius:50%; object-fit:cover; border:1px solid var(--panel-border); }
 
 /* 顶栏内联选择器 */
 .inlineSelect :global(.ant-select-selector) {
