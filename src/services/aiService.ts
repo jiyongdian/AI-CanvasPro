@@ -1805,8 +1805,8 @@ ${hasConnectionPrompt ? '3. Grid 2必须承接前一个分镜末尾镜头确保�
     return data.choices?.[0]?.message?.content || '';
   }
 
-  async checkVideoStatus(taskId: string, isVeoTask?: boolean): Promise<{ status: string; videoUrl?: string; progress?: string; failReason?: string }> {
-    const providerConfig = await this.getProviderConfig();
+  async checkVideoStatus(taskId: string, isVeoTask?: boolean, providerId?: string): Promise<{ status: string; videoUrl?: string; progress?: string; failReason?: string }> {
+    const providerConfig = await this.getProviderConfig(providerId);
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
     const apiKey = providerConfig.apiKey || this.config.apiKey;
     const baseUrl = apiUrl.replace(/\/+$/, '');

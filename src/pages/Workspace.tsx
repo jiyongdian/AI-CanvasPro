@@ -198,12 +198,12 @@ const Workspace: React.FC = () => {
   const applyDirectorResult = () => { if (!activeScene) return; setPromptText(directorResult); handleUpdateScene(activeScene.id, { prompt: directorResult }); setDirectorPreviewOpen(false); };
 
   // ==================== 视频任务轮询 ====================
-  const pollVideoTask = async (taskId: string, isVeo: boolean, sceneId: string) => {
+  const pollVideoTask = async (taskId: string, isVeo: boolean, sceneId: string, providerId?: string) => {
     const maxAttempts = 60;
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(r => setTimeout(r, 10000));
       try {
-        const status = await aiService.checkVideoStatus(taskId, isVeo);
+        const status = await aiService.checkVideoStatus(taskId, isVeo, providerId);
         if (status.status === 'completed' && status.videoUrl) {
           handleUpdateScene(sceneId, { videos: [status.videoUrl], videoStatus: 'completed', status: 'completed' });
           message.success('视频生成完成！');
@@ -248,7 +248,7 @@ const Workspace: React.FC = () => {
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined, videoStatus: 'generating' });
         message.success('视频生成任务已提交，正在后台生成...');
         // 异步轮询
-        pollVideoTask(vidResult.taskId, vidResult.isVeoTask, activeScene.id);
+        pollVideoTask(vidResult.taskId, vidResult.isVeoTask, activeScene.id, vidProvider?.id || selPlatformId);
       }
     } catch (e: any) { message.error(e.message || '生成失败'); }
     finally { setGenerating(false); setGenProgress(0); }
