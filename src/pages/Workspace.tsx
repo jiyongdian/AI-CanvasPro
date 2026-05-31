@@ -34,7 +34,7 @@ const IMAGE_RATIOS = ['1:1 方形', '3:2 标准', '4:3 经典', '16:9 宽屏', '
 const VIDEO_DURATIONS_ALL = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,20,30,60];
 const VIDEO_QUALITIES_ALL = ['480p 标清','540p','720p 高清','1080p 全高清'];
 const VIDEO_MODEL_PRESETS: Record<string, { durations: number[]; qualities: string[] }> = {
-  'doubao-seedance-2.0': { durations: Array.from({length:15},(_,i)=>i+1), qualities: ['480p 标清','720p 高清','1080p 全高清'] },
+  'doubao-seedance-2.0': { durations: [5,6,7,8,9,10,11,12,13,14,15], qualities: ['480p','720p','1080p'] },
   'viduq3': { durations: [5,8,10,16], qualities: ['540p','720p 高清','1080p 全高清'] },
   'veo-3': { durations: [5,8,10], qualities: ['720p 高清','1080p 全高清'] },
   'veo-2': { durations: [5,8], qualities: ['720p 高清','1080p 全高清'] },
