@@ -309,9 +309,10 @@ const Workspace: React.FC = () => {
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined });
         const selIds = activeScene?.selectedCharacterIds || [];
         const sceneChars = characters.filter(c => selIds.includes(c.id));
-        // 确保参考图从media store恢复(不依赖Character.referenceImage可能为空)
+        // 参考图: 优先保留HTTP URL, 仅当完全缺失时才从media store恢复
         for (const ch of sceneChars) {
-          if (!ch.referenceImage || ch.referenceImage.startsWith('blob:') || ch.referenceImage.length < 100) {
+          const isHttp = ch.referenceImage?.startsWith('http');
+          if (!isHttp && (!ch.referenceImage || ch.referenceImage.startsWith('blob:'))) {
             try { const media = await getMedia('character', ch.id); if (media) ch.referenceImage = media; } catch {}
           }
         }
