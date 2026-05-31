@@ -4,25 +4,54 @@
 
 .container {
   display: flex;
+  flex-direction: column;
   height: 100%;
   padding: 24px;
-  gap: 24px;
+  gap: 20px;
+  overflow-y: auto;
 }
 
-/* 左侧面板 - 层次感 */
-.leftPanel {
-  width: 500px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 24px;
+/* 顶部导航 */
+.tabBar {
+  display: flex; gap: 4px;
+  background: var(--input-bg);
+  border-radius: 12px; padding: 4px;
+  width: fit-content;
+}
+.tabBtn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 20px; border-radius: 10px; border: none;
+  cursor: pointer; font-size: 13px; font-weight: 500;
+  background: transparent; color: var(--text-secondary);
+  transition: all 0.2s;
+}
+.tabBtn:hover { color: var(--body-color); }
+.tabBtnActive { background: #8b5cf6; color: #fff !important; }
+.tabBadge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; border-radius: 10px;
+  background: rgba(255,255,255,0.25); color: #fff;
+  font-size: 11px; padding: 0 6px;
+}
+
+.generatePanel {
+  display: flex; flex-direction: column; gap: 20px;
+  max-width: 720px;
+}
+.historyPanel {
+  flex: 1;
+}
+
+/* 参数网格 */
+.paramsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
   background: var(--panel-bg-gradient);
   border-radius: 18px;
   border: 1px solid var(--panel-border);
-  box-shadow:
-    0 1px 3px rgba(0,0,0,0.06),
-    0 0 0 1px rgba(139,92,246,0.02);
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(139,92,246,0.02);
 }
 
 .title {

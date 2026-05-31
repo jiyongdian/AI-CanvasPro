@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import { Input, Button, Card, Spin, message, Popconfirm, Select, Space, Modal, Upload } from 'antd';
-import { SendOutlined, LoadingOutlined, DeleteOutlined, ImportOutlined, ThunderboltOutlined, PlusOutlined, CloseOutlined, CopyOutlined, DownloadOutlined } from '@ant-design/icons';
+import { SendOutlined, LoadingOutlined, DeleteOutlined, ImportOutlined, ThunderboltOutlined, PlusOutlined, CloseOutlined, CopyOutlined, DownloadOutlined, UserOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { useRecoilState } from 'recoil';
 import { v4 as uuidv4 } from 'uuid';
 import { aiService, createTempScene } from '../services/aiService';
@@ -63,6 +63,7 @@ const AICharacter: React.FC = () => {
   // 角色卡片预览弹窗状态
   const [cardPreviewVisible, setCardPreviewVisible] = useState(false);
   const [previewCharacter, setPreviewCharacter] = useState<GeneratedCharacter | null>(null);
+  const [activeTab, setActiveTab] = useState<'generate' | 'history'>(() => (localStorage.getItem('ac_tab') as any) || 'generate');
   
   // 风格选择状态
   const [styleList, setStyleList] = useState<Style[]>([]);
@@ -561,9 +562,19 @@ const AICharacter: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      {/* 左侧输入区域 */}
-      <div className={styles.leftPanel}>
-        <h1 className={styles.title}>AI 角色生成</h1>
+      {/* 顶部导航 */}
+      <div className={styles.tabBar}>
+        <button className={`${styles.tabBtn} ${activeTab === 'generate' ? styles.tabBtnActive : ''}`} onClick={() => { setActiveTab('generate'); localStorage.setItem('ac_tab', 'generate'); }}>
+          <UserOutlined /> AI角色生成
+        </button>
+        <button className={`${styles.tabBtn} ${activeTab === 'history' ? styles.tabBtnActive : ''}`} onClick={() => { setActiveTab('history'); localStorage.setItem('ac_tab', 'history'); }}>
+          <AppstoreOutlined /> 生成任务列表 {history.length > 0 && <span className={styles.tabBadge}>{history.length}</span>}
+        </button>
+      </div>
+
+      {/* Tab 1: 生成 */}
+      {activeTab === 'generate' && (
+      <div className={styles.generatePanel}>
         <div className={styles.inputWrapper}>
           <Input.TextArea
             className={styles.input}
@@ -583,7 +594,7 @@ const AICharacter: React.FC = () => {
             {optimizing ? '优化中...' : 'AI优化'}
           </Button>
         </div>
-        <div className={styles.paramsSection}>
+        <div className={styles.paramsGrid}>
           <div className={styles.paramItem}>
             <span className={styles.paramLabel}>API平台</span>
             <Select value={selPlatformId} onChange={setSelPlatformId} placeholder="全部平台" allowClear style={{width:'100%'}} options={providers.filter(p => p.enabled !== false).map(p => ({ label: p.name, value: p.id }))} />
@@ -669,10 +680,11 @@ const AICharacter: React.FC = () => {
           开始生成
         </Button>
       </div>
+      )}
 
-      {/* 右侧任务卡片区域 */}
-      <div className={styles.rightPanel}>
-        <h2 className={styles.historyTitle}>生成任务列表</h2>
+      {/* Tab 2: 任务列表 */}
+      {activeTab === 'history' && (
+      <div className={styles.historyPanel}>
         <div className={styles.cardGrid}>
           {history.length > 0 ? (
             history.map((character) => (
@@ -751,6 +763,7 @@ const AICharacter: React.FC = () => {
           )}
         </div>
       </div>
+      )}
 
       {/* 自定义图片预览弹窗 */}
       <Modal
