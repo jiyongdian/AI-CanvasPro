@@ -239,9 +239,11 @@ const Workspace: React.FC = () => {
       if ((mc as any).error) { message.error((mc as any).error); setDirectorLoading(false); return; }
       const template = selectedDirectorTemplateId ? promptTemplates.find(t => t.id === selectedDirectorTemplateId) : undefined;
       let accumulated = '';
-      console.log('[AI导演] 文本模型:', selTextModel, 'provider:', (mc as any)?.providerId);
+      console.log('[AI导演] 模型:', selTextModel, 'mode:', previewMode, 'prompt:', (promptText||'').slice(0,50));
+      // 传入当前输入框实时提示词 + 当前模式
+      const dirScene = { ...activeScene, prompt: promptText || activeScene.prompt || activeScene.description };
       await aiService.generatePrompt(
-        activeScene, 'image', undefined, undefined,
+        dirScene, previewMode, undefined, undefined,
         (text) => { accumulated = text; setDirectorResult(text); },
         selectedStyle, project.script.map(s => s.description),
         template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined,
@@ -253,7 +255,12 @@ const Workspace: React.FC = () => {
     } catch (e: any) { message.error(e.message || 'AI导演失败'); }
     finally { setDirectorLoading(false); }
   };
-  const applyDirectorResult = () => { if (!activeScene) return; setPromptText(directorResult); handleUpdateScene(activeScene.id, { prompt: directorResult }); setDirectorPreviewOpen(false); };
+  const applyDirectorResult = () => {
+    if (!activeScene) return;
+    setPromptText(directorResult);
+    handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: directorResult } as any);
+    setDirectorPreviewOpen(false);
+  };
 
   // ==================== 视频任务轮询 ====================
   const pollVideoTask = async (taskId: string, isVeo: boolean, sceneId: string, providerId?: string, model?: string) => {
