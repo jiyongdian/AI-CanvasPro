@@ -40,6 +40,7 @@ const VIDEO_MODEL_PRESETS: Record<string, { durations: number[]; qualities: stri
   'veo-2': { durations: [5,8], qualities: ['720p 高清','1080p 全高清'] },
   'sora-2': { durations: [5,10,15], qualities: ['480p 标清','720p 高清','1080p 全高清'] },
   'kling': { durations: [5,10], qualities: ['720p 高清','1080p 全高清'] },
+  'grok-video-3': { durations: [5,8,10], qualities: ['720P','1080P'] },
 };
 const getVideoPreset = (modelId: string | undefined) => {
   if (!modelId) return { durations: [5,8,10], qualities: ['720p 高清','1080p 全高清'] };
