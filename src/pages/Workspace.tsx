@@ -207,12 +207,12 @@ const Workspace: React.FC = () => {
         if (status.status === 'completed' && status.videoUrl) {
           handleUpdateScene(sceneId, { videos: [status.videoUrl], videoStatus: 'completed', status: 'completed' });
           // 更新任务历史
-          setTaskHistory(prev => prev.map(t => t.id === taskId ? { ...t, url: status.videoUrl!, status: 'completed' } : t));
+          setTaskHistory(prev => { const u = prev.map(t => t.id === taskId ? { ...t, url: status.videoUrl!, status: 'completed' as const } : t); if (projectId) saveTaskHistory(projectId, u); return u; });
           message.success('视频生成完成！');
           return;
         } else if (status.status === 'failed') {
           handleUpdateScene(sceneId, { videoStatus: 'completed' } as any);
-          setTaskHistory(prev => prev.map(t => t.id === taskId ? { ...t, status: 'failed' } : t));
+          setTaskHistory(prev => { const u = prev.map(t => t.id === taskId ? { ...t, status: 'failed' as const } : t); if (projectId) saveTaskHistory(projectId, u); return u; });
           message.error('视频生成失败: ' + (status.failReason || '未知错误'));
           return;
         }
@@ -249,7 +249,7 @@ const Workspace: React.FC = () => {
         );
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined, videoStatus: 'generating' });
         // 加入任务历史(生成中)
-        addTaskToHistory({ id: vidResult.taskId, type: 'video', url: '', sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt: promptText, model: selVideoModel, status: 'generating' });
+        addTaskToHistory({ id: vidResult.taskId, type: 'video', url: '', sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt: promptText, model: selVideoModel, status: 'generating' as const });
         message.success('视频生成任务已提交，正在后台生成...');
         // 异步轮询
         pollVideoTask(vidResult.taskId, vidResult.isVeoTask, activeScene.id, vidProvider?.id || selPlatformId);
