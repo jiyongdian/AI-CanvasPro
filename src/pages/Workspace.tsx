@@ -423,6 +423,7 @@ const Workspace: React.FC = () => {
             {currentHistory.map(item => (
               <div key={item.id} className={styles.historyCard}>
                 {item.status === 'generating' ? <div style={{height:100,display:'flex',alignItems:'center',justifyContent:'center',background:'var(--input-bg)'}}><Spin /><span style={{marginLeft:8,fontSize:12,color:'var(--text-tertiary)'}}>生成中...</span></div>
+                : item.type === 'video' && item.url ? <video src={item.url} style={{width:'100%',height:120,objectFit:'cover'}} controls />
                 : item.url ? <img src={item.url} alt="" /> : <div style={{height:100,display:'flex',alignItems:'center',justifyContent:'center',background:'var(--input-bg)',color:'var(--text-tertiary)'}}>无预览</div>}
                 <div className={styles.historyCardMeta}>
                   <Tag color={item.type === 'image' ? 'blue' : 'orange'}>{item.type === 'image' ? '图片' : '视频'}</Tag>
