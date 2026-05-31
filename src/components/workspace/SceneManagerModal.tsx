@@ -139,7 +139,7 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
     if (!createDesc.trim()) { message.warning('请输入场景描述'); return; }
     setCreateOptimizing(true);
     try {
-      const result = await aiService.optimizeScenePrompt(createDesc.trim(), textModelProviderId);
+      const result = await aiService.optimizeScenePrompt(createDesc.trim(), textModelProviderId, selectedTextModel);
       setCreatePrompt(result);
       message.success('场景描述已优化');
     } catch (e: any) { message.error(e.message || '优化失败'); }
