@@ -106,8 +106,28 @@ const Workspace: React.FC = () => {
   const [videoQuality, setVideoQuality] = useState<string>(() => localStorage.getItem('ws_video_quality') || '1080p 全高清');
 
   const selPlatform = useMemo(() => providers.find(p => p.id === selPlatformId), [providers, selPlatformId]);
-  // 所有模型统一列表（不限类别，视频/图片/文本/其它均可用）
-  const allModels = useMemo(() => { const seen = new Set<string>(); const r: ProviderModel[] = []; const src = selPlatform ? [selPlatform] : providers; src.forEach(p => p.models.forEach(m => { if (!seen.has(m.id)) { seen.add(m.id); r.push(m); } })); return r; }, [providers, selPlatform]);
+  // 分类模型列表（其它类别在所有选择器中出现）
+  const getModelsForCategory = (cats: string[]) => useMemo(() => {
+    const seen = new Set<string>(); const r: ProviderModel[] = [];
+    const src = selPlatform ? [selPlatform] : providers;
+    src.forEach(p => p.models.forEach(m => { if ((cats.includes(m.category) || m.category === 'other') && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    return r;
+  }, [providers, selPlatform]);
+  const imageModels = useMemo(() => {
+    const seen = new Set<string>(); const r: ProviderModel[] = []; const src = selPlatform ? [selPlatform] : providers;
+    src.forEach(p => p.models.forEach(m => { if ((m.category === 'image' || m.category === 'other') && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    return r;
+  }, [providers, selPlatform]);
+  const videoModels = useMemo(() => {
+    const seen = new Set<string>(); const r: ProviderModel[] = []; const src = selPlatform ? [selPlatform] : providers;
+    src.forEach(p => p.models.forEach(m => { if ((m.category === 'video' || m.category === 'other') && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    return r;
+  }, [providers, selPlatform]);
+  const textModels = useMemo(() => {
+    const seen = new Set<string>(); const r: ProviderModel[] = []; const src = selPlatform ? [selPlatform] : providers;
+    src.forEach(p => p.models.forEach(m => { if ((m.category === 'text' || m.category === 'other') && !seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    return r;
+  }, [providers, selPlatform]);
 
   const [taskHistory, setTaskHistory] = useState<TaskHistoryItem[]>(() => loadTaskHistory(projectId || ''));
 
@@ -426,9 +446,9 @@ const Workspace: React.FC = () => {
         <div className={styles.tplModalHead}><ApiOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>模型设置</span></div>
         <div className={styles.tplModalBody}>
           <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ApiOutlined /></span>API平台</div><Select size="small" value={selPlatformId} onChange={setSelPlatformId} placeholder="全部平台" allowClear style={{width:'100%'}} options={providers.filter(p => p.enabled !== false).map(p => ({ label: p.name, value: p.id }))} /></div>
-          <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><PictureOutlined /></span>图片模型</div><Select size="small" value={selImageModel} onChange={setSelImageModel} placeholder={allModels.length > 0 ? '选择图片模型' : '请先在设置页配置API'} allowClear style={{width:'100%'}} options={allModels.map(m => ({ label: m.id, value: m.id }))} /></div>
-          <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><VideoCameraOutlined /></span>视频模型</div><Select size="small" value={selVideoModel} onChange={(v) => { setSelVideoModel(v); const preset = getVideoPreset(v); if (!preset.durations.includes(videoDuration)) setVideoDuration(preset.durations[0]); if (!preset.qualities.includes(videoQuality)) setVideoQuality(preset.qualities[preset.qualities.length - 1]); }} placeholder={allModels.length > 0 ? '选择视频模型' : '请先在设置页配置API'} allowClear style={{width:'100%'}} options={allModels.map(m => ({ label: m.id, value: m.id }))} /></div>
-          <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ThunderboltOutlined /></span>文本模型（推理·AI导演）</div><Select size="small" value={selTextModel} onChange={setSelTextModel} placeholder={allModels.length > 0 ? '选择文本模型' : '请先在设置页配置API'} allowClear style={{width:'100%'}} options={allModels.map(m => ({ label: m.id, value: m.id }))} /></div>
+          <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><PictureOutlined /></span>图片模型</div><Select size="small" value={selImageModel} onChange={setSelImageModel} placeholder={!selPlatform ? '请先选择平台' : imageModels.length > 0 ? '选择图片模型' : '该平台无图片模型'} allowClear style={{width:'100%'}} options={imageModels.map(m => ({ label: m.id, value: m.id }))} /></div>
+          <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><VideoCameraOutlined /></span>视频模型</div><Select size="small" value={selVideoModel} onChange={(v) => { setSelVideoModel(v); const preset = getVideoPreset(v); if (!preset.durations.includes(videoDuration)) setVideoDuration(preset.durations[0]); if (!preset.qualities.includes(videoQuality)) setVideoQuality(preset.qualities[preset.qualities.length - 1]); }} placeholder={!selPlatform ? '请先选择平台' : videoModels.length > 0 ? '选择视频模型' : '该平台无视频模型'} allowClear style={{width:'100%'}} options={videoModels.map(m => ({ label: m.id, value: m.id }))} /></div>
+          <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ThunderboltOutlined /></span>文本模型（推理·AI导演）</div><Select size="small" value={selTextModel} onChange={setSelTextModel} placeholder={!selPlatform ? '请先选择平台' : textModels.length > 0 ? '选择文本模型' : '该平台无文本模型'} allowClear style={{width:'100%'}} options={textModels.map(m => ({ label: m.id, value: m.id }))} /></div>
         </div>
         <div className={styles.tplModalFooter}><Button type="primary" onClick={() => setModelSettingsOpen(false)}>完成</Button></div>
       </Modal>

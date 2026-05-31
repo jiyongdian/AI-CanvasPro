@@ -78,20 +78,26 @@ const AICharacter: React.FC = () => {
   const [selTextModel, setSelTextModel] = useState<string | undefined>(() => localStorage.getItem('ac_text_model') || undefined);
 
   const selPlatform = useMemo(() => providers.find(p => p.id === selPlatformId), [providers, selPlatformId]);
-  const allModels = useMemo(() => {
+  // 分类模型列表（其它类别在所有选择器中出现）
+  const imageModels = useMemo(() => {
+    if (!selPlatform) return [];
     const seen = new Set<string>(); const r: ProviderModel[] = [];
-    const src = selPlatform ? [selPlatform] : providers;
-    src.forEach(p => p.models.forEach(m => { if (!seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    selPlatform.models.forEach(m => { if ((m.category === 'image' || m.category === 'other') && !seen.has(m.id)) { seen.add(m.id); r.push(m); } });
     return r;
-  }, [providers, selPlatform]);
+  }, [selPlatform]);
+  const textModels = useMemo(() => {
+    if (!selPlatform) return [];
+    const seen = new Set<string>(); const r: ProviderModel[] = [];
+    selPlatform.models.forEach(m => { if ((m.category === 'text' || m.category === 'other') && !seen.has(m.id)) { seen.add(m.id); r.push(m); } });
+    return r;
+  }, [selPlatform]);
 
   const resolveModelConfig = (modelId?: string) => {
     if (!modelId) return { error: '请选择模型' };
-    if (selPlatformId && selPlatform?.models.some(m => m.id === modelId))
-      return { providerId: selPlatformId, model: modelId };
-    const p = providers.find(x => x.models.some(m => m.id === modelId));
-    if (!p) return { error: '模型未关联API平台' };
-    return { providerId: p.id, model: modelId };
+    if (!selPlatform) return { error: '请先选择API平台' };
+    if (selPlatform.models.some(m => m.id === modelId))
+      return { providerId: selPlatform.id, model: modelId };
+    return { error: `模型 "${modelId}" 不在当前平台` };
   };
 
   useEffect(() => {
@@ -601,11 +607,11 @@ const AICharacter: React.FC = () => {
           </div>
           <div className={styles.paramItem}>
             <span className={styles.paramLabel}>文本模型（AI优化）</span>
-            <Select value={selTextModel} onChange={setSelTextModel} placeholder={allModels.length > 0 ? '选择文本模型' : '无可用模型'} allowClear style={{width:'100%'}} options={allModels.map(m => ({ label: m.id, value: m.id }))} />
+            <Select value={selTextModel} onChange={setSelTextModel} placeholder={!selPlatform ? '请先选择API平台' : textModels.length > 0 ? '选择文本模型' : '该平台无文本模型'} allowClear style={{width:'100%'}} options={textModels.map(m => ({ label: m.id, value: m.id }))} disabled={!selPlatform} />
           </div>
           <div className={styles.paramItem}>
             <span className={styles.paramLabel}>图片模型（生成）</span>
-            <Select value={selImageModel} onChange={setSelImageModel} placeholder={allModels.length > 0 ? '选择图片模型' : '无可用模型'} allowClear style={{width:'100%'}} options={allModels.map(m => ({ label: m.id, value: m.id }))} />
+            <Select value={selImageModel} onChange={setSelImageModel} placeholder={!selPlatform ? '请先选择API平台' : imageModels.length > 0 ? '选择图片模型' : '该平台无图片模型'} allowClear style={{width:'100%'}} options={imageModels.map(m => ({ label: m.id, value: m.id }))} disabled={!selPlatform} />
           </div>
           <div className={styles.paramItem}>
             <span className={styles.paramLabel}>风格选择</span>
