@@ -1587,7 +1587,7 @@ ${hasConnectionPrompt ? '3. Grid 2必须承接前一个分镜末尾镜头确保�
     characters?: Character[],
     options?: { style?: Style; generationMode?: GenerationMode; duration?: string; enhancePrompt?: boolean; enableUpsample?: boolean }
   ): Promise<{ taskId: string; isVeoTask: boolean }> {
-    const providerConfig = await this.getProviderConfig();
+    const providerConfig = await this.getProviderConfig((options as any)?.providerId);
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
     const apiKey = providerConfig.apiKey || this.config.apiKey;
     const config = this.getConfig();
