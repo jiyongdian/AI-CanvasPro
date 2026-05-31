@@ -238,7 +238,13 @@ const Workspace: React.FC = () => {
         const prompt = promptText || activeScene.videoPrompt || activeScene.jiMengPrompt || activeScene.prompt;
         if (!prompt) { message.warning('请输入视频提示词'); return; }
         const vidProvider = selVideoModel ? getProviderForModel(selVideoModel) : undefined;
-        const vidResult = await aiService.generateVideo(activeScene, undefined, { model: selVideoModel, providerId: vidProvider?.id || selPlatformId, duration: videoDuration } as any);
+        // 更新场景prompt为当前输入框内容
+        handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined });
+        const vidResult = await aiService.generateVideo(
+          { ...activeScene, prompt: promptText || activeScene.videoPrompt || activeScene.prompt },
+          undefined,
+          { model: selVideoModel, providerId: vidProvider?.id || selPlatformId, duration: videoDuration, resolution: videoQuality, aspectRatio: imageRatio } as any
+        );
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined, videoStatus: 'generating' });
         message.success('视频生成任务已提交，正在后台生成...');
         // 异步轮询
