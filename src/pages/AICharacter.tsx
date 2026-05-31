@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Input, Button, Card, Spin, message, Popconfirm, Select, Space, Modal, Upload } from 'antd';
 import { SendOutlined, LoadingOutlined, DeleteOutlined, ImportOutlined, ThunderboltOutlined, PlusOutlined, CloseOutlined, CopyOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useRecoilState } from 'recoil';
@@ -9,8 +9,9 @@ import { preloadImage } from '../utils/imageUtils';
 import { downloadToDir, saveDirHandle } from '../utils/downloadHelper';
 import { saveCharacter, openDatabase, getAllStyles } from '../services/database';
 import { saveMedia, getMedia } from '../services/mediaService';
+import { loadApiProviders } from '../services/secureStorage';
 import { characterListState } from '../store/projectStore';
-import { Character, Style } from '../types';
+import { Character, Style, ApiProvider, ProviderModel } from '../types';
 import styles from './AICharacter.module.css';
 
 interface GeneratedCharacter {
@@ -69,19 +70,38 @@ const AICharacter: React.FC = () => {
     return localStorage.getItem(STYLE_STORAGE_KEY) || undefined;
   });
 
-  const [imageModel, setImageModel] = useState('');
+  // 模型配置
+  const [providers, setProviders] = useState<ApiProvider[]>([]);
+  const [selPlatformId, setSelPlatformId] = useState<string | undefined>(() => localStorage.getItem('ac_platform') || undefined);
+  const [selImageModel, setSelImageModel] = useState<string | undefined>(() => localStorage.getItem('ac_image_model') || undefined);
+  const [selTextModel, setSelTextModel] = useState<string | undefined>(() => localStorage.getItem('ac_text_model') || undefined);
+
+  const selPlatform = useMemo(() => providers.find(p => p.id === selPlatformId), [providers, selPlatformId]);
+  const allModels = useMemo(() => {
+    const seen = new Set<string>(); const r: ProviderModel[] = [];
+    const src = selPlatform ? [selPlatform] : providers;
+    src.forEach(p => p.models.forEach(m => { if (!seen.has(m.id)) { seen.add(m.id); r.push(m); } }));
+    return r;
+  }, [providers, selPlatform]);
+
+  const resolveModelConfig = (modelId?: string) => {
+    if (!modelId) return { error: '请选择模型' };
+    if (selPlatformId && selPlatform?.models.some(m => m.id === modelId))
+      return { providerId: selPlatformId, model: modelId };
+    const p = providers.find(x => x.models.some(m => m.id === modelId));
+    if (!p) return { error: '模型未关联API平台' };
+    return { providerId: p.id, model: modelId };
+  };
 
   useEffect(() => {
-    const loadModel = async () => {
-      const { loadApiConfig } = await import('../services/secureStorage');
-      const config = await loadApiConfig();
-      setImageModel(config.imageModel || '');
-    };
-    loadModel();
+    loadApiProviders().then(p => { setProviders(p.filter(x => x.enabled !== false)); }).catch(() => {});
   }, []);
+  useEffect(() => { if (selPlatformId) localStorage.setItem('ac_platform', selPlatformId); else localStorage.removeItem('ac_platform'); }, [selPlatformId]);
+  useEffect(() => { if (selImageModel) localStorage.setItem('ac_image_model', selImageModel); else localStorage.removeItem('ac_image_model'); }, [selImageModel]);
+  useEffect(() => { if (selTextModel) localStorage.setItem('ac_text_model', selTextModel); else localStorage.removeItem('ac_text_model'); }, [selTextModel]);
 
   const supportsImageSize = () => {
-    return imageModel.includes('nano-banana-2');
+    return (selImageModel || '').includes('nano-banana-2');
   };
 
   // 加载风格列表
@@ -234,23 +254,12 @@ const AICharacter: React.FC = () => {
       console.log('[AICharacter] 调用 aiService.generateImage...');
       // 获取选中的风格
       const selectedStyle = styleList.find(s => s.id === selectedStyleId);
+      const mc = resolveModelConfig(selImageModel);
+      if ((mc as any).error) { message.error((mc as any).error); setHistory(prev => prev.map(c => c.id === newCharacter.id ? { ...c, status: 'failed' as const } : c)); return; }
       const imageUrl = await aiService.generateImage(
-        {
-          id: newCharacter.id,
-          order: 0,
-          description: '',
-          prompt: currentPrompt,
-          generationMode: 'text-to-image',
-          images: {},
-          videos: [],
-          status: 'pending'
-        },
+        { id: newCharacter.id, order: 0, description: '', prompt: currentPrompt, generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' },
         undefined,
-        { 
-          aspectRatio, 
-          imageSize: supportsImageSize() ? imageSize : undefined,
-          style: selectedStyle
-        }
+        { aspectRatio, imageSize: supportsImageSize() ? imageSize : undefined, style: selectedStyle, model: selImageModel, providerId: (mc as any).providerId }
       );
 
       // 预加载图片到浏览器缓存，带进度回调
@@ -427,10 +436,12 @@ const AICharacter: React.FC = () => {
       message.warning('请先输入角色描述');
       return;
     }
+    const mc = resolveModelConfig(selTextModel);
+    if ((mc as any).error) { message.error((mc as any).error); return; }
 
     setOptimizing(true);
     try {
-      const optimizedPrompt = await aiService.optimizeCharacterPrompt(prompt.trim());
+      const optimizedPrompt = await aiService.optimizeCharacterPrompt(prompt.trim(), (mc as any).providerId, selTextModel);
       setPrompt(optimizedPrompt);
       message.success('提示词优化成功');
     } catch (error) {
@@ -573,6 +584,18 @@ const AICharacter: React.FC = () => {
           </Button>
         </div>
         <div className={styles.paramsSection}>
+          <div className={styles.paramItem}>
+            <span className={styles.paramLabel}>API平台</span>
+            <Select value={selPlatformId} onChange={setSelPlatformId} placeholder="全部平台" allowClear style={{width:'100%'}} options={providers.filter(p => p.enabled !== false).map(p => ({ label: p.name, value: p.id }))} />
+          </div>
+          <div className={styles.paramItem}>
+            <span className={styles.paramLabel}>文本模型（AI优化）</span>
+            <Select value={selTextModel} onChange={setSelTextModel} placeholder={allModels.length > 0 ? '选择文本模型' : '无可用模型'} allowClear style={{width:'100%'}} options={allModels.map(m => ({ label: m.id, value: m.id }))} />
+          </div>
+          <div className={styles.paramItem}>
+            <span className={styles.paramLabel}>图片模型（生成）</span>
+            <Select value={selImageModel} onChange={setSelImageModel} placeholder={allModels.length > 0 ? '选择图片模型' : '无可用模型'} allowClear style={{width:'100%'}} options={allModels.map(m => ({ label: m.id, value: m.id }))} />
+          </div>
           <div className={styles.paramItem}>
             <span className={styles.paramLabel}>风格选择</span>
             <Select
