@@ -1810,14 +1810,14 @@ ${hasConnectionPrompt ? '3. Grid 2必须承接前一个分镜末尾镜头确保�
     return data.choices?.[0]?.message?.content || '';
   }
 
-  async checkVideoStatus(taskId: string, isVeoTask?: boolean, providerId?: string): Promise<{ status: string; videoUrl?: string; progress?: string; failReason?: string }> {
+  async checkVideoStatus(taskId: string, isVeoTask?: boolean, providerId?: string, modelOverride?: string): Promise<{ status: string; videoUrl?: string; progress?: string; failReason?: string }> {
     const providerConfig = await this.getProviderConfig(providerId);
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
     const apiKey = providerConfig.apiKey || this.config.apiKey;
     const baseUrl = apiUrl.replace(/\/+$/, '');
     const videoApiUrl = baseUrl.replace(/\/v1$/, '') + '/v1';
     
-    const model = this.getConfig()?.videoModel || 'sora-2';
+    const model = modelOverride || this.getConfig()?.videoModel || 'sora-2';
     const vcfg = this.getVideoConfig(model);
     
     const queryUrl = `${videoApiUrl}${vcfg.queryPath.replace('{id}', encodeURIComponent(taskId))}`;

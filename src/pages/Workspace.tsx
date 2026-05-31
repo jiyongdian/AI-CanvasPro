@@ -218,13 +218,13 @@ const Workspace: React.FC = () => {
   const applyDirectorResult = () => { if (!activeScene) return; setPromptText(directorResult); handleUpdateScene(activeScene.id, { prompt: directorResult }); setDirectorPreviewOpen(false); };
 
   // ==================== 视频任务轮询 ====================
-  const pollVideoTask = async (taskId: string, isVeo: boolean, sceneId: string, providerId?: string) => {
+  const pollVideoTask = async (taskId: string, isVeo: boolean, sceneId: string, providerId?: string, model?: string) => {
     console.log(`[轮询] 开始: ${taskId}, provider: ${providerId}`);
     const maxAttempts = 60;
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(r => setTimeout(r, 10000));
       try {
-        const status = await aiService.checkVideoStatus(taskId, isVeo, providerId);
+        const status = await aiService.checkVideoStatus(taskId, isVeo, providerId, model);
         console.log(`[轮询] #${i+1}:`, status);
         if (status.status === 'completed' && status.videoUrl) {
           handleUpdateScene(sceneId, { videos: [status.videoUrl], videoStatus: 'completed', status: 'completed' });
@@ -278,7 +278,7 @@ const Workspace: React.FC = () => {
         addTaskToHistory({ id: vidResult.taskId, type: 'video', url: '', sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt: promptText, model: selVideoModel, status: 'generating' as const });
         message.success('视频生成任务已提交，正在后台生成...');
         // 异步轮询
-        pollVideoTask(vidResult.taskId, vidResult.isVeoTask, activeScene.id, (mc as any).providerId);
+        pollVideoTask(vidResult.taskId, vidResult.isVeoTask, activeScene.id, (mc as any).providerId, selVideoModel);
       }
     } catch (e: any) { message.error(e.message || '生成失败'); }
     finally { setGenerating(false); setGenProgress(0); }
