@@ -179,12 +179,24 @@
 }
 .expandBtn:hover { color:#8b5cf6; border-color:rgba(139,92,246,0.3); background:rgba(139,92,246,0.06); }
 
-/* 展开: 占满中栏 */
+/* 展开: 覆盖预览区（顶栏下方） */
 .promptExpanded {
-  position:absolute !important; top:0; left:0; right:0; bottom:0 !important;
-  z-index:20 !important; height:auto !important; border-radius:16px !important;
-  margin:0 !important;
+  position:absolute !important;
+  top:48px; left:0; right:0; bottom:0 !important;
+  z-index:20 !important; height:auto !important;
+  border-radius:16px !important; margin:0 !important;
 }
+
+/* 关联角色卡片 */
+.charCards { display:flex; gap:6px; flex-wrap:wrap; padding:4px 18px 0; }
+.charCard {
+  display:flex; align-items:center; gap:6px; padding:4px 10px; border-radius:8px;
+  background:var(--input-bg); border:1px solid var(--panel-border);
+  cursor:pointer; font-size:11px; color:var(--body-color); transition:all 0.2s;
+}
+.charCard:hover { border-color:#8b5cf6; }
+.charCardActive { border-color:#8b5cf6; background:rgba(139,92,246,0.06); }
+.charCardImg { width:22px; height:22px; border-radius:4px; object-fit:cover; }
 
 /* 顶栏内联选择器 */
 .inlineSelect :global(.ant-select-selector) {

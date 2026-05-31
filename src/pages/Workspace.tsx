@@ -288,11 +288,11 @@ const Workspace: React.FC = () => {
         const mc = resolveModelConfig(selVideoModel);
         if ((mc as any).error) { message.error((mc as any).error); setGenerating(false); return; }
         console.log('[视频生成] 模型:', selVideoModel, 'provider:', (mc as any).providerId);
-        // 更新场景prompt为当前输入框内容
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined });
+        const sceneChars = characters.filter(c => (activeScene?.selectedCharacterIds || []).includes(c.id));
         const vidResult = await aiService.generateVideo(
-          { ...activeScene, prompt: promptText || activeScene.videoPrompt || activeScene.prompt },
-          undefined,
+          { ...activeScene, prompt: promptText || activeScene.videoPrompt || activeScene.prompt, useImageAsReference: !!activeScene.images?.keyFrame },
+          sceneChars.length > 0 ? sceneChars.map(c => ({ id: c.id, name: c.name, voiceType: c.voiceType || '', referenceImage: c.referenceImage || '' })) as any : undefined,
           { model: selVideoModel, providerId: (mc as any).providerId, duration: videoDuration, resolution: videoQuality, aspectRatio: imageRatio } as any
         );
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined, videoStatus: 'generating' });
@@ -353,14 +353,6 @@ const Workspace: React.FC = () => {
           <div className={styles.centerTopBar}>
             <div className={styles.triggerCard} onClick={() => { if (project && project.script.length > 0) { const ids = new Set<string>(); project.script.forEach(s => (s.availableCharacterIds || []).forEach(id => ids.add(id))); setSelectedCharacterIds(Array.from(ids)); } setCharacterModalVisible(true); }}><UserOutlined className={styles.triggerCardIcon} />角色</div>
             <div className={styles.triggerCard} onClick={() => setSceneManagerVisible(true)}><PictureOutlined className={styles.triggerCardIcon} />场景</div>
-            <Select size="small" className={styles.inlineSelect} value={imageRatio} onChange={setImageRatio} style={{width:110}}
-              options={IMAGE_RATIOS.map(r => ({ label: r, value: r }))} />
-            {previewMode === 'video' && <>
-              <Select size="small" className={styles.inlineSelect} value={videoDuration} onChange={setVideoDuration} style={{width:72}}
-                options={getVideoPreset(selVideoModel).durations.map(d => ({ label: `${d}秒`, value: d }))} />
-              <Select size="small" className={styles.inlineSelect} value={videoQuality} onChange={setVideoQuality} style={{width:96}}
-                options={getVideoPreset(selVideoModel).qualities.map(q => ({ label: q, value: q }))} />
-            </>}
             <div className={styles.toggleMode}><button className={`${styles.toggleBtn} ${previewMode === 'image' ? styles.toggleBtnActive : ''}`} onClick={() => switchPreviewMode('image')}>图片</button><button className={`${styles.toggleBtn} ${previewMode === 'video' ? styles.toggleBtnActive : ''}`} onClick={() => switchPreviewMode('video')}>视频</button></div>
           </div>
 
@@ -373,6 +365,17 @@ const Workspace: React.FC = () => {
           </div>
 
           <div className={`${styles.promptArea} ${promptExpanded ? styles.promptExpanded : ''}`}>
+            {selectedCharacterIds.length > 0 && (
+              <div className={styles.charCards}>
+                {selectedCharacterIds.map(cid => { const ch = characters.find(c => c.id === cid); return ch ? (
+                  <div key={cid} className={`${styles.charCard} ${(activeScene?.selectedCharacterIds || []).includes(cid) ? styles.charCardActive : ''}`}
+                    onClick={() => { if (!activeScene) return; const cur = activeScene.selectedCharacterIds || []; const next = cur.includes(cid) ? cur.filter(x => x !== cid) : [...cur, cid]; handleUpdateScene(activeScene.id, { selectedCharacterIds: next } as any); }}>
+                    {ch.referenceImage ? <img src={ch.referenceImage} className={styles.charCardImg} alt="" /> : <UserOutlined />}
+                    <span>{ch.name}</span>
+                  </div>
+                ) : null; })}
+              </div>
+            )}
             <div className={styles.promptAreaHead}>
               <span>提示词输入</span>
               <button className={styles.expandBtn} onClick={togglePromptExpand} title={promptExpanded ? '收起' : '展开'}>
@@ -390,6 +393,11 @@ const Workspace: React.FC = () => {
         </div>
 
         {!rightCollapsed && (<div className={styles.rightCol}>
+          <div className={styles.selectorGroup}><div className={styles.selectorLabel}>图片比例</div><Select size="small" className={styles.inlineSelect} value={imageRatio} onChange={setImageRatio} style={{width:'100%'}} options={IMAGE_RATIOS.map(r => ({ label: r, value: r }))} /></div>
+          {previewMode === 'video' && <>
+            <div className={styles.selectorGroup}><div className={styles.selectorLabel}>视频秒数</div><Select size="small" className={styles.inlineSelect} value={videoDuration} onChange={setVideoDuration} style={{width:'100%'}} options={getVideoPreset(selVideoModel).durations.map(d => ({ label: `${d}秒`, value: d }))} /></div>
+            <div className={styles.selectorGroup}><div className={styles.selectorLabel}>清晰度</div><Select size="small" className={styles.inlineSelect} value={videoQuality} onChange={setVideoQuality} style={{width:'100%'}} options={getVideoPreset(selVideoModel).qualities.map(q => ({ label: q, value: q }))} /></div>
+          </>}
           <div className={styles.selectorGroup}><div className={styles.selectorLabel}>风格</div><Select size="small" value={selectedStyleId} onChange={setSelectedStyleId} placeholder="选择风格" allowClear style={{width:'100%'}} options={styleList.map(s => ({ label: s.name, value: s.id }))} /></div>
           <div className={styles.selectorGroup}><div className={styles.selectorLabel}>生成模式</div><Select size="small" value={generationMode} onChange={setGenerationMode} style={{width:'100%'}} options={[{ label: '文生视频', value: 'text-to-video' as GenerationMode }, { label: '图生视频', value: 'image-to-video' as GenerationMode }]} /></div>
           <div className={styles.selectorGroup}><div className={styles.selectorLabel}>API模型</div><div className={styles.chipRow}><div className={styles.chip} onClick={() => setModelSettingsOpen(true)}><ApiOutlined /> 模型设置</div></div></div>
