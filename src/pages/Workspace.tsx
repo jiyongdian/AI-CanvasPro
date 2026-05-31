@@ -254,8 +254,10 @@ const Workspace: React.FC = () => {
         const mc = resolveModelConfig(selImageModel);
         if ((mc as any).error) { message.error((mc as any).error); setGenerating(false); return; }
         setGenProgress(30);
-        console.log('[图片生成] 模型:', selImageModel, 'provider:', (mc as any).providerId);
-        const result = await aiService.generateImage(activeScene, undefined, { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0], providerId: (mc as any).providerId });
+        console.log('[图片生成] 模型:', selImageModel, '提示词:', (promptText || activeScene.prompt).slice(0,50));
+        // 动态传入当前输入框提示词
+        const imgScene = { ...activeScene, prompt: promptText || activeScene.prompt };
+        const result = await aiService.generateImage(imgScene, undefined, { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0], providerId: (mc as any).providerId });
         setGenProgress(100);
         handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: result }, imagePrompt: promptText || undefined, status: 'completed', imageStatus: 'completed' });
         addTaskToHistory({ id: crypto.randomUUID(), type: 'image', url: result, sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt: promptText, model: selImageModel });
