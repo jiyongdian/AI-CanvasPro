@@ -13,6 +13,7 @@ import { currentProjectState, characterListState } from '../store/projectStore';
 import { getProject, saveProject, getAllCharacters, getAllStyles, getAllPromptTemplates } from '../services/database';
 import { migrateOldMediaData, preloadMedia, getMedia } from '../services/mediaService';
 import { saveImageToLocalFile } from '../utils/imageUtils';
+import { downloadToDir, getDirHandle, verifyPermission } from '../utils/downloadHelper';
 import CharacterSelectCard from '../components/workspace/CharacterSelectCard';
 import SceneManagerModal from '../components/workspace/SceneManagerModal';
 import { Project, Scene, Style, GenerationMode, Character, PromptTemplate, ApiProvider, ProviderModel } from '../types';
@@ -141,6 +142,23 @@ const Workspace: React.FC = () => {
     const p = getProviderForModel(modelId);
     if (!p) return { error: `模型 "${modelId}" 未关联API平台` };
     return { providerId: p.id, apiUrl: p.apiUrl, apiKey: p.apiKey, model: modelId };
+  };
+
+  // 下载到用户配置的文件夹（优先）或浏览器默认下载
+  const downloadToUserDir = async (url: string, fileName: string) => {
+    try {
+      const r = await fetch(url); const blob = await r.blob();
+      const dirHandle = await getDirHandle();
+      if (dirHandle && await verifyPermission(dirHandle)) {
+        const fh = await dirHandle.getFileHandle(fileName, { create: true });
+        const w = await fh.createWritable(); await w.write(blob); await w.close();
+        message.success(`已保存到 ${dirHandle.name}/${fileName}`);
+      } else {
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = fileName; a.click(); URL.revokeObjectURL(a.href);
+        message.success('已保存到下载文件夹');
+      }
+    } catch { message.error('保存失败'); }
   };
 
   useEffect(() => { getAllPromptTemplates().then(d => setPromptTemplates(d)).catch(() => {}); }, []);
@@ -441,7 +459,13 @@ const Workspace: React.FC = () => {
                 </div>
                 <div className={styles.historyCardActions}>
                   <Button size="small" icon={<EyeOutlined />} onClick={() => window.open(item.url)}>查看</Button>
-                  <Button size="small" icon={<DownloadOutlined />} onClick={async () => { try { await saveImageToLocalFile(item.url, `生成_${item.type}_${Date.now()}`); message.success('已保存到本地'); } catch { message.error('保存失败'); } }}>保存</Button>
+                  <Button size="small" icon={<DownloadOutlined />} onClick={() => {
+                    const idx = project.script.findIndex(s => s.id === item.sceneId);
+                    const sceneNum = idx >= 0 ? idx + 1 : '';
+                    const name = `${project.name}${sceneNum}`;
+                    const ext = item.type === 'video' ? 'mp4' : 'png';
+                    downloadToUserDir(item.url, `${name}.${ext}`);
+                  }}>保存</Button>
                   <Button size="small" danger icon={<DeleteOutlined />} onClick={() => { const updated = taskHistory.filter(t => t.id !== item.id); setTaskHistory(updated); if (projectId) saveTaskHistory(projectId, updated); }}>删除</Button>
                 </div>
               </div>
