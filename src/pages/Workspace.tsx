@@ -11,7 +11,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useRecoilState, useSetRecoilState } from 'recoil';
 import { currentProjectState, characterListState } from '../store/projectStore';
 import { getProject, saveProject, getAllCharacters, getAllStyles, getAllPromptTemplates } from '../services/database';
-import { migrateOldMediaData, preloadMedia } from '../services/mediaService';
+import { migrateOldMediaData, preloadMedia, getMedia } from '../services/mediaService';
 import { saveImageToLocalFile } from '../utils/imageUtils';
 import CharacterSelectCard from '../components/workspace/CharacterSelectCard';
 import SceneManagerModal from '../components/workspace/SceneManagerModal';
@@ -289,7 +289,15 @@ const Workspace: React.FC = () => {
         if ((mc as any).error) { message.error((mc as any).error); setGenerating(false); return; }
         console.log('[视频生成] 模型:', selVideoModel, 'provider:', (mc as any).providerId);
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined });
-        const sceneChars = characters.filter(c => (activeScene?.selectedCharacterIds || []).includes(c.id));
+        const selIds = activeScene?.selectedCharacterIds || [];
+        const sceneChars = characters.filter(c => selIds.includes(c.id));
+        // 确保参考图从media store恢复(不依赖Character.referenceImage可能为空)
+        for (const ch of sceneChars) {
+          if (!ch.referenceImage || ch.referenceImage.startsWith('blob:') || ch.referenceImage.length < 100) {
+            try { const media = await getMedia('character', ch.id); if (media) ch.referenceImage = media; } catch {}
+          }
+        }
+        console.log('[视频生成] 出场角色:', sceneChars.map(c => ({ name: c.name, hasRef: !!c.referenceImage })));
         const vidResult = await aiService.generateVideo(
           { ...activeScene, prompt: promptText || activeScene.videoPrompt || activeScene.prompt, useImageAsReference: !!activeScene.images?.keyFrame },
           sceneChars.length > 0 ? sceneChars.map(c => ({ id: c.id, name: c.name, voiceType: c.voiceType || '', referenceImage: c.referenceImage || '' })) as any : undefined,
