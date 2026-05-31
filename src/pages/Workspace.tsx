@@ -246,6 +246,7 @@ const Workspace: React.FC = () => {
         const mc = resolveModelConfig(selImageModel);
         if ((mc as any).error) { message.error((mc as any).error); setGenerating(false); return; }
         setGenProgress(30);
+        console.log('[图片生成] 模型:', selImageModel, 'provider:', (mc as any).providerId);
         const result = await aiService.generateImage(activeScene, undefined, { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0], providerId: (mc as any).providerId });
         setGenProgress(100);
         handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: result }, imagePrompt: promptText || undefined, status: 'completed', imageStatus: 'completed' });
@@ -256,6 +257,7 @@ const Workspace: React.FC = () => {
         if (!prompt) { message.warning('请输入视频提示词'); return; }
         const mc = resolveModelConfig(selVideoModel);
         if ((mc as any).error) { message.error((mc as any).error); setGenerating(false); return; }
+        console.log('[视频生成] 模型:', selVideoModel, 'provider:', (mc as any).providerId);
         // 更新场景prompt为当前输入框内容
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined });
         const vidResult = await aiService.generateVideo(
