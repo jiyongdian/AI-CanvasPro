@@ -686,9 +686,10 @@ ${requirementBlock}
     onChunk?: (text: string) => void,
     selectedStyle?: { name: string; description: string },
     allSceneDescriptions?: string[],
-    promptTemplate?: { positive_prompt: string; negative_prompt?: string }
+    promptTemplate?: { positive_prompt: string; negative_prompt?: string },
+    providerId?: string,
   ): Promise<string> {
-    const providerConfig = await this.getProviderConfig();
+    const providerConfig = await this.getProviderConfig(providerId);
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
     const apiKey = providerConfig.apiKey || this.config.apiKey;
     const config = this.getConfig();
@@ -903,9 +904,9 @@ ${hasConnectionPrompt ? '3. Grid 2必须承接前一个分镜末尾镜头确保�
   async generateImage(
     scene: Scene, 
     characters?: Character[],
-    options?: { aspectRatio?: string; imageSize?: string; style?: Style; generationMode?: GenerationMode; gridMode?: number; model?: string }
+    options?: { aspectRatio?: string; imageSize?: string; style?: Style; generationMode?: GenerationMode; gridMode?: number; model?: string; providerId?: string }
   ): Promise<string> {
-    const providerConfig = await this.getProviderConfig();
+    const providerConfig = await this.getProviderConfig(options?.providerId);
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
     const apiKey = providerConfig.apiKey || this.config.apiKey;
     const config = this.getConfig();
@@ -1151,8 +1152,8 @@ ${hasConnectionPrompt ? '3. Grid 2必须承接前一个分镜末尾镜头确保�
     return data.choices?.[0]?.message?.content?.trim() || userPrompt;
   }
 
-  async optimizeScenePrompt(userPrompt: string): Promise<string> {
-    const providerConfig = await this.getProviderConfig();
+  async optimizeScenePrompt(userPrompt: string, providerId?: string): Promise<string> {
+    const providerConfig = await this.getProviderConfig(providerId);
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
     const apiKey = providerConfig.apiKey || this.config.apiKey;
     const config = this.getConfig();

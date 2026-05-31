@@ -112,6 +112,12 @@ const Workspace: React.FC = () => {
   const [taskHistory, setTaskHistory] = useState<TaskHistoryItem[]>(() => loadTaskHistory(projectId || ''));
 
   const getProviderForModel = useCallback((modelId: string) => providers.find(p => p.models.some(m => m.id === modelId)), [providers]);
+  const resolveModelConfig = (modelId?: string) => {
+    if (!modelId) return { error: '请先在右侧模型设置中选择模型' };
+    const p = getProviderForModel(modelId);
+    if (!p) return { error: `模型 "${modelId}" 未关联API平台` };
+    return { providerId: p.id, apiUrl: p.apiUrl, apiKey: p.apiKey, model: modelId };
+  };
 
   useEffect(() => { getAllPromptTemplates().then(d => setPromptTemplates(d)).catch(() => {}); }, []);
 
@@ -163,12 +169,15 @@ const Workspace: React.FC = () => {
     try {
       const prompt = promptText || activeScene.prompt || activeScene.description;
       if (!prompt) { message.warning('请输入提示词'); return; }
+      const mc = resolveModelConfig(selTextModel);
+      if ((mc as any).error) { message.error((mc as any).error); setInferLoading(false); return; }
       const templateId = previewMode === 'image' ? selectedImageTemplateId : selectedVideoTemplateId;
       const template = templateId ? promptTemplates.find(t => t.id === templateId) : undefined;
       const result = await aiService.generatePrompt(
         activeScene, previewMode, undefined, undefined, undefined,
         selectedStyle, project.script.map(s => s.description),
-        template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined
+        template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined,
+        selTextModel ? (mc as any).providerId : undefined,
       );
       setPromptText(result);
       handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: result } as any);
@@ -182,13 +191,16 @@ const Workspace: React.FC = () => {
     if (!activeScene || !project) return;
     setDirectorLoading(true); setDirectorResult('');
     try {
+      const mc = resolveModelConfig(selTextModel);
+      if ((mc as any).error) { message.error((mc as any).error); setDirectorLoading(false); return; }
       const template = selectedDirectorTemplateId ? promptTemplates.find(t => t.id === selectedDirectorTemplateId) : undefined;
       let accumulated = '';
       await aiService.generatePrompt(
         activeScene, 'image', undefined, undefined,
         (text) => { accumulated = text; setDirectorResult(text); },
         selectedStyle, project.script.map(s => s.description),
-        template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined
+        template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined,
+        (mc as any).providerId,
       );
       setDirectorPreviewOpen(true);
       message.success('AI导演优化完成');
@@ -231,9 +243,10 @@ const Workspace: React.FC = () => {
       if (previewMode === 'image') {
         const prompt = promptText || activeScene.prompt || activeScene.description;
         if (!prompt) { message.warning('请输入提示词'); return; }
+        const mc = resolveModelConfig(selImageModel);
+        if ((mc as any).error) { message.error((mc as any).error); setGenerating(false); return; }
         setGenProgress(30);
-        const imgTemplate = selectedImageTemplateId ? promptTemplates.find(t => t.id === selectedImageTemplateId) : undefined;
-        const result = await aiService.generateImage(activeScene, undefined, { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0] });
+        const result = await aiService.generateImage(activeScene, undefined, { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0], providerId: (mc as any).providerId });
         setGenProgress(100);
         handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: result }, imagePrompt: promptText || undefined, status: 'completed', imageStatus: 'completed' });
         addTaskToHistory({ id: crypto.randomUUID(), type: 'image', url: result, sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt: promptText, model: selImageModel });
@@ -241,20 +254,21 @@ const Workspace: React.FC = () => {
       } else {
         const prompt = promptText || activeScene.videoPrompt || activeScene.jiMengPrompt || activeScene.prompt;
         if (!prompt) { message.warning('请输入视频提示词'); return; }
-        const vidProvider = selVideoModel ? getProviderForModel(selVideoModel) : undefined;
+        const mc = resolveModelConfig(selVideoModel);
+        if ((mc as any).error) { message.error((mc as any).error); setGenerating(false); return; }
         // 更新场景prompt为当前输入框内容
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined });
         const vidResult = await aiService.generateVideo(
           { ...activeScene, prompt: promptText || activeScene.videoPrompt || activeScene.prompt },
           undefined,
-          { model: selVideoModel, providerId: vidProvider?.id || selPlatformId, duration: videoDuration, resolution: videoQuality, aspectRatio: imageRatio } as any
+          { model: selVideoModel, providerId: (mc as any).providerId, duration: videoDuration, resolution: videoQuality, aspectRatio: imageRatio } as any
         );
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined, videoStatus: 'generating' });
         // 加入任务历史(生成中)
         addTaskToHistory({ id: vidResult.taskId, type: 'video', url: '', sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt: promptText, model: selVideoModel, status: 'generating' as const });
         message.success('视频生成任务已提交，正在后台生成...');
         // 异步轮询
-        pollVideoTask(vidResult.taskId, vidResult.isVeoTask, activeScene.id, vidProvider?.id || selPlatformId);
+        pollVideoTask(vidResult.taskId, vidResult.isVeoTask, activeScene.id, (mc as any).providerId);
       }
     } catch (e: any) { message.error(e.message || '生成失败'); }
     finally { setGenerating(false); setGenProgress(0); }
@@ -392,7 +406,7 @@ const Workspace: React.FC = () => {
       <Modal title="添加分镜" open={addConfirmOpen} onCancel={() => setAddConfirmOpen(false)} onOk={doAddScene} okText="确认添加" cancelText="取消" centered width={400}><p style={{color:'var(--body-color)',fontSize:14}}>在当前分镜 <strong style={{color:'#6366f1'}}>分镜 {activeIdx + 1}</strong> 之后插入一个新分镜？</p></Modal>
       <Modal title="删除分镜" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={doDeleteScene} okText="确认删除" cancelText="取消" okButtonProps={{danger:true}} centered width={400}><p style={{color:'var(--body-color)',fontSize:14}}>确定要删除 <strong style={{color:'#ef4444'}}>分镜 {activeIdx + 1}</strong> 吗？</p></Modal>
       <Modal title="选择角色" open={characterModalVisible} onCancel={()=>setCharacterModalVisible(false)} onOk={async () => { if (!project) return; await handleUpdateProject({ ...project, script: project.script.map(s => ({ ...s, availableCharacterIds: selectedCharacterIds })) }); setCharacterModalVisible(false); }} okText="确认" cancelText="取消" width="45%" centered className={styles.charModal}><div className={styles.charGrid}>{characters.length === 0 ? <Empty description="暂无角色" /> : characters.map(c => <CharacterSelectCard key={c.id} character={c} isSelected={selectedCharacterIds.includes(c.id)} onToggle={(id) => setSelectedCharacterIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])} />)}</div></Modal>
-      <SceneManagerModal visible={sceneManagerVisible} scenes={project.script} selectedStyle={selectedStyle} selectedImageModel={selImageModel} savedSceneLocations={project.sceneLocations} onClose={() => setSceneManagerVisible(false)} onImportToScene={(ids, url) => { if (ids === '__current__' && activeSceneId) { handleUpdateScene(activeSceneId, { images: { ...(project.script.find(s=>s.id===activeSceneId)?.images || {}), keyFrame: url, storyboard: url } }); return; } const idList = ids.split(',').filter(Boolean); const script = project.script.map(s => idList.includes(s.id) ? { ...s, images: { ...s.images, keyFrame: url, storyboard: url } } : s); handleUpdateProject({ ...project, script }); }} onSaveSceneLocations={locs => handleUpdateProject({ ...project, sceneLocations: locs })} onApplyPromptToScenes={(ids, prompt) => { const script = project.script.map(s => ids.includes(s.id) ? { ...s, jiMengPrompt: `【场景提示词】${prompt}` } : s); handleUpdateProject({ ...project, script }); }} />
+      <SceneManagerModal visible={sceneManagerVisible} scenes={project.script} selectedStyle={selectedStyle} selectedImageModel={selImageModel} selectedTextModel={selTextModel} imageModelProviderId={selImageModel ? (resolveModelConfig(selImageModel) as any)?.providerId : undefined} textModelProviderId={selTextModel ? (resolveModelConfig(selTextModel) as any)?.providerId : undefined} savedSceneLocations={project.sceneLocations} onClose={() => setSceneManagerVisible(false)} onImportToScene={(ids, url) => { if (ids === '__current__' && activeSceneId) { handleUpdateScene(activeSceneId, { images: { ...(project.script.find(s=>s.id===activeSceneId)?.images || {}), keyFrame: url, storyboard: url } }); return; } const idList = ids.split(',').filter(Boolean); const script = project.script.map(s => idList.includes(s.id) ? { ...s, images: { ...s.images, keyFrame: url, storyboard: url } } : s); handleUpdateProject({ ...project, script }); }} onSaveSceneLocations={locs => handleUpdateProject({ ...project, sceneLocations: locs })} onApplyPromptToScenes={(ids, prompt) => { const script = project.script.map(s => ids.includes(s.id) ? { ...s, jiMengPrompt: `【场景提示词】${prompt}` } : s); handleUpdateProject({ ...project, script }); }} />
       <Modal title="AI导演优化结果" open={directorPreviewOpen} onCancel={() => setDirectorPreviewOpen(false)} footer={[<Button key="cancel" onClick={() => setDirectorPreviewOpen(false)}>取消</Button>,<Button key="apply" type="primary" onClick={applyDirectorResult}>应用到提示词</Button>]} width={700} centered><pre style={{whiteSpace:'pre-wrap',fontSize:13,lineHeight:1.7,color:'var(--body-color)',maxHeight:'50vh',overflow:'auto',padding:16,background:'var(--input-bg)',borderRadius:10}}>{directorResult}</pre></Modal>
 
       {/* 模型设置 + 自定义视频 + 模板弹窗 (保持原样) */}

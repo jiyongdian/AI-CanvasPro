@@ -22,6 +22,9 @@ interface SceneManagerModalProps {
   scenes: Scene[];
   selectedStyle?: Style;
   selectedImageModel?: string;
+  selectedTextModel?: string;
+  imageModelProviderId?: string;
+  textModelProviderId?: string;
   savedSceneLocations?: SceneLocationData[];
   onClose: () => void;
   onImportToScene: (sceneId: string, imageUrl: string) => void;
@@ -49,7 +52,8 @@ const MULTIVIEW_PROMPT_TEMPLATE = `【多视角场景参考图 — 6视图全景
 5. 不要在任何格子中放置人物`;
 
 const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
-  visible, scenes, selectedStyle, selectedImageModel, savedSceneLocations,
+  visible, scenes, selectedStyle, selectedImageModel, selectedTextModel,
+  imageModelProviderId, textModelProviderId, savedSceneLocations,
   onClose, onImportToScene, onSaveSceneLocations, onApplyPromptToScenes,
 }) => {
   const [sceneLocations, setSceneLocations] = useState<SceneLocation[]>([]);
@@ -135,7 +139,7 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
     if (!createDesc.trim()) { message.warning('请输入场景描述'); return; }
     setCreateOptimizing(true);
     try {
-      const result = await aiService.optimizeScenePrompt(createDesc.trim());
+      const result = await aiService.optimizeScenePrompt(createDesc.trim(), textModelProviderId);
       setCreatePrompt(result);
       message.success('场景描述已优化');
     } catch (e: any) { message.error(e.message || '优化失败'); }
@@ -150,7 +154,7 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
       const fullPrompt = `${MULTIVIEW_PROMPT_TEMPLATE}\n\n【场景内容】\n${prompt.trim()}`;
       const tempScene: Scene = { id: 'temp', order: 0, description: createDesc, prompt: fullPrompt, generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' };
       setCreateGenProgress(20);
-      const imageUrl = await aiService.generateImage(tempScene, undefined, { aspectRatio: '1:1', style: selectedStyle, model: selectedImageModel });
+      const imageUrl = await aiService.generateImage(tempScene, undefined, { aspectRatio: '1:1', style: selectedStyle, model: selectedImageModel, providerId: imageModelProviderId });
       setCreateGenProgress(70);
       await preloadImage(imageUrl, (p) => setCreateGenProgress(20 + Math.round(p * 0.5)));
       // 转 Base64 永久存储
@@ -208,7 +212,7 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
     setSceneLocations(prev => { const u = [...prev]; u[index] = { ...u[index], isGenerating: true, loadingProgress: 0 }; return u; });
     try {
       const tempScene: Scene = { id: 'temp', order: 0, description: loc.sceneDescription, prompt: loc.prompt, generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' };
-      const imageUrl = await aiService.generateImage(tempScene, undefined, { aspectRatio: '16:9', style: selectedStyle, model: selectedImageModel });
+      const imageUrl = await aiService.generateImage(tempScene, undefined, { aspectRatio: '16:9', style: selectedStyle, model: selectedImageModel, providerId: imageModelProviderId });
       await preloadImage(imageUrl, (p) => setSceneLocations(prev => { const u = [...prev]; u[index] = { ...u[index], loadingProgress: p }; return u; }));
       let final = imageUrl;
       try { const r = await fetch(imageUrl); if (r.ok) final = await blobToBase64(await r.blob()); } catch {}
