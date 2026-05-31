@@ -325,23 +325,12 @@ const AICharacter: React.FC = () => {
     
     try {
       const selectedStyle = styleList.find(s => s.id === selectedStyleId);
+      const mc = resolveModelConfig(selImageModel);
+      if ((mc as any).error) return;
       const imageUrl = await aiService.generateImage(
-        {
-          id: character.id,
-          order: 0,
-          description: '',
-          prompt: character.prompt,
-          generationMode: 'text-to-image',
-          images: {},
-          videos: [],
-          status: 'pending'
-        },
+        { id: character.id, order: 0, description: '', prompt: character.prompt, generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' },
         undefined,
-        { 
-          aspectRatio: character.aspectRatio || '16:9', 
-          imageSize: character.imageSize,
-          style: selectedStyle
-        }
+        { aspectRatio: character.aspectRatio || '16:9', imageSize: character.imageSize, style: selectedStyle, model: selImageModel, providerId: (mc as any).providerId }
       );
 
       // 预加载图片
@@ -379,30 +368,18 @@ const AICharacter: React.FC = () => {
   const handleRetry = async (character: GeneratedCharacter) => {
     console.log('[AICharacter] 重试任务:', character.id, character.prompt);
     
-    // 更新状态为 generating
     const retryingCharacter = { ...character, status: 'generating' as const, loadingProgress: 0 };
     setHistory(prev => prev.map(c => c.id === character.id ? retryingCharacter : c));
     saveToIndexedDB(retryingCharacter);
     
     try {
       const selectedStyle = styleList.find(s => s.id === selectedStyleId);
+      const mc = resolveModelConfig(selImageModel);
+      if ((mc as any).error) { message.error((mc as any).error); return; }
       const imageUrl = await aiService.generateImage(
-        {
-          id: character.id,
-          order: 0,
-          description: '',
-          prompt: character.prompt,
-          generationMode: 'text-to-image',
-          images: {},
-          videos: [],
-          status: 'pending'
-        },
+        { id: character.id, order: 0, description: '', prompt: character.prompt, generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' },
         undefined,
-        { 
-          aspectRatio: character.aspectRatio || '16:9', 
-          imageSize: character.imageSize,
-          style: selectedStyle
-        }
+        { aspectRatio: character.aspectRatio || '16:9', imageSize: character.imageSize, style: selectedStyle, model: selImageModel, providerId: (mc as any).providerId }
       );
 
       // 预加载图片
