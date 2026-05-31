@@ -688,12 +688,14 @@ ${requirementBlock}
     allSceneDescriptions?: string[],
     promptTemplate?: { positive_prompt: string; negative_prompt?: string },
     providerId?: string,
+    modelOverride?: string,
   ): Promise<string> {
     const providerConfig = await this.getProviderConfig(providerId);
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
     const apiKey = providerConfig.apiKey || this.config.apiKey;
     const config = this.getConfig();
     const baseUrl = apiUrl.replace(/\/+$/, '');
+    const chatModel = modelOverride || config.chatModel || 'gemini-3-flash-preview';
     
     const getGridLayout = (grid: number) => {
       switch (grid) {
@@ -828,7 +830,7 @@ ${hasConnectionPrompt ? '3. Grid 2必须承接前一个分镜末尾镜头确保�
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: config.chatModel || 'gemini-3-flash-preview',
+          model: chatModel,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: sceneInfo }
@@ -884,7 +886,7 @@ ${hasConnectionPrompt ? '3. Grid 2必须承接前一个分镜末尾镜头确保�
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: config.chatModel || 'gemini-3-flash-preview',
+        model: chatModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: sceneInfo }

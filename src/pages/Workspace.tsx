@@ -177,11 +177,13 @@ const Workspace: React.FC = () => {
       if ((mc as any).error) { message.error((mc as any).error); setInferLoading(false); return; }
       const templateId = previewMode === 'image' ? selectedImageTemplateId : selectedVideoTemplateId;
       const template = templateId ? promptTemplates.find(t => t.id === templateId) : undefined;
+      console.log('[推理] 文本模型:', selTextModel, 'provider:', (mc as any)?.providerId);
       const result = await aiService.generatePrompt(
         activeScene, previewMode, undefined, undefined, undefined,
         selectedStyle, project.script.map(s => s.description),
         template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined,
-        selTextModel ? (mc as any).providerId : undefined,
+        (mc as any)?.providerId,
+        selTextModel,
       );
       setPromptText(result);
       handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: result } as any);
@@ -199,12 +201,14 @@ const Workspace: React.FC = () => {
       if ((mc as any).error) { message.error((mc as any).error); setDirectorLoading(false); return; }
       const template = selectedDirectorTemplateId ? promptTemplates.find(t => t.id === selectedDirectorTemplateId) : undefined;
       let accumulated = '';
+      console.log('[AI导演] 文本模型:', selTextModel, 'provider:', (mc as any)?.providerId);
       await aiService.generatePrompt(
         activeScene, 'image', undefined, undefined,
         (text) => { accumulated = text; setDirectorResult(text); },
         selectedStyle, project.script.map(s => s.description),
         template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined,
-        (mc as any).providerId,
+        (mc as any)?.providerId,
+        selTextModel,
       );
       setDirectorPreviewOpen(true);
       message.success('AI导演优化完成');
