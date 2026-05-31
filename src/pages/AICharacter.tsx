@@ -5,7 +5,7 @@ import { SendOutlined, LoadingOutlined, DeleteOutlined, ImportOutlined, Thunderb
 import { useRecoilState } from 'recoil';
 import { v4 as uuidv4 } from 'uuid';
 import { aiService, createTempScene } from '../services/aiService';
-import { preloadImage } from '../utils/imageUtils';
+import { preloadImage, compressImage } from '../utils/imageUtils';
 import { downloadToDir, saveDirHandle } from '../utils/downloadHelper';
 import { saveCharacter, openDatabase, getAllStyles } from '../services/database';
 import { saveMedia, getMedia } from '../services/mediaService';
@@ -106,6 +106,24 @@ const AICharacter: React.FC = () => {
   useEffect(() => { if (selPlatformId) localStorage.setItem('ac_platform', selPlatformId); else localStorage.removeItem('ac_platform'); }, [selPlatformId]);
   useEffect(() => { if (selImageModel) localStorage.setItem('ac_image_model', selImageModel); else localStorage.removeItem('ac_image_model'); }, [selImageModel]);
   useEffect(() => { if (selTextModel) localStorage.setItem('ac_text_model', selTextModel); else localStorage.removeItem('ac_text_model'); }, [selTextModel]);
+
+  // 通过 canvas 将图片 URL 转为 Base64（绕过 CORS）
+  const urlToBase64 = async (url: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas not supported')); return; }
+        ctx.drawImage(img, 0, 0);
+        try { resolve(canvas.toDataURL('image/png')); } catch { reject(new Error('Canvas tainted')); }
+      };
+      img.onerror = () => reject(new Error('Image load failed'));
+      img.src = url;
+    });
+  };
 
   const supportsImageSize = () => {
     return (selImageModel || '').includes('nano-banana-2');
@@ -276,17 +294,15 @@ const AICharacter: React.FC = () => {
         ));
       });
 
-      // 将图片转为 Base64 并永久保存（与角色库/风格库一致）
+      // 转为Base64并永久保存(canvas绕过CORS)
       let permanentImage = imageUrl;
       try {
-        await saveMedia('character', `ai_${newCharacter.id}`, imageUrl);
-        const base64 = await getMedia('character', `ai_${newCharacter.id}`);
-        if (base64) {
-          permanentImage = base64;
-          console.log('[AICharacter] 角色图片已永久保存到本地');
-        }
+        const base64 = await urlToBase64(imageUrl);
+        permanentImage = base64;
+        await saveMedia('character', `ai_${newCharacter.id}`, base64);
+        console.log('[AICharacter] 角色图片已永久保存到本地');
       } catch (mediaError) {
-        console.warn('[AICharacter] 图片保存到本地失败，使用远程URL:', mediaError);
+        console.warn('[AICharacter] 图片保存失败，使用远程URL:', mediaError);
       }
 
       const completedCharacter = { ...newCharacter, imageUrl: permanentImage, status: 'completed' as const };
@@ -340,13 +356,9 @@ const AICharacter: React.FC = () => {
         ));
       });
 
-      // 永久保存图片到本地
+      // Canvas转Base64永久保存
       let permanentImage = imageUrl;
-      try {
-        await saveMedia('character', `ai_${character.id}`, imageUrl);
-        const base64 = await getMedia('character', `ai_${character.id}`);
-        if (base64) permanentImage = base64;
-      } catch { /* 降级到远程URL */ }
+      try { const b64 = await urlToBase64(imageUrl); permanentImage = b64; await saveMedia('character', `ai_${character.id}`, b64); } catch {}
 
       const completedCharacter = { ...character, imageUrl: permanentImage, status: 'completed' as const };
       setHistory(prev => prev.map(c =>
@@ -389,13 +401,9 @@ const AICharacter: React.FC = () => {
         ));
       });
 
-      // 永久保存图片到本地
+      // Canvas转Base64永久保存
       let permanentImage = imageUrl;
-      try {
-        await saveMedia('character', `ai_${character.id}`, imageUrl);
-        const base64 = await getMedia('character', `ai_${character.id}`);
-        if (base64) permanentImage = base64;
-      } catch { /* 降级到远程URL */ }
+      try { const b64 = await urlToBase64(imageUrl); permanentImage = b64; await saveMedia('character', `ai_${character.id}`, b64); } catch {}
 
       const completedCharacter = { ...character, imageUrl: permanentImage, status: 'completed' as const };
       setHistory(prev => prev.map(c =>
