@@ -216,7 +216,7 @@ const Workspace: React.FC = () => {
         const prompt = promptText || activeScene.videoPrompt || activeScene.jiMengPrompt || activeScene.prompt;
         if (!prompt) { message.warning('请输入视频提示词'); return; }
         const vidTemplate = selectedVideoTemplateId ? promptTemplates.find(t => t.id === selectedVideoTemplateId) : undefined;
-        await aiService.generateVideo(activeScene);
+        await aiService.generateVideo(activeScene, undefined, { model: selVideoModel } as any);
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined, videoStatus: 'generating' });
         message.success('视频生成任务已提交');
       }
