@@ -1615,7 +1615,7 @@ ${hasConnectionPrompt ? '3. Grid 2必须承接前一个分镜末尾镜头确保�
       payload[vcfg.resolutionField] = options?.enableUpsample ? '1080P' : '720P';
       if (options?.enhancePrompt !== undefined) payload.enhance_prompt = options.enhancePrompt;
     } else {
-      payload.duration = options?.duration || '10';
+      payload.duration = parseInt(options?.duration as string || '10');
       if (vcfg.resolutionField && vcfg.resolutionField !== 'size') {
         payload[vcfg.resolutionField] = '720p';
       }
