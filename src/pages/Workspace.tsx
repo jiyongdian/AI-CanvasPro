@@ -114,6 +114,10 @@ const Workspace: React.FC = () => {
   const getProviderForModel = useCallback((modelId: string) => providers.find(p => p.models.some(m => m.id === modelId)), [providers]);
   const resolveModelConfig = (modelId?: string) => {
     if (!modelId) return { error: '请先在右侧模型设置中选择模型' };
+    // 优先使用用户选中的平台，再回退查找模型所属平台
+    if (selPlatformId && selPlatform?.models.some(m => m.id === modelId)) {
+      return { providerId: selPlatformId, apiUrl: selPlatform.apiUrl, apiKey: selPlatform.apiKey, model: modelId };
+    }
     const p = getProviderForModel(modelId);
     if (!p) return { error: `模型 "${modelId}" 未关联API平台` };
     return { providerId: p.id, apiUrl: p.apiUrl, apiKey: p.apiKey, model: modelId };
@@ -415,7 +419,7 @@ const Workspace: React.FC = () => {
       <Modal title={null} open={modelSettingsOpen} onCancel={() => setModelSettingsOpen(false)} footer={null} width={560} centered className={styles.tplModal}>
         <div className={styles.tplModalHead}><ApiOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>模型设置</span></div>
         <div className={styles.tplModalBody}>
-          <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ApiOutlined /></span>API平台</div><Select size="small" value={selPlatformId} onChange={(v) => { setSelPlatformId(v); setSelImageModel(undefined); setSelVideoModel(undefined); setSelTextModel(undefined); }} placeholder="全部平台" allowClear style={{width:'100%'}} options={providers.filter(p => p.enabled !== false).map(p => ({ label: p.name, value: p.id }))} /></div>
+          <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ApiOutlined /></span>API平台</div><Select size="small" value={selPlatformId} onChange={setSelPlatformId} placeholder="全部平台" allowClear style={{width:'100%'}} options={providers.filter(p => p.enabled !== false).map(p => ({ label: p.name, value: p.id }))} /></div>
           <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><PictureOutlined /></span>图片模型</div><Select size="small" value={selImageModel} onChange={setSelImageModel} placeholder={allModels.length > 0 ? '选择图片模型' : '请先在设置页配置API'} allowClear style={{width:'100%'}} options={allModels.map(m => ({ label: m.id, value: m.id }))} /></div>
           <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><VideoCameraOutlined /></span>视频模型</div><Select size="small" value={selVideoModel} onChange={(v) => { setSelVideoModel(v); const preset = getVideoPreset(v); if (!preset.durations.includes(videoDuration)) setVideoDuration(preset.durations[0]); if (!preset.qualities.includes(videoQuality)) setVideoQuality(preset.qualities[preset.qualities.length - 1]); }} placeholder={allModels.length > 0 ? '选择视频模型' : '请先在设置页配置API'} allowClear style={{width:'100%'}} options={allModels.map(m => ({ label: m.id, value: m.id }))} /></div>
           <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ThunderboltOutlined /></span>文本模型（推理·AI导演）</div><Select size="small" value={selTextModel} onChange={setSelTextModel} placeholder={allModels.length > 0 ? '选择文本模型' : '请先在设置页配置API'} allowClear style={{width:'100%'}} options={allModels.map(m => ({ label: m.id, value: m.id }))} /></div>
