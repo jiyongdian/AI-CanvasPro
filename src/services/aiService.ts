@@ -716,7 +716,8 @@ ${requirementBlock}
     const storyContent = storyParts.join('\n');
 
     // 提取用户在输入框中的修改（最高优先级，必须完全遵循）
-    const userModified = (mode === 'image' ? scene.imagePrompt : scene.videoPrompt);
+    // 优先取 scene.prompt（工作台实时传入的输入框内容），回退到 imagePrompt/videoPrompt
+    const userModified = scene.prompt || (mode === 'image' ? scene.imagePrompt : scene.videoPrompt);
     const userModifiedContent = userModified && userModified.trim() ? userModified : null;
 
     if (promptTemplate && promptTemplate.positive_prompt) {
