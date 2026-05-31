@@ -25,7 +25,7 @@ type PreviewMode = 'image' | 'video';
 
 interface TaskHistoryItem {
   id: string; type: 'image' | 'video'; url: string; sceneId: string;
-  createdAt: string; prompt: string; model?: string;
+  createdAt: string; prompt: string; model?: string; status?: 'generating' | 'completed' | 'failed';
 }
 
 const TEMPLATE_TYPE_LABELS: Record<string, string> = { image: '图片模板', video: '视频模板', director: '导演模板' };
@@ -206,11 +206,13 @@ const Workspace: React.FC = () => {
         const status = await aiService.checkVideoStatus(taskId, isVeo, providerId);
         if (status.status === 'completed' && status.videoUrl) {
           handleUpdateScene(sceneId, { videos: [status.videoUrl], videoStatus: 'completed', status: 'completed' });
+          // 更新任务历史
+          setTaskHistory(prev => prev.map(t => t.id === taskId ? { ...t, url: status.videoUrl!, status: 'completed' } : t));
           message.success('视频生成完成！');
-          addTaskToHistory({ id: crypto.randomUUID(), type: 'video', url: status.videoUrl, sceneId, createdAt: new Date().toISOString(), prompt: promptText, model: selVideoModel });
           return;
         } else if (status.status === 'failed') {
           handleUpdateScene(sceneId, { videoStatus: 'completed' } as any);
+          setTaskHistory(prev => prev.map(t => t.id === taskId ? { ...t, status: 'failed' } : t));
           message.error('视频生成失败: ' + (status.failReason || '未知错误'));
           return;
         }
@@ -246,6 +248,8 @@ const Workspace: React.FC = () => {
           { model: selVideoModel, providerId: vidProvider?.id || selPlatformId, duration: videoDuration, resolution: videoQuality, aspectRatio: imageRatio } as any
         );
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined, videoStatus: 'generating' });
+        // 加入任务历史(生成中)
+        addTaskToHistory({ id: vidResult.taskId, type: 'video', url: '', sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt: promptText, model: selVideoModel, status: 'generating' });
         message.success('视频生成任务已提交，正在后台生成...');
         // 异步轮询
         pollVideoTask(vidResult.taskId, vidResult.isVeoTask, activeScene.id, vidProvider?.id || selPlatformId);
@@ -363,9 +367,12 @@ const Workspace: React.FC = () => {
           <div className={styles.historyGrid}>
             {currentHistory.map(item => (
               <div key={item.id} className={styles.historyCard}>
-                <img src={item.url} alt="" />
+                {item.status === 'generating' ? <div style={{height:100,display:'flex',alignItems:'center',justifyContent:'center',background:'var(--input-bg)'}}><Spin /><span style={{marginLeft:8,fontSize:12,color:'var(--text-tertiary)'}}>生成中...</span></div>
+                : item.url ? <img src={item.url} alt="" /> : <div style={{height:100,display:'flex',alignItems:'center',justifyContent:'center',background:'var(--input-bg)',color:'var(--text-tertiary)'}}>无预览</div>}
                 <div className={styles.historyCardMeta}>
                   <Tag color={item.type === 'image' ? 'blue' : 'orange'}>{item.type === 'image' ? '图片' : '视频'}</Tag>
+                  {item.status === 'generating' && <Tag color="processing">生成中</Tag>}
+                  {item.status === 'failed' && <Tag color="error">失败</Tag>}
                   <span style={{fontSize:11,color:'var(--text-tertiary)'}}>{new Date(item.createdAt).toLocaleString()}</span>
                 </div>
                 <div className={styles.historyCardActions}>
