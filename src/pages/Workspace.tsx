@@ -199,11 +199,13 @@ const Workspace: React.FC = () => {
 
   // ==================== 视频任务轮询 ====================
   const pollVideoTask = async (taskId: string, isVeo: boolean, sceneId: string, providerId?: string) => {
+    console.log(`[轮询] 开始: ${taskId}, provider: ${providerId}`);
     const maxAttempts = 60;
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(r => setTimeout(r, 10000));
       try {
         const status = await aiService.checkVideoStatus(taskId, isVeo, providerId);
+        console.log(`[轮询] #${i+1}:`, status);
         if (status.status === 'completed' && status.videoUrl) {
           handleUpdateScene(sceneId, { videos: [status.videoUrl], videoStatus: 'completed', status: 'completed' });
           // 更新任务历史
@@ -216,7 +218,7 @@ const Workspace: React.FC = () => {
           message.error('视频生成失败: ' + (status.failReason || '未知错误'));
           return;
         }
-      } catch { /* 继续轮询 */ }
+      } catch (e) { console.warn(`[轮询] #${i+1}出错:`, e); }
     }
     message.warning('视频生成超时，请稍后手动刷新查看结果');
   };

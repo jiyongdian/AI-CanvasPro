@@ -1816,6 +1816,7 @@ ${hasConnectionPrompt ? '3. Grid 2必须承接前一个分镜末尾镜头确保�
     const vcfg = this.getVideoConfig(model);
     
     const queryUrl = `${videoApiUrl}${vcfg.queryPath.replace('{id}', encodeURIComponent(taskId))}`;
+    console.log(`[checkVideoStatus] 查询URL: ${queryUrl}`);
     
     const response = await fetch(queryUrl, {
       method: 'GET',
