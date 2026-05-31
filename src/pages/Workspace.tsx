@@ -197,6 +197,28 @@ const Workspace: React.FC = () => {
   };
   const applyDirectorResult = () => { if (!activeScene) return; setPromptText(directorResult); handleUpdateScene(activeScene.id, { prompt: directorResult }); setDirectorPreviewOpen(false); };
 
+  // ==================== 视频任务轮询 ====================
+  const pollVideoTask = async (taskId: string, isVeo: boolean, sceneId: string) => {
+    const maxAttempts = 60;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, 10000));
+      try {
+        const status = await aiService.checkVideoStatus(taskId, isVeo);
+        if (status.status === 'completed' && status.videoUrl) {
+          handleUpdateScene(sceneId, { videos: [status.videoUrl], videoStatus: 'completed', status: 'completed' });
+          message.success('视频生成完成！');
+          addTaskToHistory({ id: crypto.randomUUID(), type: 'video', url: status.videoUrl, sceneId, createdAt: new Date().toISOString(), prompt: promptText, model: selVideoModel });
+          return;
+        } else if (status.status === 'failed') {
+          handleUpdateScene(sceneId, { videoStatus: 'completed' } as any);
+          message.error('视频生成失败: ' + (status.failReason || '未知错误'));
+          return;
+        }
+      } catch { /* 继续轮询 */ }
+    }
+    message.warning('视频生成超时，请稍后手动刷新查看结果');
+  };
+
   // ==================== 生成 ====================
   const handleGenerate = async () => {
     if (!activeScene || !project) return;
@@ -215,11 +237,12 @@ const Workspace: React.FC = () => {
       } else {
         const prompt = promptText || activeScene.videoPrompt || activeScene.jiMengPrompt || activeScene.prompt;
         if (!prompt) { message.warning('请输入视频提示词'); return; }
-        const vidTemplate = selectedVideoTemplateId ? promptTemplates.find(t => t.id === selectedVideoTemplateId) : undefined;
         const vidProvider = selVideoModel ? getProviderForModel(selVideoModel) : undefined;
-        await aiService.generateVideo(activeScene, undefined, { model: selVideoModel, providerId: vidProvider?.id || selPlatformId, duration: videoDuration } as any);
+        const vidResult = await aiService.generateVideo(activeScene, undefined, { model: selVideoModel, providerId: vidProvider?.id || selPlatformId, duration: videoDuration } as any);
         handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined, videoStatus: 'generating' });
-        message.success('视频生成任务已提交');
+        message.success('视频生成任务已提交，正在后台生成...');
+        // 异步轮询
+        pollVideoTask(vidResult.taskId, vidResult.isVeoTask, activeScene.id);
       }
     } catch (e: any) { message.error(e.message || '生成失败'); }
     finally { setGenerating(false); setGenProgress(0); }
