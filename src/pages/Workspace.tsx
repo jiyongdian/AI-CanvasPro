@@ -198,14 +198,13 @@ const Workspace: React.FC = () => {
   }, [selPlatformId]);
   // 恢复新平台之前保存的选择
   useEffect(() => {
-    if (!selPlatformId) return;
+    if (!selPlatformId || !selPlatform?.models?.length) return;
     const img = localStorage.getItem(`ws_img_${selPlatformId}`);
     const vid = localStorage.getItem(`ws_vid_${selPlatformId}`);
     const txt = localStorage.getItem(`ws_txt_${selPlatformId}`);
-    // 验证模型仍存在于当前平台
-    if (img && selPlatform?.models.some(m => m.id === img)) setSelImageModel(img); else { setSelImageModel(undefined); localStorage.removeItem(`ws_img_${selPlatformId}`); }
-    if (vid && selPlatform?.models.some(m => m.id === vid)) setSelVideoModel(vid); else { setSelVideoModel(undefined); localStorage.removeItem(`ws_vid_${selPlatformId}`); }
-    if (txt && selPlatform?.models.some(m => m.id === txt)) setSelTextModel(txt); else { setSelTextModel(undefined); localStorage.removeItem(`ws_txt_${selPlatformId}`); }
+    if (img && selPlatform.models.some(m => m.id === img)) setSelImageModel(img); else setSelImageModel(undefined);
+    if (vid && selPlatform.models.some(m => m.id === vid)) setSelVideoModel(vid); else setSelVideoModel(undefined);
+    if (txt && selPlatform.models.some(m => m.id === txt)) setSelTextModel(txt); else setSelTextModel(undefined);
   }, [selPlatformId, selPlatform]);
   useEffect(() => { if (selImageModel) localStorage.setItem('ws_image_model', selImageModel); else localStorage.removeItem('ws_image_model'); }, [selImageModel]);
   useEffect(() => { if (selVideoModel) localStorage.setItem('ws_video_model', selVideoModel); else localStorage.removeItem('ws_video_model'); }, [selVideoModel]);
