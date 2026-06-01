@@ -383,7 +383,14 @@ const Workspace: React.FC = () => {
     } catch (e: any) { message.error(e.message || '生成失败'); }
     finally { setGenerating(false); setGenProgress(0); }
   };
-  const savePrompt = useCallback(() => { if (!activeScene) return; handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: promptText } as any); }, [activeScene, promptText, previewMode, handleUpdateScene]);
+  const savePromptRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savePrompt = useCallback((immediate?: boolean) => {
+    if (!activeScene) return;
+    const save = () => handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: promptText } as any);
+    if (immediate) { save(); return; }
+    if (savePromptRef.current) clearTimeout(savePromptRef.current);
+    savePromptRef.current = setTimeout(save, 800);
+  }, [activeScene, promptText, previewMode, handleUpdateScene]);
 
   // ==================== 提示词展开/收起 ====================
   const togglePromptExpand = () => {
@@ -467,7 +474,7 @@ const Workspace: React.FC = () => {
               </button>
               <span style={{marginLeft:'auto',fontSize:11,color:'var(--text-tertiary)'}}>{activeScene ? `分镜 ${activeIdx + 1}` : '未选择'}</span>
             </div>
-            <textarea className={styles.promptInput} placeholder="输入提示词描述..." value={promptText} onChange={e => setPromptText(e.target.value)} onBlur={savePrompt} />
+            <textarea className={styles.promptInput} placeholder="输入提示词描述..." value={promptText} onChange={e => { setPromptText(e.target.value); savePrompt(); }} onBlur={() => savePrompt(true)} />
             <div className={styles.promptActions}>
               <Button size="small" icon={<ThunderboltOutlined />} onClick={handleInfer} loading={inferLoading}>推理</Button>
               <Button size="small" icon={<BulbOutlined />} onClick={handleDirector} loading={directorLoading}>AI导演</Button>
