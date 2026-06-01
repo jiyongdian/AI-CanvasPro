@@ -22,9 +22,21 @@
 .topBarRight { display:flex; gap:6px; align-items:center; }
 .topIconBtn {
   display:flex; align-items:center; justify-content:center;
-  width:34px; height:34px; border-radius:10px; border:1px solid var(--panel-border);
-  background:var(--input-bg); color:var(--text-secondary);
-  cursor:pointer; transition:all 0.2s; font-size:15px;
+  width:34px; height:34px; border-radius:10px; cursor:pointer;
+  transition:all 0.2s; font-size:15px;
+  border:1px solid var(--divider-color);
+  background:var(--panel-bg-gradient);
+  color:var(--text-secondary);
+}
+:root[data-theme='light'] .topIconBtn {
+  border:1px solid #d1d5db;
+  background:#fff;
+  color:#6b7280;
+}
+:root[data-theme='dark'] .topIconBtn {
+  border:1px solid var(--panel-border);
+  background:var(--input-bg);
+  color:var(--text-secondary);
 }
 .topIconBtn:hover { color:#8b5cf6; border-color:rgba(139,92,246,0.3); background:rgba(139,92,246,0.06); }
 .topBarLeft { display: flex; align-items: center; gap: 14px; }
