@@ -104,6 +104,22 @@ const AICharacter: React.FC = () => {
     loadApiProviders().then(p => { setProviders(p.filter(x => x.enabled !== false)); }).catch(() => {});
   }, []);
   useEffect(() => { if (selPlatformId) localStorage.setItem('ac_platform', selPlatformId); else localStorage.removeItem('ac_platform'); }, [selPlatformId]);
+  // 平台切换：保存当前选择 + 恢复新平台选择
+  useEffect(() => {
+    const prevPid = localStorage.getItem('ac_prev_platform');
+    if (prevPid) {
+      if (selImageModel) localStorage.setItem(`ac_img_${prevPid}`, selImageModel); else localStorage.removeItem(`ac_img_${prevPid}`);
+      if (selTextModel) localStorage.setItem(`ac_txt_${prevPid}`, selTextModel); else localStorage.removeItem(`ac_txt_${prevPid}`);
+    }
+    if (selPlatformId) localStorage.setItem('ac_prev_platform', selPlatformId);
+  }, [selPlatformId]);
+  useEffect(() => {
+    if (!selPlatformId || !selPlatform?.models?.length) return;
+    const img = localStorage.getItem(`ac_img_${selPlatformId}`);
+    const txt = localStorage.getItem(`ac_txt_${selPlatformId}`);
+    if (img && selPlatform.models.some(m => m.id === img)) setSelImageModel(img); else setSelImageModel(undefined);
+    if (txt && selPlatform.models.some(m => m.id === txt)) setSelTextModel(txt); else setSelTextModel(undefined);
+  }, [selPlatformId, selPlatform]);
   useEffect(() => { if (selImageModel) localStorage.setItem('ac_image_model', selImageModel); else localStorage.removeItem('ac_image_model'); }, [selImageModel]);
   useEffect(() => { if (selTextModel) localStorage.setItem('ac_text_model', selTextModel); else localStorage.removeItem('ac_text_model'); }, [selTextModel]);
 
