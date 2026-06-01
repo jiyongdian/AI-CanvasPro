@@ -184,6 +184,14 @@ const Workspace: React.FC = () => {
 
   // 模型选择持久化
   useEffect(() => { if (selPlatformId) localStorage.setItem('ws_platform_id', selPlatformId); else localStorage.removeItem('ws_platform_id'); }, [selPlatformId]);
+  // 切换平台时清理不存在的模型
+  useEffect(() => {
+    if (!selPlatform) return;
+    const has = (mid?: string) => mid && selPlatform.models.some(m => m.id === mid);
+    if (selImageModel && !has(selImageModel)) setSelImageModel(undefined);
+    if (selVideoModel && !has(selVideoModel)) setSelVideoModel(undefined);
+    if (selTextModel && !has(selTextModel)) setSelTextModel(undefined);
+  }, [selPlatformId]);
   useEffect(() => { if (selImageModel) localStorage.setItem('ws_image_model', selImageModel); else localStorage.removeItem('ws_image_model'); }, [selImageModel]);
   useEffect(() => { if (selVideoModel) localStorage.setItem('ws_video_model', selVideoModel); else localStorage.removeItem('ws_video_model'); }, [selVideoModel]);
   useEffect(() => { if (selTextModel) localStorage.setItem('ws_text_model', selTextModel); else localStorage.removeItem('ws_text_model'); }, [selTextModel]);
@@ -493,7 +501,7 @@ const Workspace: React.FC = () => {
       <Modal title={null} open={modelSettingsOpen} onCancel={() => setModelSettingsOpen(false)} footer={null} width={560} centered className={styles.tplModal}>
         <div className={styles.tplModalHead}><ApiOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>模型设置</span></div>
         <div className={styles.tplModalBody}>
-          <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ApiOutlined /></span>API平台</div><Select size="small" value={selPlatformId} onChange={(v) => { setSelPlatformId(v); if (v) { const p = providers.find(x => x.id === v); const hasModel = (mid?: string) => mid && p?.models.some(m => m.id === mid); if (!hasModel(selImageModel)) setSelImageModel(undefined); if (!hasModel(selVideoModel)) setSelVideoModel(undefined); if (!hasModel(selTextModel)) setSelTextModel(undefined); } }} placeholder="全部平台" allowClear style={{width:'100%'}} options={providers.filter(p => p.enabled !== false).map(p => ({ label: p.name, value: p.id }))} /></div>
+          <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ApiOutlined /></span>API平台</div><Select size="small" value={selPlatformId} onChange={setSelPlatformId} placeholder="全部平台" allowClear style={{width:'100%'}} options={providers.filter(p => p.enabled !== false).map(p => ({ label: p.name, value: p.id }))} /></div>
           <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><PictureOutlined /></span>图片模型</div><Select size="small" value={selImageModel} onChange={setSelImageModel} placeholder={!selPlatform ? '请先选择平台' : imageModels.length > 0 ? '选择图片模型' : '该平台无图片模型'} allowClear style={{width:'100%'}} options={imageModels.map(m => ({ label: m.id, value: m.id }))} /></div>
           <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><VideoCameraOutlined /></span>视频模型</div><Select size="small" value={selVideoModel} onChange={(v) => { setSelVideoModel(v); const preset = getVideoPreset(v); if (!preset.durations.includes(videoDuration)) setVideoDuration(preset.durations[0]); if (!preset.qualities.includes(videoQuality)) setVideoQuality(preset.qualities[preset.qualities.length - 1]); }} placeholder={!selPlatform ? '请先选择平台' : videoModels.length > 0 ? '选择视频模型' : '该平台无视频模型'} allowClear style={{width:'100%'}} options={videoModels.map(m => ({ label: m.id, value: m.id }))} /></div>
           <div className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}><ThunderboltOutlined /></span>文本模型（推理·AI导演）</div><Select size="small" value={selTextModel} onChange={setSelTextModel} placeholder={!selPlatform ? '请先选择平台' : textModels.length > 0 ? '选择文本模型' : '该平台无文本模型'} allowClear style={{width:'100%'}} options={textModels.map(m => ({ label: m.id, value: m.id }))} /></div>
