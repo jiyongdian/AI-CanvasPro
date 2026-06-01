@@ -245,9 +245,9 @@ const Workspace: React.FC = () => {
       if ((mc as any).error) { message.error((mc as any).error); setInferLoading(false); return; }
       const templateId = previewMode === 'image' ? selectedImageTemplateId : selectedVideoTemplateId;
       const template = templateId ? promptTemplates.find(t => t.id === templateId) : undefined;
-      console.log('[推理] 文本模型:', selTextModel, 'mode:', previewMode);
-      // 传入当前输入框实时提示词
-      const inferScene = { ...activeScene, prompt: promptText || activeScene.prompt || activeScene.description };
+      console.log('[推理] 文本模型:', selTextModel, 'mode:', previewMode, 'promptText:', (promptText||'').slice(0,60));
+      // 强制用输入框实时内容作为用户提示词
+      const inferScene = { ...activeScene, prompt: promptText || '', imagePrompt: '', videoPrompt: '' };
       let accumulated = '';
       const result = await aiService.generatePrompt(
         inferScene, previewMode, undefined, undefined,
@@ -274,8 +274,8 @@ const Workspace: React.FC = () => {
       const template = selectedDirectorTemplateId ? promptTemplates.find(t => t.id === selectedDirectorTemplateId) : undefined;
       let accumulated = '';
       console.log('[AI导演] 模型:', selTextModel, 'mode:', previewMode, 'prompt:', (promptText||'').slice(0,50));
-      // 传入当前输入框实时提示词 + 当前模式
-      const dirScene = { ...activeScene, prompt: promptText || activeScene.prompt || activeScene.description };
+      // 强制用输入框实时内容
+      const dirScene = { ...activeScene, prompt: promptText || '', imagePrompt: '', videoPrompt: '' };
       await aiService.generatePrompt(
         dirScene, previewMode, undefined, undefined,
         (text) => { accumulated = text; setDirectorResult(text); },
