@@ -174,7 +174,21 @@ const Workspace: React.FC = () => {
 
   const toggleTheme = () => { setIsDark(p => { const n = !p; localStorage.setItem('theme', n ? 'dark' : 'light'); document.documentElement.setAttribute('data-theme', n ? 'dark' : 'light'); return n; }); };
   const handleBack = () => { setProject(null as any); navigate('/projects'); };
-  const buildScenePrompt = (s: Scene | undefined, preferMode?: PreviewMode): string => { if (!s) return ''; const existing = preferMode === 'image' ? s.imagePrompt : preferMode === 'video' ? s.videoPrompt : undefined; if (existing) return existing; const parts: string[] = []; if (s.description) parts.push(s.description); if (s.actionDescription) parts.push(`【动作】${s.actionDescription}`); if (s.character) parts.push(`【角色】${s.character}`); if (s.dialogue) parts.push(`【对话】${s.dialogue}`); if (s.narration) parts.push(`【旁白】${s.narration}`); return parts.join('\n'); };
+  const buildScenePrompt = (s: Scene | undefined, preferMode?: PreviewMode): string => {
+    if (!s) return '';
+    const existing = preferMode === 'image' ? s.imagePrompt : preferMode === 'video' ? s.videoPrompt : undefined;
+    if (existing?.trim()) return existing;
+    // 也尝试从另一个模式的提示词获取
+    const alt = preferMode === 'image' ? s.videoPrompt : preferMode === 'video' ? s.imagePrompt : undefined;
+    if (alt?.trim()) return alt;
+    const parts: string[] = [];
+    if (s.description) parts.push(s.description);
+    if (s.actionDescription) parts.push(`【动作】${s.actionDescription}`);
+    if (s.character) parts.push(`【角色】${s.character}`);
+    if (s.dialogue) parts.push(`【对话】${s.dialogue}`);
+    if (s.narration) parts.push(`【旁白】${s.narration}`);
+    return parts.join('\n');
+  };
 
   const addTaskToHistory = useCallback((item: TaskHistoryItem) => {
     setTaskHistory(prev => { const updated = [item, ...prev]; if (projectId) saveTaskHistory(projectId, updated); return updated; });
