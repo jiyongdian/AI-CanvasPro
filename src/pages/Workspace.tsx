@@ -249,9 +249,14 @@ const Workspace: React.FC = () => {
       // 强制用输入框实时内容作为用户提示词
       const inferScene = { ...activeScene, prompt: promptText || '', imagePrompt: '', videoPrompt: '' };
       let accumulated = '';
+      let rafId = 0;
       const result = await aiService.generatePrompt(
         inferScene, previewMode, undefined, undefined,
-        (chunk) => { accumulated = chunk; setPromptText(chunk); },
+        (chunk) => {
+          accumulated = chunk;
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = requestAnimationFrame(() => setPromptText(chunk));
+        },
         selectedStyle, project.script.map(s => s.description),
         template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined,
         (mc as any)?.providerId,
@@ -273,12 +278,17 @@ const Workspace: React.FC = () => {
       if ((mc as any).error) { message.error((mc as any).error); setDirectorLoading(false); return; }
       const template = selectedDirectorTemplateId ? promptTemplates.find(t => t.id === selectedDirectorTemplateId) : undefined;
       let accumulated = '';
+      let rafId2 = 0;
       console.log('[AI导演] 模型:', selTextModel, 'mode:', previewMode, 'prompt:', (promptText||'').slice(0,50));
       // 强制用输入框实时内容
       const dirScene = { ...activeScene, prompt: promptText || '', imagePrompt: '', videoPrompt: '' };
       await aiService.generatePrompt(
         dirScene, previewMode, undefined, undefined,
-        (text) => { accumulated = text; setDirectorResult(text); },
+        (text) => {
+          accumulated = text; setDirectorResult(text);
+          if (rafId2) cancelAnimationFrame(rafId2);
+          rafId2 = requestAnimationFrame(() => setDirectorResult(text));
+        },
         selectedStyle, project.script.map(s => s.description),
         template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined,
         (mc as any)?.providerId,
