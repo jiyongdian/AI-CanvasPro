@@ -210,6 +210,10 @@ const Workspace: React.FC = () => {
   useEffect(() => { if (selVideoModel) localStorage.setItem('ws_video_model', selVideoModel); else localStorage.removeItem('ws_video_model'); }, [selVideoModel]);
   useEffect(() => { if (selTextModel) localStorage.setItem('ws_text_model', selTextModel); else localStorage.removeItem('ws_text_model'); }, [selTextModel]);
   useEffect(() => { localStorage.setItem('ws_image_ratio', imageRatio); }, [imageRatio]);
+  // 模板选择持久化
+  useEffect(() => { if (selectedImageTemplateId) localStorage.setItem('workspace_image_template', selectedImageTemplateId); else localStorage.removeItem('workspace_image_template'); }, [selectedImageTemplateId]);
+  useEffect(() => { if (selectedVideoTemplateId) localStorage.setItem('workspace_video_template_id', selectedVideoTemplateId); else localStorage.removeItem('workspace_video_template_id'); }, [selectedVideoTemplateId]);
+  useEffect(() => { if (selectedDirectorTemplateId) localStorage.setItem('workspace_director_template_id', selectedDirectorTemplateId); else localStorage.removeItem('workspace_director_template_id'); }, [selectedDirectorTemplateId]);
   useEffect(() => { localStorage.setItem('ws_video_duration', String(videoDuration)); }, [videoDuration]);
   useEffect(() => { localStorage.setItem('ws_video_quality', videoQuality); }, [videoQuality]);
 
