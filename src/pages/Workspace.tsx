@@ -184,14 +184,29 @@ const Workspace: React.FC = () => {
 
   // 模型选择持久化
   useEffect(() => { if (selPlatformId) localStorage.setItem('ws_platform_id', selPlatformId); else localStorage.removeItem('ws_platform_id'); }, [selPlatformId]);
-  // 切换平台时清理不存在的模型
+  // 平台切换：保存当前选择 + 恢复新平台之前的选择
   useEffect(() => {
-    if (!selPlatform) return;
-    const has = (mid?: string) => mid && selPlatform.models.some(m => m.id === mid);
-    if (selImageModel && !has(selImageModel)) setSelImageModel(undefined);
-    if (selVideoModel && !has(selVideoModel)) setSelVideoModel(undefined);
-    if (selTextModel && !has(selTextModel)) setSelTextModel(undefined);
+    // 保存当前平台的选择
+    const prevPid = localStorage.getItem('ws_prev_platform');
+    if (prevPid) {
+      if (selImageModel) localStorage.setItem(`ws_img_${prevPid}`, selImageModel); else localStorage.removeItem(`ws_img_${prevPid}`);
+      if (selVideoModel) localStorage.setItem(`ws_vid_${prevPid}`, selVideoModel); else localStorage.removeItem(`ws_vid_${prevPid}`);
+      if (selTextModel) localStorage.setItem(`ws_txt_${prevPid}`, selTextModel); else localStorage.removeItem(`ws_txt_${prevPid}`);
+    }
+    // 保存当前平台ID供下次切换使用
+    if (selPlatformId) localStorage.setItem('ws_prev_platform', selPlatformId);
   }, [selPlatformId]);
+  // 恢复新平台之前保存的选择
+  useEffect(() => {
+    if (!selPlatformId) return;
+    const img = localStorage.getItem(`ws_img_${selPlatformId}`);
+    const vid = localStorage.getItem(`ws_vid_${selPlatformId}`);
+    const txt = localStorage.getItem(`ws_txt_${selPlatformId}`);
+    // 验证模型仍存在于当前平台
+    if (img && selPlatform?.models.some(m => m.id === img)) setSelImageModel(img); else { setSelImageModel(undefined); localStorage.removeItem(`ws_img_${selPlatformId}`); }
+    if (vid && selPlatform?.models.some(m => m.id === vid)) setSelVideoModel(vid); else { setSelVideoModel(undefined); localStorage.removeItem(`ws_vid_${selPlatformId}`); }
+    if (txt && selPlatform?.models.some(m => m.id === txt)) setSelTextModel(txt); else { setSelTextModel(undefined); localStorage.removeItem(`ws_txt_${selPlatformId}`); }
+  }, [selPlatformId, selPlatform]);
   useEffect(() => { if (selImageModel) localStorage.setItem('ws_image_model', selImageModel); else localStorage.removeItem('ws_image_model'); }, [selImageModel]);
   useEffect(() => { if (selVideoModel) localStorage.setItem('ws_video_model', selVideoModel); else localStorage.removeItem('ws_video_model'); }, [selVideoModel]);
   useEffect(() => { if (selTextModel) localStorage.setItem('ws_text_model', selTextModel); else localStorage.removeItem('ws_text_model'); }, [selTextModel]);
