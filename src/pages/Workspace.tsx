@@ -6,6 +6,7 @@ import {
   PlusOutlined, DeleteOutlined, ThunderboltOutlined, BulbOutlined, UploadOutlined,
   EyeOutlined, MenuFoldOutlined, MenuUnfoldOutlined, FileTextOutlined,
   ApiOutlined, VideoCameraOutlined, UpOutlined, DownOutlined, HistoryOutlined, DownloadOutlined,
+  SunOutlined, MoonOutlined,
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRecoilState, useSetRecoilState } from 'recoil';
@@ -88,6 +89,7 @@ const Workspace: React.FC = () => {
   const [directorPreviewOpen, setDirectorPreviewOpen] = useState(false);
   const [directorResult, setDirectorResult] = useState('');
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [isDark, setIsDark] = useState(() => { const t = localStorage.getItem('theme'); return t !== 'light'; });
   const [templateSelectOpen, setTemplateSelectOpen] = useState(false);
   const [addConfirmOpen, setAddConfirmOpen] = useState(false);
   const [previewImportOpen, setPreviewImportOpen] = useState(false);
@@ -161,6 +163,7 @@ const Workspace: React.FC = () => {
     } catch { message.error('保存失败'); }
   };
 
+  useEffect(() => { document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light'); }, [isDark]);
   useEffect(() => { getAllPromptTemplates().then(d => setPromptTemplates(d)).catch(() => {}); }, []);
 
   const activeScene = useMemo(() => project?.script.find(s => s.id === activeSceneId) || null, [project, activeSceneId]);
@@ -169,6 +172,7 @@ const Workspace: React.FC = () => {
   const getSelectedTemplateId = (type: string) => type === 'image' ? selectedImageTemplateId : type === 'video' ? selectedVideoTemplateId : selectedDirectorTemplateId;
   const setSelectedTemplateId = (type: string, id: string | undefined) => { if (type === 'image') setSelectedImageTemplateId(id); else if (type === 'video') setSelectedVideoTemplateId(id); else setSelectedDirectorTemplateId(id); };
 
+  const toggleTheme = () => { setIsDark(p => { const n = !p; localStorage.setItem('theme', n ? 'dark' : 'light'); document.documentElement.setAttribute('data-theme', n ? 'dark' : 'light'); return n; }); };
   const handleBack = () => { setProject(null as any); navigate('/projects'); };
   const buildScenePrompt = (s: Scene | undefined, preferMode?: PreviewMode): string => { if (!s) return ''; const existing = preferMode === 'image' ? s.imagePrompt : preferMode === 'video' ? s.videoPrompt : undefined; if (existing) return existing; const parts: string[] = []; if (s.description) parts.push(s.description); if (s.actionDescription) parts.push(`【动作】${s.actionDescription}`); if (s.character) parts.push(`【角色】${s.character}`); if (s.dialogue) parts.push(`【对话】${s.dialogue}`); if (s.narration) parts.push(`【旁白】${s.narration}`); return parts.join('\n'); };
 
@@ -397,6 +401,7 @@ const Workspace: React.FC = () => {
           <Button type="primary" icon={<PlayCircleOutlined />} loading={generating} onClick={handleGenerate} size="small">
             {previewMode === 'image' ? '生成图片' : '生成视频'}
           </Button>
+          <Button type="text" size="small" icon={isDark ? <SunOutlined /> : <MoonOutlined />} onClick={toggleTheme} title={isDark ? '切换亮色模式' : '切换暗色模式'} />
           <Button type="text" size="small" icon={rightCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setRightCollapsed(!rightCollapsed)} />
         </div>
       </div>
