@@ -401,8 +401,14 @@ const Workspace: React.FC = () => {
           <Button type="primary" icon={<PlayCircleOutlined />} loading={generating} onClick={handleGenerate} size="small">
             {previewMode === 'image' ? '生成图片' : '生成视频'}
           </Button>
-          <Button type="text" size="small" icon={isDark ? <SunOutlined /> : <MoonOutlined />} onClick={toggleTheme} title={isDark ? '切换亮色模式' : '切换暗色模式'} />
-          <Button type="text" size="small" icon={rightCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setRightCollapsed(!rightCollapsed)} />
+          <div className={styles.topBarRight}>
+            <div className={styles.topIconBtn} onClick={toggleTheme} title={isDark ? '切换亮色模式' : '切换暗色模式'}>
+              {isDark ? <SunOutlined /> : <MoonOutlined />}
+            </div>
+            <div className={styles.topIconBtn} onClick={() => setRightCollapsed(!rightCollapsed)} title={rightCollapsed ? '展开右侧栏' : '收起右侧栏'}>
+              {rightCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            </div>
+          </div>
         </div>
       </div>
 
