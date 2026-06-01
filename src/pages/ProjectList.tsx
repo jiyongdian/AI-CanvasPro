@@ -436,9 +436,9 @@ const ProjectList: React.FC = () => {
             AI 生成脚本
           </Button>
         ]}
-        width="75vw"
-        style={{ top: '12.5vh' }}
-        styles={{ body: { height: '60vh', overflow: 'auto' } }}
+        width="95vw"
+        style={{ top: '2.5vh', maxWidth: 1200 }}
+        styles={{ body: { height: '85vh', overflow: 'auto' } }}
         forceRender
         destroyOnClose={false}
       >
