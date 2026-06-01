@@ -248,6 +248,16 @@ const Workspace: React.FC = () => {
     setPromptText(mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s)));
   };
 
+  // 获取上一个分镜的提示词(用于剧情连贯)
+  const getPreviousScenePrompt = () => {
+    if (!project || !activeSceneId) return undefined;
+    const idx = project.script.findIndex(s => s.id === activeSceneId);
+    if (idx <= 0) return undefined; // 第一个分镜无上一个
+    const prev = project.script[idx - 1];
+    return previewMode === 'image' ? (prev.imagePrompt || buildScenePrompt(prev, 'image'))
+      : (prev.videoPrompt || buildScenePrompt(prev, 'video'));
+  };
+
   // ==================== 推理 (文本优化，绑定当前模式模板) ====================
   const handleInfer = async () => {
     if (!activeScene || !project) return;
@@ -259,13 +269,13 @@ const Workspace: React.FC = () => {
       if ((mc as any).error) { message.error((mc as any).error); setInferLoading(false); return; }
       const templateId = previewMode === 'image' ? selectedImageTemplateId : selectedVideoTemplateId;
       const template = templateId ? promptTemplates.find(t => t.id === templateId) : undefined;
-      console.log('[推理] 文本模型:', selTextModel, 'mode:', previewMode, 'promptText:', (promptText||'').slice(0,60));
-      // 强制用输入框实时内容作为用户提示词
+      const prevPrompt = getPreviousScenePrompt();
+      console.log('[推理] 文本模型:', selTextModel, 'mode:', previewMode, 'promptText:', (promptText||'').slice(0,60), 'hasPrev:', !!prevPrompt);
       const inferScene = { ...activeScene, prompt: promptText || '', imagePrompt: '', videoPrompt: '' };
       let accumulated = '';
       let rafId = 0;
       const result = await aiService.generatePrompt(
-        inferScene, previewMode, undefined, undefined,
+        inferScene, previewMode, undefined, prevPrompt,
         (chunk) => {
           accumulated = chunk;
           if (rafId) cancelAnimationFrame(rafId);
@@ -293,11 +303,11 @@ const Workspace: React.FC = () => {
       const template = selectedDirectorTemplateId ? promptTemplates.find(t => t.id === selectedDirectorTemplateId) : undefined;
       let accumulated = '';
       let rafId2 = 0;
-      console.log('[AI导演] 模型:', selTextModel, 'mode:', previewMode, 'prompt:', (promptText||'').slice(0,50));
-      // 强制用输入框实时内容
+      const prevPrompt = getPreviousScenePrompt();
+      console.log('[AI导演] 模型:', selTextModel, 'mode:', previewMode, 'hasPrev:', !!prevPrompt);
       const dirScene = { ...activeScene, prompt: promptText || '', imagePrompt: '', videoPrompt: '' };
       await aiService.generatePrompt(
-        dirScene, previewMode, undefined, undefined,
+        dirScene, previewMode, undefined, prevPrompt,
         (text) => {
           accumulated = text; setDirectorResult(text);
           if (rafId2) cancelAnimationFrame(rafId2);
