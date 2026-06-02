@@ -570,7 +570,7 @@ ${requirementBlock}`;
           ],
           temperature: this.getTemperature(),
           max_tokens: parseInt(this.getConfig()?.maxTokens || '4096'),
-          stream: !!options?.onChunk,
+          ...(options?.onChunk ? { stream: true } : { response_format: { type: 'json_object' } }),
         })
       });
 
@@ -662,7 +662,7 @@ ${requirementBlock}
         ],
         temperature: this.getTemperature(),
         max_tokens: parseInt(this.getConfig()?.maxTokens || '4096'),
-        stream: !!options?.onChunk,
+        ...(options?.onChunk ? { stream: true } : { response_format: { type: 'json_object' } }),
       })
     });
 
