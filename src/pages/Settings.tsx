@@ -137,8 +137,8 @@ const Settings: React.FC = () => {
 
   // ==================== system ====================
 
-  const handleTemp = (v:number) => { setTemperature(v); saveApiConfig({temperature:String(v)}); aiService.refreshConfig(); };
-  const handleMaxTokens = (v:number) => { setMaxTokens(v); saveApiConfig({maxTokens:String(v)}); aiService.refreshConfig(); };
+  const handleTemp = async (v:number) => { setTemperature(v); const {loadApiConfig} = await import('../services/secureStorage'); const c = await loadApiConfig(); await saveApiConfig({...c, temperature:String(v)}); aiService.refreshConfig(); };
+  const handleMaxTokens = async (v:number) => { setMaxTokens(v); const {loadApiConfig} = await import('../services/secureStorage'); const c = await loadApiConfig(); await saveApiConfig({...c, maxTokens:String(v)}); aiService.refreshConfig(); };
   const handleDownload = async () => {
     try{const h=await(window as any).showDirectoryPicker({mode:'readwrite',startIn:'downloads'});setDownloadPath(h.name);await saveDirHandle(h);localStorage.setItem('download_path',h.name);message.success(`已选择: ${h.name}`)}catch(e:any){if(e.name!=='AbortError')message.error('选择失败')}
   };
