@@ -781,10 +781,11 @@ ${requirementBlock}
     if (scene.character) storyParts.push(`【角色】${scene.character}`);
     const storyContent = storyParts.join('\n');
 
-    // 提取用户在输入框中的修改（最高优先级，必须完全遵循）
-    // 优先取 scene.prompt（工作台实时传入的输入框内容），回退到 imagePrompt/videoPrompt
-    const userModified = scene.prompt || (mode === 'image' ? scene.imagePrompt : scene.videoPrompt);
-    const userModifiedContent = userModified && userModified.trim() ? userModified : null;
+    // 用户内容: prompt(实时) > imagePrompt/videoPrompt(上次保存) > 原脚本
+    const userModified = (scene.prompt?.trim?.() || '')
+      || ((mode === 'image' ? scene.imagePrompt?.trim?.() : scene.videoPrompt?.trim?.()) || '')
+      || (scene.description?.trim?.() || '');
+    const userModifiedContent = userModified || null;
 
     // 注入风格参考(视觉方向,不覆盖用户内容)
     const stylePrefix = selectedStyle?.description

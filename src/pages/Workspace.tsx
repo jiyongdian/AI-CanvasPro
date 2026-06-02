@@ -263,7 +263,10 @@ const Workspace: React.FC = () => {
     if (!activeScene || !project) return;
     setInferLoading(true);
     try {
-      const prompt = promptText || activeScene.prompt || activeScene.description;
+      const prompt = (promptText?.trim?.() || '')
+        || (activeScene.imagePrompt?.trim?.() || '')
+        || (activeScene.videoPrompt?.trim?.() || '')
+        || (activeScene.description?.trim?.() || '');
       if (!prompt) { message.warning('请输入提示词'); return; }
       const mc = resolveModelConfig(selTextModel);
       if ((mc as any).error) { message.error((mc as any).error); setInferLoading(false); return; }
@@ -271,7 +274,8 @@ const Workspace: React.FC = () => {
       const template = templateId ? promptTemplates.find(t => t.id === templateId) : undefined;
       const prevPrompt = getPreviousScenePrompt();
       console.log('[推理] 文本模型:', selTextModel, 'mode:', previewMode, 'promptText:', (promptText||'').slice(0,60), 'hasPrev:', !!prevPrompt);
-      const inferScene = { ...activeScene, prompt: promptText || '', imagePrompt: '', videoPrompt: '' };
+      // 只覆盖prompt(最新输入框内容),保留imagePrompt/videoPrompt作回退
+      const inferScene = { ...activeScene, prompt: promptText };
       let accumulated = '';
       let rafId = 0;
       const result = await aiService.generatePrompt(
@@ -305,7 +309,8 @@ const Workspace: React.FC = () => {
       let rafId2 = 0;
       const prevPrompt = getPreviousScenePrompt();
       console.log('[AI导演] 模型:', selTextModel, 'mode:', previewMode, 'hasPrev:', !!prevPrompt);
-      const dirScene = { ...activeScene, prompt: promptText || '', imagePrompt: '', videoPrompt: '' };
+      // 只覆盖prompt(最新输入框内容),保留imagePrompt/videoPrompt作回退
+      const dirScene = { ...activeScene, prompt: promptText };
       await aiService.generatePrompt(
         dirScene, previewMode, undefined, prevPrompt,
         (text) => {
