@@ -720,13 +720,18 @@ ${requirementBlock}
     if (lb !== -1 && rb !== -1 && rb > lb) {
       try { return JSON.parse(cleaned.slice(lb, rb + 1)); } catch {}
     }
-    // 截断修复: 找最后一个完整对象(通过{}配对计数)
+    // 截断修复: {}配对计数(跳过字符串内容)
     const start = cleaned.indexOf('[');
     if (start !== -1) {
-      let depth = 0, lastComplete = -1;
+      let depth = 0, lastComplete = -1, inStr = false, esc = false;
       for (let i = start; i < cleaned.length; i++) {
-        if (cleaned[i] === '{') depth++;
-        else if (cleaned[i] === '}') { depth--; if (depth === 0) lastComplete = i; }
+        const ch = cleaned[i];
+        if (esc) { esc = false; continue; }
+        if (ch === '\\') { esc = true; continue; }
+        if (ch === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (ch === '{') depth++;
+        else if (ch === '}') { depth--; if (depth === 0) lastComplete = i; }
       }
       if (lastComplete > start) {
         try { return JSON.parse(cleaned.slice(start, lastComplete + 1) + ']'); } catch {}
