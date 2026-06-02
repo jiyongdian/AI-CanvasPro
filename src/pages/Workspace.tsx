@@ -81,6 +81,8 @@ const Workspace: React.FC = () => {
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<PreviewMode>('image');
   const [promptText, setPromptText] = useState('');
+  const promptRef = useRef(promptText);
+  useEffect(() => { promptRef.current = promptText; }, [promptText]);
   const [promptExpanded, setPromptExpanded] = useState(() => sessionStorage.getItem('ws_prompt_expanded') === 'true');
   const [generating, setGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
@@ -263,7 +265,8 @@ const Workspace: React.FC = () => {
     if (!activeScene || !project) return;
     setInferLoading(true);
     try {
-      const prompt = (promptText?.trim?.() || '')
+      const curPrompt = promptRef.current;
+      const prompt = (curPrompt?.trim?.() || '')
         || (activeScene.imagePrompt?.trim?.() || '')
         || (activeScene.videoPrompt?.trim?.() || '')
         || (activeScene.description?.trim?.() || '');
@@ -273,9 +276,8 @@ const Workspace: React.FC = () => {
       const templateId = previewMode === 'image' ? selectedImageTemplateId : selectedVideoTemplateId;
       const template = templateId ? promptTemplates.find(t => t.id === templateId) : undefined;
       const prevPrompt = getPreviousScenePrompt();
-      console.log('[推理] 文本模型:', selTextModel, 'mode:', previewMode, 'promptText:', (promptText||'').slice(0,60), 'hasPrev:', !!prevPrompt);
-      // 只覆盖prompt(最新输入框内容),保留imagePrompt/videoPrompt作回退
-      const inferScene = { ...activeScene, prompt: promptText };
+      console.log('[推理] 模型:', selTextModel, 'mode:', previewMode, 'prompt:', (curPrompt||'').slice(0,60), 'hasPrev:', !!prevPrompt);
+      const inferScene = { ...activeScene, prompt: curPrompt };
       let accumulated = '';
       let rafId = 0;
       const result = await aiService.generatePrompt(
@@ -309,8 +311,7 @@ const Workspace: React.FC = () => {
       let rafId2 = 0;
       const prevPrompt = getPreviousScenePrompt();
       console.log('[AI导演] 模型:', selTextModel, 'mode:', previewMode, 'hasPrev:', !!prevPrompt);
-      // 只覆盖prompt(最新输入框内容),保留imagePrompt/videoPrompt作回退
-      const dirScene = { ...activeScene, prompt: promptText };
+      const dirScene = { ...activeScene, prompt: promptRef.current };
       await aiService.generatePrompt(
         dirScene, previewMode, undefined, prevPrompt,
         (text) => {
@@ -415,11 +416,12 @@ const Workspace: React.FC = () => {
   const savePromptRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savePrompt = useCallback((immediate?: boolean) => {
     if (!activeScene) return;
-    const save = () => handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: promptText } as any);
+    const cur = promptRef.current;
+    const save = () => handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: cur } as any);
     if (immediate) { save(); return; }
     if (savePromptRef.current) clearTimeout(savePromptRef.current);
     savePromptRef.current = setTimeout(save, 800);
-  }, [activeScene, promptText, previewMode, handleUpdateScene]);
+  }, [activeScene, previewMode, handleUpdateScene]);
 
   // ==================== 提示词展开/收起 ====================
   const togglePromptExpand = () => {
