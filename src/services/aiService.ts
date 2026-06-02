@@ -711,11 +711,29 @@ ${requirementBlock}
   }
 
   private parseScriptContent(content: string): ScriptScene[] {
-    try { return JSON.parse(content); } catch {
-      const lb = content.indexOf('['); const rb = content.lastIndexOf(']');
-      if (lb !== -1 && rb !== -1 && rb > lb) return JSON.parse(content.slice(lb, rb + 1));
-      throw new Error('AI 返回的脚本格式无法解析，请重试');
+    try { return JSON.parse(content); } catch {}
+    // 提取第一个[到最后一个]
+    const lb = content.indexOf('['); const rb = content.lastIndexOf(']');
+    if (lb !== -1 && rb !== -1 && rb > lb) {
+      try { return JSON.parse(content.slice(lb, rb + 1)); } catch {}
+      // 尝试修复截断JSON: 找到最后一个完整对象
+      let truncated = content.slice(lb, rb + 1);
+      if (!truncated.endsWith(']')) truncated += ']';
+      // 移除可能被截断的最后一个不完整对象
+      const lastComma = truncated.lastIndexOf('},');
+      if (lastComma !== -1) {
+        try { return JSON.parse(truncated.slice(0, lastComma + 1) + ']'); } catch {}
+      }
     }
+    // 最后尝试: 逐个修复常见JSON错误
+    try {
+      const cleaned = content
+        .replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+        .replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+      const lb2 = cleaned.indexOf('['); const rb2 = cleaned.lastIndexOf(']');
+      if (lb2 !== -1 && rb2 !== -1 && rb2 > lb2) return JSON.parse(cleaned.slice(lb2, rb2 + 1));
+    } catch {}
+    throw new Error('AI 返回的脚本格式无法解析，请重试');
   }
 
   async generatePrompt(
