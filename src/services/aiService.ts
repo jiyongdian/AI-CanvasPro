@@ -712,38 +712,35 @@ ${requirementBlock}
 
   private parseScriptContent(content: string): ScriptScene[] {
     try { return JSON.parse(content); } catch {}
-    // 清洗常见干扰
     let cleaned = content.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
       .replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
-    // 提取第一个[到最后一个]
-    const lb = cleaned.indexOf('['); const rb = cleaned.lastIndexOf(']');
-    if (lb !== -1 && rb !== -1 && rb > lb) {
-      try { return JSON.parse(cleaned.slice(lb, rb + 1)); } catch {}
-    }
-    // 截断修复: {}配对计数(跳过字符串内容)
-    const start = cleaned.indexOf('[');
-    if (start !== -1) {
-      let depth = 0, lastComplete = -1, inStr = false, esc = false;
-      for (let i = start; i < cleaned.length; i++) {
-        const ch = cleaned[i];
-        if (esc) { esc = false; continue; }
-        if (ch === '\\') { esc = true; continue; }
-        if (ch === '"') { inStr = !inStr; continue; }
-        if (inStr) continue;
-        if (ch === '{') depth++;
-        else if (ch === '}') { depth--; if (depth === 0) lastComplete = i; }
-      }
-      if (lastComplete > start) {
-        try { return JSON.parse(cleaned.slice(start, lastComplete + 1) + ']'); } catch {}
-      }
-      // 回退: 从后往前找最后一个},
-      for (let i = cleaned.length - 1; i > start; i--) {
-        if (cleaned[i] === '}' && (cleaned[i-1] === '"' || cleaned[i-1] === ']' || cleaned[i-1] === '}')) {
-          try { return JSON.parse(cleaned.slice(start, i + 1) + ']'); } catch {}
-          break;
+    // 提取第一个[
+    const lb = cleaned.indexOf('['); if (lb === -1) throw new Error('脚本格式无法解析：找不到JSON数组');
+    // 正常解析
+    const rb = cleaned.lastIndexOf(']');
+    if (rb !== -1 && rb > lb) { try { return JSON.parse(cleaned.slice(lb, rb + 1)); } catch {} }
+    // 逐个提取完整对象(通过{}配对,跳过字符串)
+    const results: ScriptScene[] = [];
+    let i = lb + 1, objStart = -1, depth = 0, inStr = false, esc = false;
+    while (i < cleaned.length) {
+      const ch = cleaned[i];
+      if (esc) { esc = false; i++; continue; }
+      if (ch === '\\') { esc = true; i++; continue; }
+      if (ch === '"') { inStr = !inStr; i++; continue; }
+      if (inStr) { i++; continue; }
+      if (ch === '{') {
+        if (depth === 0) objStart = i;
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0 && objStart >= 0) {
+          try { results.push(JSON.parse(cleaned.slice(objStart, i + 1))); } catch {}
+          objStart = -1;
         }
       }
+      i++;
     }
+    if (results.length > 0) return results;
     throw new Error('AI 返回的脚本格式无法解析，请重试');
   }
 
