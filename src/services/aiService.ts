@@ -794,23 +794,13 @@ ${requirementBlock}
       : '';
 
     if (promptTemplate && promptTemplate.positive_prompt) {
-      systemPrompt = `你是专业的AI${mode === 'image' ? '绘画' : '视频'}提示词生成专家。`;
-
       if (userModifiedContent) {
-        systemPrompt += `\n\n【最高优先级指令 — 必须无条件遵守】\n用户已在输入框中明确写入了需要生成的内容。你必须以用户在输入框中的内容为绝对最高优先级，逐字逐句遵循用户的要求。提示词模板仅作为风格参考（次要），当用户输入内容与模板要求冲突时，必须以用户输入内容为准。禁止根据模板风格擅自修改或覆盖用户在输入框中写好的具体内容。`;
+        systemPrompt = `你是AI提示词优化助手。用户已在输入框写好了完整内容，你的任务是：1)逐字保留用户原文的核心场景/动作/人物/台词 2)仅做轻微措辞润色和格式优化 3)绝对禁止修改用户原文的任何实质性内容。模板和风格仅供参考，不得覆盖用户内容。`;
         sceneInfo = `${stylePrefix}${userModifiedContent}
-
 ---
-
-【提示词模板 — 仅作为风格和质量参考，不得覆盖用户输入内容】
-${promptTemplate.positive_prompt}
-${promptTemplate.negative_prompt ? `\n【反向提示词（禁止出现以下内容）】\n${promptTemplate.negative_prompt}` : ''}
-
----
-
-【分镜剧情内容】
-${storyContent || '无'}`;
+仅参考：${promptTemplate.positive_prompt.slice(0,500)}`;
       } else {
+        systemPrompt = `你是专业的AI${mode === 'image' ? '绘画' : '视频'}提示词生成专家。`;
         systemPrompt += `你必须严格遵循用户提供的【提示词模板】的风格、结构和要求，基于【分镜剧情内容】生成提示词。不要添加模板之外的任何额外格式规则。`;
         sceneInfo = `【提示词模板（必须严格遵循以下风格和结构）】
 ${promptTemplate.positive_prompt}
