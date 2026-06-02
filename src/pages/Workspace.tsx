@@ -82,7 +82,7 @@ const Workspace: React.FC = () => {
   const [previewMode, setPreviewMode] = useState<PreviewMode>('image');
   const [promptText, setPromptText] = useState('');
   const promptRef = useRef(promptText);
-  useEffect(() => { promptRef.current = promptText; }, [promptText]);
+  const setPrompt = (v: string) => { promptRef.current = v; setPromptText(v); };
   const [promptExpanded, setPromptExpanded] = useState(() => sessionStorage.getItem('ws_prompt_expanded') === 'true');
   const [generating, setGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
@@ -197,7 +197,7 @@ const Workspace: React.FC = () => {
   }, [projectId]);
 
   // ==================== 加载 ====================
-  useEffect(() => { let c = false; (async () => { if (!projectId) { navigate('/projects'); return; } setLoading(true); try { if (!localStorage.getItem('media_migration_v1')) { try { await migrateOldMediaData(); localStorage.setItem('media_migration_v1', 'done'); } catch {} } const [lp, lc, ls] = await Promise.all([getProject(projectId), getAllCharacters(), getAllStyles()]); if (c) return; if (!lp) { message.error('项目不存在'); navigate('/projects'); return; } setProject(lp); setCharacters(lc); setCharactersLocal(lc); setStyleList(ls); const savedSceneId = sessionStorage.getItem(`ws_active_${projectId}`); const initialScene = savedSceneId ? lp.script.find(s => s.id === savedSceneId) : lp.script[0]; if (initialScene) { setActiveSceneId(initialScene.id); const m = sessionStorage.getItem(`ws_pmode_${initialScene.id}`) as PreviewMode | null; setPreviewMode(m || 'image'); setPromptText(buildScenePrompt(initialScene, m || 'image')); } else if (lp.script.length > 0) { setActiveSceneId(lp.script[0].id); setPromptText(buildScenePrompt(lp.script[0])); } try { const p = await loadApiProviders(); setProviders(p.filter(x => x.enabled !== false)); } catch {} const items: Array<{type:'character'|'style';ownerId:string}> = [...lc.map(x=>({type:'character' as const,ownerId:x.id})), ...ls.map(x=>({type:'style' as const,ownerId:x.id}))]; if (items.length > 0) preloadMedia(items).catch(()=>{}); setTaskHistory(loadTaskHistory(projectId)); } catch (e) { if (!c) { message.error('加载失败'); navigate('/projects'); } } finally { if (!c) setLoading(false); } })(); return () => { c = true; setProject(null as any); }; }, [projectId]);
+  useEffect(() => { let c = false; (async () => { if (!projectId) { navigate('/projects'); return; } setLoading(true); try { if (!localStorage.getItem('media_migration_v1')) { try { await migrateOldMediaData(); localStorage.setItem('media_migration_v1', 'done'); } catch {} } const [lp, lc, ls] = await Promise.all([getProject(projectId), getAllCharacters(), getAllStyles()]); if (c) return; if (!lp) { message.error('项目不存在'); navigate('/projects'); return; } setProject(lp); setCharacters(lc); setCharactersLocal(lc); setStyleList(ls); const savedSceneId = sessionStorage.getItem(`ws_active_${projectId}`); const initialScene = savedSceneId ? lp.script.find(s => s.id === savedSceneId) : lp.script[0]; if (initialScene) { setActiveSceneId(initialScene.id); const m = sessionStorage.getItem(`ws_pmode_${initialScene.id}`) as PreviewMode | null; setPreviewMode(m || 'image'); setPrompt(buildScenePrompt(initialScene, m || 'image')); } else if (lp.script.length > 0) { setActiveSceneId(lp.script[0].id); setPrompt(buildScenePrompt(lp.script[0])); } try { const p = await loadApiProviders(); setProviders(p.filter(x => x.enabled !== false)); } catch {} const items: Array<{type:'character'|'style';ownerId:string}> = [...lc.map(x=>({type:'character' as const,ownerId:x.id})), ...ls.map(x=>({type:'style' as const,ownerId:x.id}))]; if (items.length > 0) preloadMedia(items).catch(()=>{}); setTaskHistory(loadTaskHistory(projectId)); } catch (e) { if (!c) { message.error('加载失败'); navigate('/projects'); } } finally { if (!c) setLoading(false); } })(); return () => { c = true; setProject(null as any); }; }, [projectId]);
 
   useEffect(() => { if (!loading && leftListRef.current && projectId) { const s = sessionStorage.getItem(`ws_scroll_${projectId}`); if (s) leftListRef.current.scrollTop = parseInt(s, 10); } }, [loading, projectId]);
   const handleLeftScroll = useCallback(() => { if (leftListRef.current && projectId) sessionStorage.setItem(`ws_scroll_${projectId}`, String(leftListRef.current.scrollTop)); }, [projectId]);
@@ -239,15 +239,15 @@ const Workspace: React.FC = () => {
 
   const handleUpdateProject = useCallback(async (p: Project) => { const ts = { ...p, updatedAt: new Date() }; setProject(ts); try { await saveProject(ts); } catch {} }, [setProject]);
   const handleUpdateScene = useCallback((sid: string, updates: Partial<Scene>) => { setProject(prev => { if (!prev) return prev; const script = prev.script.map(s => s.id === sid ? { ...s, ...updates } : s); const np = { ...prev, script, updatedAt: new Date() }; saveProject(np).catch(()=>{}); return np; }); }, [setProject]);
-  const doAddScene = async () => { if (!project || !activeSceneId) return; const idx = project.script.findIndex(s => s.id === activeSceneId); const ns: Scene = { id: crypto.randomUUID(), order: idx + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' }; const script = [...project.script.slice(0, idx + 1), ns, ...project.script.slice(idx + 1)].map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); setActiveSceneId(ns.id); setPromptText(''); sessionStorage.setItem(`ws_active_${projectId}`, ns.id); setAddConfirmOpen(false); };
-  const doDeleteScene = async () => { if (!project || !activeSceneId) return; if (project.script.length <= 1) { message.warning('至少保留一个分镜'); return; } const script = project.script.filter(s => s.id !== activeSceneId).map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); const nextId = script[0]?.id || null; setActiveSceneId(nextId); setPromptText(buildScenePrompt(script[0])); if (nextId) sessionStorage.setItem(`ws_active_${projectId}`, nextId); setDeleteConfirmOpen(false); };
-  const selectScene = (sid: string) => { setActiveSceneId(sid); const s = project?.script.find(x => x.id === sid); const savedMode = sessionStorage.getItem(`ws_pmode_${sid}`) as PreviewMode | null; const mode = savedMode || 'image'; setPreviewMode(mode); setPromptText(mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s))); sessionStorage.setItem(`ws_active_${projectId}`, sid); };
+  const doAddScene = async () => { if (!project || !activeSceneId) return; const idx = project.script.findIndex(s => s.id === activeSceneId); const ns: Scene = { id: crypto.randomUUID(), order: idx + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' }; const script = [...project.script.slice(0, idx + 1), ns, ...project.script.slice(idx + 1)].map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); setActiveSceneId(ns.id); setPrompt(''); sessionStorage.setItem(`ws_active_${projectId}`, ns.id); setAddConfirmOpen(false); };
+  const doDeleteScene = async () => { if (!project || !activeSceneId) return; if (project.script.length <= 1) { message.warning('至少保留一个分镜'); return; } const script = project.script.filter(s => s.id !== activeSceneId).map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); const nextId = script[0]?.id || null; setActiveSceneId(nextId); setPrompt(buildScenePrompt(script[0])); if (nextId) sessionStorage.setItem(`ws_active_${projectId}`, nextId); setDeleteConfirmOpen(false); };
+  const selectScene = (sid: string) => { setActiveSceneId(sid); const s = project?.script.find(x => x.id === sid); const savedMode = sessionStorage.getItem(`ws_pmode_${sid}`) as PreviewMode | null; const mode = savedMode || 'image'; setPreviewMode(mode); setPrompt(mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s))); sessionStorage.setItem(`ws_active_${projectId}`, sid); };
 
   const switchPreviewMode = (mode: PreviewMode) => {
     if (activeScene) handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: promptText } as any);
     setPreviewMode(mode); sessionStorage.setItem(`ws_pmode_${activeSceneId}`, mode);
     const s = project?.script.find(x => x.id === activeSceneId);
-    setPromptText(mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s)));
+    setPrompt(mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s)));
   };
 
   // 获取上一个分镜的提示词(用于剧情连贯)
@@ -285,14 +285,14 @@ const Workspace: React.FC = () => {
         (chunk) => {
           accumulated = chunk;
           if (rafId) cancelAnimationFrame(rafId);
-          rafId = requestAnimationFrame(() => setPromptText(chunk));
+          rafId = requestAnimationFrame(() => setPrompt(chunk));
         },
         selectedStyle, project.script.map(s => s.description),
         template ? { positive_prompt: template.positive_prompt, negative_prompt: template.negative_prompt } : undefined,
         (mc as any)?.providerId,
         selTextModel,
       );
-      if (!accumulated) setPromptText(result);
+      if (!accumulated) setPrompt(result);
       handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: accumulated || result } as any);
       message.success('推理完成');
     } catch (e: any) { message.error(e.message || '推理失败'); }
@@ -331,7 +331,7 @@ const Workspace: React.FC = () => {
   };
   const applyDirectorResult = () => {
     if (!activeScene) return;
-    setPromptText(directorResult);
+    setPrompt(directorResult);
     handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: directorResult } as any);
     setDirectorPreviewOpen(false);
   };
@@ -505,7 +505,7 @@ const Workspace: React.FC = () => {
               </button>
               <span style={{marginLeft:'auto',fontSize:11,color:'var(--text-tertiary)'}}>{activeScene ? `分镜 ${activeIdx + 1}` : '未选择'}</span>
             </div>
-            <textarea className={styles.promptInput} placeholder="输入提示词描述..." value={promptText} onChange={e => { setPromptText(e.target.value); savePrompt(); }} onBlur={() => savePrompt(true)} />
+            <textarea className={styles.promptInput} placeholder="输入提示词描述..." value={promptText} onChange={e => { setPrompt(e.target.value); savePrompt(); }} onBlur={() => savePrompt(true)} />
             <div className={styles.promptActions}>
               <Button size="small" icon={<ThunderboltOutlined />} onClick={handleInfer} loading={inferLoading}>推理</Button>
               <Button size="small" icon={<BulbOutlined />} onClick={handleDirector} loading={directorLoading}>AI导演</Button>
