@@ -266,6 +266,7 @@ class AIGenerationService {
     imageModel: string;
     videoModel: string;
     temperature: string;
+    maxTokens?: string;
   } | null = null;
 
   // 多provider支持
@@ -365,6 +366,7 @@ class AIGenerationService {
           imageModel: secureConfig.imageModel || DEFAULT_MODELS.image,
           videoModel: secureConfig.videoModel || DEFAULT_MODELS.video,
           temperature: secureConfig.temperature || '0.6',
+          maxTokens: secureConfig.maxTokens || '4096',
         };
         return this.cachedConfig;
       }
@@ -567,7 +569,7 @@ ${requirementBlock}`;
             { role: 'user', content: userMessage }
           ],
           temperature: this.getTemperature(),
-          max_tokens: 80000
+          max_tokens: parseInt(this.getConfig()?.maxTokens || '4096')
         })
       });
 
@@ -645,12 +647,14 @@ ${requirementBlock}
           { role: 'user', content: userMessage }
         ],
         temperature: this.getTemperature(),
-        max_tokens: 80000
+        max_tokens: parseInt(this.getConfig()?.maxTokens || '4096')
       })
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.statusText}`);
+      const errData = await response.json().catch(() => ({}));
+      const errMsg = (errData as any).error?.message || response.statusText || `HTTP ${response.status}`;
+      throw new Error(`API 请求失败 (${response.status}): ${errMsg}`);
     }
 
     const data = await response.json();

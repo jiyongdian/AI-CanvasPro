@@ -14,7 +14,9 @@ interface ApiConfig {
   imageModel?: string;
   videoModel?: string;
   temperature?: string;
+  maxTokens?: string;
 }
+
 
 // 简单的混淆函数（非加密，仅防止直接 grep 和随意查看）
 // Tauri 环境下由 Tauri Store 提供真正的加密保护

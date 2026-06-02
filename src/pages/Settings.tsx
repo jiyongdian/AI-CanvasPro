@@ -47,6 +47,7 @@ const Settings: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<ApiProvider | null>(null);
 
   const [temperature, setTemperature] = useState(0.6);
+  const [maxTokens, setMaxTokens] = useState(4096);
   const [downloadPath, setDownloadPath] = useState('');
 
   const [isTauri, setIsTauri] = useState(false);
@@ -63,7 +64,7 @@ const Settings: React.FC = () => {
 
   useEffect(()=>{
     (async()=>{setProvidersLoading(true);try{const l=await loadApiProviders();setProviders(l);aiService.refreshProviders()}catch{}setProvidersLoading(false)})();
-    (async()=>{try{const{loadApiConfig}=await import('../services/secureStorage');const c=await loadApiConfig();if(c.temperature)setTemperature(parseFloat(c.temperature))}catch{};const p=localStorage.getItem('download_path');if(p)setDownloadPath(p);try{const h=await getDirHandle();if(h){if(await verifyPermission(h))setDownloadPath(h.name);else{setDownloadPath('');localStorage.removeItem('download_path')}}}catch{}})();
+    (async()=>{try{const{loadApiConfig}=await import('../services/secureStorage');const c=await loadApiConfig();if(c.temperature)setTemperature(parseFloat(c.temperature));if(c.maxTokens)setMaxTokens(parseInt(c.maxTokens))}catch{};const p=localStorage.getItem('download_path');if(p)setDownloadPath(p);try{const h=await getDirHandle();if(h){if(await verifyPermission(h))setDownloadPath(h.name);else{setDownloadPath('');localStorage.removeItem('download_path')}}}catch{}})();
   },[]);
 
   // ==================== provider CRUD ====================
@@ -137,6 +138,7 @@ const Settings: React.FC = () => {
   // ==================== system ====================
 
   const handleTemp = (v:number) => { setTemperature(v); saveApiConfig({temperature:String(v)}); aiService.refreshConfig(); };
+  const handleMaxTokens = (v:number) => { setMaxTokens(v); saveApiConfig({maxTokens:String(v)}); aiService.refreshConfig(); };
   const handleDownload = async () => {
     try{const h=await(window as any).showDirectoryPicker({mode:'readwrite',startIn:'downloads'});setDownloadPath(h.name);await saveDirHandle(h);localStorage.setItem('download_path',h.name);message.success(`已选择: ${h.name}`)}catch(e:any){if(e.name!=='AbortError')message.error('选择失败')}
   };
@@ -243,6 +245,15 @@ const Settings: React.FC = () => {
               </div>
               <Slider min={0.1} max={2.0} step={0.1} value={temperature} onChange={handleTemp} tooltip={{formatter:(v:any)=>`${v}`}} />
               <p className={styles.sysBlockHint}>0 = 高度确定 · 1 = 平衡 · 2 = 高度创造</p>
+            </div>
+            <div className={styles.sysBlock}>
+              <div className={styles.sysBlockHead}>
+                <ThunderboltOutlined className={styles.sysBlockIcon} />
+                <span className={styles.sysBlockLabel}>脚本生成最大输出</span>
+                <span className={styles.sysBlockVal}>{maxTokens} tokens</span>
+              </div>
+              <Slider min={1024} max={16000} step={1024} value={maxTokens} onChange={handleMaxTokens} tooltip={{formatter:(v:any)=>`${v} tokens`}} />
+              <p className={styles.sysBlockHint}>AI脚本最大输出长度。小模型4096,大模型可设16000。过高会导致API拒绝</p>
             </div>
             {/* 下载 */}
             <div className={styles.sysBlock}>
