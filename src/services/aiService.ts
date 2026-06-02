@@ -526,7 +526,7 @@ class AIGenerationService {
     novelContent: string,
     mode: ScriptMode,
     userRequirement?: string,
-    options?: { model?: string; providerId?: string; template?: { positive_prompt: string } },
+    options?: { model?: string; providerId?: string; template?: { positive_prompt: string }; onChunk?: (text: string) => void },
   ): Promise<ScriptScene[]> {
     const providerConfig = await this.getProviderConfig(options?.providerId);
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
@@ -569,7 +569,8 @@ ${requirementBlock}`;
             { role: 'user', content: userMessage }
           ],
           temperature: this.getTemperature(),
-          max_tokens: parseInt(this.getConfig()?.maxTokens || '4096')
+          max_tokens: parseInt(this.getConfig()?.maxTokens || '4096'),
+          stream: !!options?.onChunk,
         })
       });
 
@@ -578,6 +579,19 @@ ${requirementBlock}`;
         const errMsg = (errData as any).error?.message || response.statusText || `HTTP ${response.status}`;
         throw new Error(`API 请求失败 (${response.status}): ${errMsg}`);
       }
+      // 流式输出
+      if (options?.onChunk && response.body) {
+        const reader = response.body.getReader(); const decoder = new TextDecoder(); let fc = '';
+        while (true) { const { done, value } = await reader.read(); if (done) break;
+          for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+              try { const j = JSON.parse(line.slice(6)); fc += j.choices?.[0]?.delta?.content || ''; options.onChunk(fc); } catch {}
+            }
+          }
+        }
+        try { return JSON.parse(fc); } catch { const lb = fc.indexOf('['); const rb = fc.lastIndexOf(']'); if (lb !== -1 && rb !== -1 && rb > lb) return JSON.parse(fc.slice(lb, rb + 1)); throw new Error('脚本格式无法解析'); }
+      }
+      // 非流式
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content || '[]';
       try { return JSON.parse(content); } catch {
@@ -647,7 +661,8 @@ ${requirementBlock}
           { role: 'user', content: userMessage }
         ],
         temperature: this.getTemperature(),
-        max_tokens: parseInt(this.getConfig()?.maxTokens || '4096')
+        max_tokens: parseInt(this.getConfig()?.maxTokens || '4096'),
+        stream: !!options?.onChunk,
       })
     });
 
@@ -655,6 +670,19 @@ ${requirementBlock}
       const errData = await response.json().catch(() => ({}));
       const errMsg = (errData as any).error?.message || response.statusText || `HTTP ${response.status}`;
       throw new Error(`API 请求失败 (${response.status}): ${errMsg}`);
+    }
+
+    // 流式输出
+    if (options?.onChunk && response.body) {
+      const reader = response.body.getReader(); const decoder = new TextDecoder(); let fc = '';
+      while (true) { const { done, value } = await reader.read(); if (done) break;
+        for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+            try { const j = JSON.parse(line.slice(6)); fc += j.choices?.[0]?.delta?.content || ''; options.onChunk!(fc); } catch {}
+          }
+        }
+      }
+      return this.parseScriptContent(fc);
     }
 
     const data = await response.json();
@@ -678,6 +706,14 @@ ${requirementBlock}
         throw new Error('AI 返回的脚本格式无法解析，请重试');
       }
       console.error('Failed to parse script JSON:', content.substring(0, 500));
+      throw new Error('AI 返回的脚本格式无法解析，请重试');
+    }
+  }
+
+  private parseScriptContent(content: string): ScriptScene[] {
+    try { return JSON.parse(content); } catch {
+      const lb = content.indexOf('['); const rb = content.lastIndexOf(']');
+      if (lb !== -1 && rb !== -1 && rb > lb) return JSON.parse(content.slice(lb, rb + 1));
       throw new Error('AI 返回的脚本格式无法解析，请重试');
     }
   }

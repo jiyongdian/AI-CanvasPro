@@ -124,6 +124,17 @@
   margin-bottom: 0;
 }
 
+.streamBox {
+  margin-top: 12px; padding: 12px;
+  background: rgba(139,92,246,0.04); border:1px solid rgba(139,92,246,0.12);
+  border-radius: 10px; max-height: 200px; overflow-y: auto;
+}
+.streamLabel { font-size: 11px; color: #8b5cf6; font-weight: 600; margin-bottom: 6px; }
+.streamText {
+  margin: 0; font-size: 12px; color: var(--body-color); line-height: 1.7;
+  white-space: pre-wrap; word-break: break-word; font-family: inherit;
+}
+
 /* 项目卡片 — 3D 层次 */
 .projectCard {
   position: relative;

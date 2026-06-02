@@ -30,6 +30,7 @@ const ProjectList: React.FC = () => {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [generatingModal, setGeneratingModal] = useState(false);
   const [generatingLog, setGeneratingLog] = useState<string[]>([]);
+  const [streamContent, setStreamContent] = useState('');
   const [scriptEditorVisible, setScriptEditorVisible] = useState(false);
   const [scriptEditorProject, setScriptEditorProject] = useState<Project | null>(null);
 
@@ -104,11 +105,13 @@ const ProjectList: React.FC = () => {
 
     try {
       setGeneratingLog(prev => [...prev, '🤖 AI正在分析小说内容...']);
+      setStreamContent('');
       const selTemplate = selectedScriptTemplateId ? scriptTemplates.find(t => t.id === selectedScriptTemplateId) : undefined;
       const scriptScenes = await aiService.generateScript(
         novelContent.trim(), scriptMode, customRequirement.trim() || undefined,
         { model: selectedModel, providerId: selectedProviderId,
-          template: selTemplate ? { positive_prompt: selTemplate.positive_prompt } : undefined },
+          template: selTemplate ? { positive_prompt: selTemplate.positive_prompt } : undefined,
+          onChunk: (text) => setStreamContent(text) },
       );
       setGeneratingLog(prev => [...prev, `✅ AI分析完成，共生成 ${scriptScenes.length} 个分镜`]);
       
@@ -257,11 +260,13 @@ const ProjectList: React.FC = () => {
 
     try {
       setGeneratingLog(prev => [...prev, '🤖 AI正在分析小说内容...']);
+      setStreamContent('');
       const selTemplate2 = selectedScriptTemplateId ? scriptTemplates.find(t => t.id === selectedScriptTemplateId) : undefined;
       const scriptScenes = await aiService.generateScript(
         novelContent.trim(), scriptMode, customRequirement.trim() || undefined,
         { model: selectedModel, providerId: selectedProviderId,
-          template: selTemplate2 ? { positive_prompt: selTemplate2.positive_prompt } : undefined },
+          template: selTemplate2 ? { positive_prompt: selTemplate2.positive_prompt } : undefined,
+          onChunk: (text) => setStreamContent(text) },
       );
       setGeneratingLog(prev => [...prev, `✅ AI分析完成，共生成 ${scriptScenes.length} 个分镜`]);
       
@@ -568,6 +573,12 @@ const ProjectList: React.FC = () => {
             <p key={index} className={styles.logItem}>{log}</p>
           ))}
           {generating && <Spin size="small" style={{ marginTop: 8 }} />}
+          {streamContent && (
+            <div className={styles.streamBox}>
+              <div className={styles.streamLabel}>AI 实时输出:</div>
+              <pre className={styles.streamText}>{streamContent}</pre>
+            </div>
+          )}
         </div>
       </Modal>
 
