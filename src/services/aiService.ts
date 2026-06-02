@@ -712,27 +712,33 @@ ${requirementBlock}
 
   private parseScriptContent(content: string): ScriptScene[] {
     try { return JSON.parse(content); } catch {}
+    // 清洗常见干扰
+    let cleaned = content.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+      .replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
     // 提取第一个[到最后一个]
-    const lb = content.indexOf('['); const rb = content.lastIndexOf(']');
+    const lb = cleaned.indexOf('['); const rb = cleaned.lastIndexOf(']');
     if (lb !== -1 && rb !== -1 && rb > lb) {
-      try { return JSON.parse(content.slice(lb, rb + 1)); } catch {}
-      // 尝试修复截断JSON: 找到最后一个完整对象
-      let truncated = content.slice(lb, rb + 1);
-      if (!truncated.endsWith(']')) truncated += ']';
-      // 移除可能被截断的最后一个不完整对象
-      const lastComma = truncated.lastIndexOf('},');
-      if (lastComma !== -1) {
-        try { return JSON.parse(truncated.slice(0, lastComma + 1) + ']'); } catch {}
+      try { return JSON.parse(cleaned.slice(lb, rb + 1)); } catch {}
+    }
+    // 截断修复: 找最后一个完整对象(通过{}配对计数)
+    const start = cleaned.indexOf('[');
+    if (start !== -1) {
+      let depth = 0, lastComplete = -1;
+      for (let i = start; i < cleaned.length; i++) {
+        if (cleaned[i] === '{') depth++;
+        else if (cleaned[i] === '}') { depth--; if (depth === 0) lastComplete = i; }
+      }
+      if (lastComplete > start) {
+        try { return JSON.parse(cleaned.slice(start, lastComplete + 1) + ']'); } catch {}
+      }
+      // 回退: 从后往前找最后一个},
+      for (let i = cleaned.length - 1; i > start; i--) {
+        if (cleaned[i] === '}' && (cleaned[i-1] === '"' || cleaned[i-1] === ']' || cleaned[i-1] === '}')) {
+          try { return JSON.parse(cleaned.slice(start, i + 1) + ']'); } catch {}
+          break;
+        }
       }
     }
-    // 最后尝试: 逐个修复常见JSON错误
-    try {
-      const cleaned = content
-        .replace(/```json\s*/gi, '').replace(/```\s*/g, '')
-        .replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
-      const lb2 = cleaned.indexOf('['); const rb2 = cleaned.lastIndexOf(']');
-      if (lb2 !== -1 && rb2 !== -1 && rb2 > lb2) return JSON.parse(cleaned.slice(lb2, rb2 + 1));
-    } catch {}
     throw new Error('AI 返回的脚本格式无法解析，请重试');
   }
 
