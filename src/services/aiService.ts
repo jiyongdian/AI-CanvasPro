@@ -785,6 +785,7 @@ ${requirementBlock}
     const userModified = (scene.prompt?.trim?.() || '')
       || ((mode === 'image' ? scene.imagePrompt?.trim?.() : scene.videoPrompt?.trim?.()) || '')
       || (scene.description?.trim?.() || '');
+    console.log('[generatePrompt] scene.prompt:', (scene.prompt||'').slice(0,80), 'imgPrompt:', (scene.imagePrompt||'').slice(0,40), 'vidPrompt:', (scene.videoPrompt||'').slice(0,40), '→ userModified:', (userModified||'').slice(0,80));
     const userModifiedContent = userModified || null;
 
     // 注入风格参考(视觉方向,不覆盖用户内容)
