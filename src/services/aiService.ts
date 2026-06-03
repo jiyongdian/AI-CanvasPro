@@ -522,6 +522,10 @@ class AIGenerationService {
     return baseUrl.replace(/\/v1$/, '') + '/v1';
   }
 
+  /** 严格 JSON 格式指令 — 解析失败重试时注入 */
+  private static readonly STRICT_JSON_INSTRUCTION =
+    '\n【严格 JSON 格式 — 最高优先级】你必须输出且仅输出一个合法的 JSON 数组，所有属性名和字符串值必须用双引号包裹，禁止使用单引号、禁止尾随逗号、禁止添加注释或任何额外文字。只输出 JSON，不要输出 markdown 代码块或任何其他内容。\n';
+
   async generateScript(
     novelContent: string,
     mode: ScriptMode,
@@ -532,45 +536,62 @@ class AIGenerationService {
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
     const apiKey = providerConfig.apiKey || this.config.apiKey;
     const model = options?.model || this.getConfig().chatModel || 'gemini-3-flash-preview';
-    
-    // 标准化 URL
     const baseUrl = apiUrl.replace(/\/+$/, '');
-    
-    // 如果用户提供了创作要求，注入到系统提示中
     const requirementBlock = userRequirement && userRequirement.trim()
       ? `\n【用户创作要求 - 必须严格遵守】\n${userRequirement.trim()}\n`
       : '';
-
-    // 如果有脚本模板，使用模板作为系统提示
     const template = options?.template;
-    if (template?.positive_prompt) {
+
+    // 第一次尝试
+    try {
+      return await this._doGenerate(novelContent, mode, requirementBlock, { model, baseUrl, apiKey, template, options }, false);
+    } catch (e: any) {
+      // 仅对 JSON 解析失败进行自动重试（API 错误直接抛出）
+      if (e?.message?.includes('脚本格式')) {
+        console.warn('[generateScript] 首次解析失败，使用严格 JSON 格式指令自动重试...');
+        return await this._doGenerate(novelContent, mode, requirementBlock, { model, baseUrl, apiKey, template, options }, true);
+      }
+      throw e;
+    }
+  }
+
+  private async _doGenerate(
+    novelContent: string,
+    mode: ScriptMode,
+    requirementBlock: string,
+    ctx: { model: string; baseUrl: string; apiKey: string; template?: { positive_prompt: string }; options?: { onChunk?: (text: string) => void } },
+    strictFormat: boolean,
+  ): Promise<ScriptScene[]> {
+    const strictInstruction = strictFormat ? AIGenerationService.STRICT_JSON_INSTRUCTION : '';
+
+    if (ctx.template?.positive_prompt) {
       const systemPrompt = `你是一个专业的AI漫剧编剧。请严格按照下面的【脚本模板】要求，将小说内容转换为分镜脚本。
 
 【脚本模板 — 最高优先级，必须严格遵循】
-${template.positive_prompt}
+${ctx.template.positive_prompt}
 
 【补充规则】
 - 必须完整覆盖原文的所有剧情，不得省略任何场景、对话或情节
 - 每个分镜必须包含：分镜序号(order)、场景描述(sceneDescription)、动作描述(actionDescription)、出现的角色标签(character)、台词/对话内容(dialogue)${mode === 'narration' ? '、解说词(narration)' : ''}
 - 请直接输出JSON数组格式，不要添加任何额外文字
-${requirementBlock}`;
+${strictInstruction}${requirementBlock}`;
 
-      const userMessage = userRequirement && userRequirement.trim()
-        ? `【创作要求】${userRequirement.trim()}\n\n请将以下小说内容完整转换为分镜脚本，不要省略任何剧情：\n\n${novelContent}`
+      const userMessage = requirementBlock
+        ? `【创作要求】已包含在系统提示中\n\n请将以下小说内容完整转换为分镜脚本，不要省略任何剧情：\n\n${novelContent}`
         : `请将以下小说内容完整转换为分镜脚本，不要省略任何剧情：\n\n${novelContent}`;
 
-      const response = await fetch(`${baseUrl}/chat/completions`, {
+      const response = await fetch(`${ctx.baseUrl}/chat/completions`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${ctx.apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model,
+          model: ctx.model,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMessage }
           ],
           temperature: this.getTemperature(),
           max_tokens: parseInt(this.getConfig()?.maxTokens || '4096'),
-          ...(options?.onChunk ? { stream: true } : {}),
+          ...(ctx.options?.onChunk ? { stream: true } : {}),
         })
       });
 
@@ -579,29 +600,20 @@ ${requirementBlock}`;
         const errMsg = (errData as any).error?.message || response.statusText || `HTTP ${response.status}`;
         throw new Error(`API 请求失败 (${response.status}): ${errMsg}`);
       }
-      // 流式输出
-      if (options?.onChunk && response.body) {
+      if (ctx.options?.onChunk && response.body) {
         const reader = response.body.getReader(); const decoder = new TextDecoder(); let fc = '';
         while (true) { const { done, value } = await reader.read(); if (done) break;
           for (const line of decoder.decode(value, { stream: true }).split('\n')) {
             if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-              try { const j = JSON.parse(line.slice(6)); fc += j.choices?.[0]?.delta?.content || ''; options.onChunk(fc); } catch {}
+              try { const j = JSON.parse(line.slice(6)); fc += j.choices?.[0]?.delta?.content || ''; ctx.options!.onChunk!(fc); } catch {}
             }
           }
         }
-        try { return JSON.parse(fc); } catch { const lb = fc.indexOf('['); const rb = fc.lastIndexOf(']'); if (lb !== -1 && rb !== -1 && rb > lb) return JSON.parse(fc.slice(lb, rb + 1)); throw new Error('脚本格式无法解析'); }
+        return this.parseScriptContent(fc);
       }
-      // 非流式
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content || '[]';
-      try { return JSON.parse(content); } catch {
-        const firstBracket = content.indexOf('[');
-        const lastBracket = content.lastIndexOf(']');
-        if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
-          return JSON.parse(content.slice(firstBracket, lastBracket + 1));
-        }
-        throw new Error('AI 返回的脚本格式无法解析，请重试');
-      }
+      return this.parseScriptContent(content);
     }
 
     const systemPrompt = mode === 'dialogue' 
@@ -612,7 +624,7 @@ ${requirementBlock}`;
 - 原文中的每一段对话都必须保留
 - 原文中的每一个场景转换都必须体现
 - 宁可分镜数量多，也不能遗漏剧情内容
-${requirementBlock}
+${strictInstruction}${requirementBlock}
 输出格式要求：
 1. 每个分镜包含：分镜序号(order)、场景描述(sceneDescription)、动作描述(actionDescription)、出现的角色标签(character)、台词/对话内容(dialogue)
 2. 场景描述使用"场景A"、"场景B"、"场景C"等标记来标识不同场景
@@ -631,7 +643,7 @@ ${requirementBlock}
 - 原文中的每一个场景转换都必须体现
 - 原文中的叙事性内容要转换为解说词
 - 宁可分镜数量多，也不能遗漏剧情内容
-${requirementBlock}
+${strictInstruction}${requirementBlock}
 输出格式要求：
 1. 每个分镜包含：分镜序号(order)、场景描述(sceneDescription)、动作描述(actionDescription)、出现的角色标签(character)、台词/对话内容(dialogue)、解说词(narration)
 2. 场景描述使用"场景A"、"场景B"、"场景C"等标记来标识不同场景
@@ -644,25 +656,25 @@ ${requirementBlock}
 9. 台词要自然流畅，符合角色性格
 10. 请直接输出JSON数组格式，不要添加任何额外文字`;
 
-    const userMessage = userRequirement && userRequirement.trim()
-      ? `【创作要求】${userRequirement.trim()}\n\n请将以下小说内容完整转换为分镜脚本，不要省略任何剧情：\n\n${novelContent}`
+    const userMessage = requirementBlock
+      ? `【创作要求】已包含在系统提示中\n\n请将以下小说内容完整转换为分镜脚本，不要省略任何剧情：\n\n${novelContent}`
       : `请将以下小说内容完整转换为分镜脚本，不要省略任何剧情：\n\n${novelContent}`;
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
+    const response = await fetch(`${ctx.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${ctx.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: model,
+        model: ctx.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
         ],
         temperature: this.getTemperature(),
         max_tokens: parseInt(this.getConfig()?.maxTokens || '4096'),
-        ...(options?.onChunk ? { stream: true } : {}),
+        ...(ctx.options?.onChunk ? { stream: true } : {}),
       })
     });
 
@@ -672,13 +684,12 @@ ${requirementBlock}
       throw new Error(`API 请求失败 (${response.status}): ${errMsg}`);
     }
 
-    // 流式输出
-    if (options?.onChunk && response.body) {
+    if (ctx.options?.onChunk && response.body) {
       const reader = response.body.getReader(); const decoder = new TextDecoder(); let fc = '';
       while (true) { const { done, value } = await reader.read(); if (done) break;
         for (const line of decoder.decode(value, { stream: true }).split('\n')) {
           if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-            try { const j = JSON.parse(line.slice(6)); fc += j.choices?.[0]?.delta?.content || ''; options.onChunk!(fc); } catch {}
+            try { const j = JSON.parse(line.slice(6)); fc += j.choices?.[0]?.delta?.content || ''; ctx.options!.onChunk!(fc); } catch {}
           }
         }
       }
@@ -687,41 +698,99 @@ ${requirementBlock}
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || '[]';
+    return this.parseScriptContent(content);
+  }
 
-    try {
-      // 尝试直接解析
-      return JSON.parse(content);
-    } catch {
-      try {
-        // 尝试从内容中提取 JSON 数组：从第一个 [ 到最后一个 ]
-        const firstBracket = content.indexOf('[');
-        const lastBracket = content.lastIndexOf(']');
-        if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
-          const jsonStr = content.slice(firstBracket, lastBracket + 1);
-          return JSON.parse(jsonStr);
-        }
-      } catch {
-        // 都失败时记录错误并抛出
-        console.error('Failed to parse script JSON:', content.substring(0, 500));
-        throw new Error('AI 返回的脚本格式无法解析，请重试');
-      }
-      console.error('Failed to parse script JSON:', content.substring(0, 500));
-      throw new Error('AI 返回的脚本格式无法解析，请重试');
+  /**
+   * 修复 AI 返回的常见 JSON 格式错误，使其能被 JSON.parse 正确解析。
+   * 操作都是保守的——理论上不会破坏有效 JSON。
+   */
+  private repairJson(text: string): string {
+    let result = text;
+
+    // 1. 修复无引号的属性名：{order: → {"order":
+    //    匹配 { 或 , 后面跟着的未加引号的标识符 + :
+    result = result.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*:)/g, '$1"$2"$3');
+
+    // 2. 修复单引号属性名：{'key': → {"key":
+    result = result.replace(/'([^']+)'(\s*:)/g, '"$1"$2');
+
+    // 3. 修复单引号字符串值：: 'value' → : "value"
+    result = result.replace(/:\s*'([^']*)'/g, ': "$1"');
+
+    // 4. 删除尾随逗号（} 或 ] 前的逗号）
+    result = result.replace(/,(\s*[}\]])/g, '$1');
+
+    // 5. 修复相邻对象/数组之间缺失的逗号
+    result = result.replace(/\}(\s*)\{/g, '},$1{');
+    result = result.replace(/\](\s*)\[/g, '],$1[');
+    result = result.replace(/\}(\s*)\[/g, '},$1[');
+    result = result.replace(/\](\s*)\{/g, '],$1{');
+
+    return result;
+  }
+
+  /**
+   * 校验并修复解析后的分镜场景数组：
+   * - 确保每个场景有必填字段，缺失的给默认值
+   * - order 强制转为数字
+   * - 过滤掉完全无法使用的空对象
+   */
+  private validateAndRepairScenes(raw: any[]): ScriptScene[] {
+    if (!Array.isArray(raw)) {
+      throw new Error('AI 返回的不是数组格式');
     }
+    const scenes: ScriptScene[] = [];
+    for (let i = 0; i < raw.length; i++) {
+      const obj = raw[i];
+      // 跳过非对象元素
+      if (!obj || typeof obj !== 'object') continue;
+      // 跳过明显是空对象的元素
+      const keys = Object.keys(obj);
+      if (keys.length === 0) continue;
+
+      scenes.push({
+        order: typeof obj.order === 'number' ? obj.order : (parseInt(String(obj.order), 10) || i + 1),
+        sceneDescription: String(obj.sceneDescription ?? obj.scene_description ?? obj.scene ?? `场景${i + 1}`),
+        actionDescription: obj.actionDescription != null ? String(obj.actionDescription) : (obj.action_description != null ? String(obj.action_description) : undefined),
+        character: String(obj.character ?? obj.characters ?? ''),
+        dialogue: String(obj.dialogue ?? ''),
+        narration: obj.narration != null ? String(obj.narration) : undefined,
+      });
+    }
+    if (scenes.length === 0) {
+      throw new Error('AI 返回的脚本中没有有效分镜数据');
+    }
+    return scenes;
   }
 
   private parseScriptContent(content: string): ScriptScene[] {
-    try { return JSON.parse(content); } catch {}
+    // Level 0: 直接解析
+    try { return this.validateAndRepairScenes(JSON.parse(content)); } catch {}
+
+    // Level 1: 修复常见 JSON 格式错误后解析
+    const repaired = this.repairJson(content);
+    try { return this.validateAndRepairScenes(JSON.parse(repaired)); } catch {}
+
     // 清洗: 移除markdown/HTML/多余文字
-    let cleaned = content
+    let cleaned = repaired
       .replace(/```json\s*/gi, '').replace(/```\s*/g, '')
       .replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
       .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ' '); // 控制字符
-    // 提取JSON数组
-    const lb = cleaned.indexOf('['); if (lb === -1) throw new Error('脚本格式无法解析：找不到JSON数组');
+
+    // Level 2: 提取 JSON 数组（从第一个 [ 到最后一个 ]）后解析
+    const lb = cleaned.indexOf('[');
+    if (lb === -1) throw new Error('脚本格式无法解析：找不到JSON数组');
     const rb = cleaned.lastIndexOf(']');
-    if (rb !== -1 && rb > lb) { try { return JSON.parse(cleaned.slice(lb, rb + 1)); } catch {} }
-    // 逐个提取完整对象
+    if (rb !== -1 && rb > lb) {
+      const slice = cleaned.slice(lb, rb + 1);
+      try { return this.validateAndRepairScenes(JSON.parse(slice)); } catch {}
+      // 对切片再修复一次
+      const repairedSlice = this.repairJson(slice);
+      try { return this.validateAndRepairScenes(JSON.parse(repairedSlice)); } catch {}
+    }
+
+    // Level 3: 逐个提取完整对象（每个 {…} 单独解析）
     const results: ScriptScene[] = [];
     let i = lb + 1, objStart = -1, depth = 0, inStr = false, esc = false;
     while (i < cleaned.length) {
@@ -731,14 +800,30 @@ ${requirementBlock}
       if (ch === '"') { inStr = !inStr; i++; continue; }
       if (inStr) { i++; continue; }
       if (ch === '{') { if (depth === 0) objStart = i; depth++; }
-      else if (ch === '}') { depth--; if (depth === 0 && objStart >= 0) { try { results.push(JSON.parse(cleaned.slice(objStart, i + 1))); } catch {} objStart = -1; } }
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0 && objStart >= 0) {
+          const objStr = cleaned.slice(objStart, i + 1);
+          try {
+            results.push(JSON.parse(objStr));
+          } catch {
+            // 对单个对象也尝试修复
+            try { results.push(JSON.parse(this.repairJson(objStr))); } catch {}
+          }
+          objStart = -1;
+        }
+      }
       i++;
     }
-    if (results.length > 0) return results;
-    // 最后手段: 从尾部逐字节裁剪尝试解析
+    if (results.length > 0) return this.validateAndRepairScenes(results);
+
+    // Level 4: 最后手段 — 从尾部逐字节裁剪尝试解析
     for (let trim = cleaned.length - lb; trim > lb + 2; trim--) {
-      try { return JSON.parse(cleaned.slice(lb, trim) + ']'); } catch {}
+      try { return this.validateAndRepairScenes(JSON.parse(cleaned.slice(lb, trim) + ']')); } catch {}
+      // 修复后再试
+      try { return this.validateAndRepairScenes(JSON.parse(this.repairJson(cleaned.slice(lb, trim) + ']'))); } catch {}
     }
+
     console.error('[parseScriptContent] 解析失败, raw:', content.slice(0, 500), '... cleaned:', cleaned.slice(0, 500));
     throw new Error('AI 返回的脚本格式无法解析，请重试');
   }
