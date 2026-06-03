@@ -149,6 +149,7 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
   const handleGenerateScene = async () => {
     const prompt = createPrompt || createDesc;
     if (!prompt.trim()) { message.warning('请先输入场景描述并优化'); return; }
+    if (!selectedImageModel) { message.error('请在工作台右侧模型设置中选择图片模型'); return; }
     setCreateGenerating(true); setCreateGenProgress(0);
     try {
       const fullPrompt = `${MULTIVIEW_PROMPT_TEMPLATE}\n\n【场景内容】\n${prompt.trim()}`;
@@ -208,6 +209,7 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
 
   // ==================== 生成/导入场景图片 ====================
   const handleGenerateImage = useCallback(async (index: number) => {
+    if (!selectedImageModel) { message.error('请在工作台右侧模型设置中选择图片模型'); return; }
     const loc = sceneLocations[index];
     setSceneLocations(prev => { const u = [...prev]; u[index] = { ...u[index], isGenerating: true, loadingProgress: 0 }; return u; });
     try {
