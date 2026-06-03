@@ -22,10 +22,10 @@ const ProjectList: React.FC = () => {
   const [currentProject, setCurrentProject] = useRecoilState(currentProjectState);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [novelContent, setNovelContent] = useState('');
-  const [scriptMode, setScriptMode] = useState<ScriptMode>('dialogue');
-  const [customRequirement, setCustomRequirement] = useState('');
+  const [newProjectName, setNewProjectName] = useState(() => localStorage.getItem('pl_name') || '');
+  const [novelContent, setNovelContent] = useState(() => localStorage.getItem('pl_novel') || '');
+  const [scriptMode, setScriptMode] = useState<ScriptMode>(() => (localStorage.getItem('pl_mode') as ScriptMode) || 'dialogue');
+  const [customRequirement, setCustomRequirement] = useState(() => localStorage.getItem('pl_req') || '');
   const [generating, setGenerating] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [generatingModal, setGeneratingModal] = useState(false);
@@ -36,9 +36,16 @@ const ProjectList: React.FC = () => {
 
   // 脚本模板
   const [scriptTemplates, setScriptTemplates] = useState<PromptTemplate[]>([]);
-  const [selectedScriptTemplateId, setSelectedScriptTemplateId] = useState<string | undefined>(undefined);
+  const [selectedScriptTemplateId, setSelectedScriptTemplateId] = useState<string | undefined>(() => localStorage.getItem('pl_template') || undefined);
 
   useEffect(() => { getAllPromptTemplates().then(d => setScriptTemplates(d.filter(t => t.type === 'script'))).catch(() => {}); }, []);
+  // 弹窗字段持久化
+  useEffect(() => { localStorage.setItem('pl_name', newProjectName); }, [newProjectName]);
+  useEffect(() => { localStorage.setItem('pl_novel', novelContent); }, [novelContent]);
+  useEffect(() => { localStorage.setItem('pl_mode', scriptMode); }, [scriptMode]);
+  useEffect(() => { localStorage.setItem('pl_req', customRequirement); }, [customRequirement]);
+  useEffect(() => { if (selectedScriptTemplateId) localStorage.setItem('pl_template', selectedScriptTemplateId); else localStorage.removeItem('pl_template'); }, [selectedScriptTemplateId]);
+  const clearDialogFields = () => { setNewProjectName(''); setNovelContent(''); setCustomRequirement(''); localStorage.removeItem('pl_name'); localStorage.removeItem('pl_novel'); localStorage.removeItem('pl_req'); };
 
   // 模型选择
   const [providers, setProviders] = useState<ApiProvider[]>([]);
@@ -147,9 +154,7 @@ const ProjectList: React.FC = () => {
       setTimeout(() => {
         setGeneratingModal(false);
         setModalVisible(false);
-        setNewProjectName('');
-        setNovelContent('');
-        setCustomRequirement('');
+        clearDialogFields();
         setCurrentProject(newProject);
         navigate(`/workspace/${newProject.id}`);
       }, 1500);

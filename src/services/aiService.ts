@@ -739,6 +739,7 @@ ${requirementBlock}
     for (let trim = cleaned.length - lb; trim > lb + 2; trim--) {
       try { return JSON.parse(cleaned.slice(lb, trim) + ']'); } catch {}
     }
+    console.error('[parseScriptContent] 解析失败, raw:', content.slice(0, 500), '... cleaned:', cleaned.slice(0, 500));
     throw new Error('AI 返回的脚本格式无法解析，请重试');
   }
 
