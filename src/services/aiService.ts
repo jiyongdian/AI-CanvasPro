@@ -712,14 +712,16 @@ ${requirementBlock}
 
   private parseScriptContent(content: string): ScriptScene[] {
     try { return JSON.parse(content); } catch {}
-    let cleaned = content.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
-      .replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
-    // 提取第一个[
+    // 清洗: 移除markdown/HTML/多余文字
+    let cleaned = content
+      .replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+      .replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
+      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ' '); // 控制字符
+    // 提取JSON数组
     const lb = cleaned.indexOf('['); if (lb === -1) throw new Error('脚本格式无法解析：找不到JSON数组');
-    // 正常解析
     const rb = cleaned.lastIndexOf(']');
     if (rb !== -1 && rb > lb) { try { return JSON.parse(cleaned.slice(lb, rb + 1)); } catch {} }
-    // 逐个提取完整对象(通过{}配对,跳过字符串)
+    // 逐个提取完整对象
     const results: ScriptScene[] = [];
     let i = lb + 1, objStart = -1, depth = 0, inStr = false, esc = false;
     while (i < cleaned.length) {
@@ -728,19 +730,15 @@ ${requirementBlock}
       if (ch === '\\') { esc = true; i++; continue; }
       if (ch === '"') { inStr = !inStr; i++; continue; }
       if (inStr) { i++; continue; }
-      if (ch === '{') {
-        if (depth === 0) objStart = i;
-        depth++;
-      } else if (ch === '}') {
-        depth--;
-        if (depth === 0 && objStart >= 0) {
-          try { results.push(JSON.parse(cleaned.slice(objStart, i + 1))); } catch {}
-          objStart = -1;
-        }
-      }
+      if (ch === '{') { if (depth === 0) objStart = i; depth++; }
+      else if (ch === '}') { depth--; if (depth === 0 && objStart >= 0) { try { results.push(JSON.parse(cleaned.slice(objStart, i + 1))); } catch {} objStart = -1; } }
       i++;
     }
     if (results.length > 0) return results;
+    // 最后手段: 从尾部逐字节裁剪尝试解析
+    for (let trim = cleaned.length - lb; trim > lb + 2; trim--) {
+      try { return JSON.parse(cleaned.slice(lb, trim) + ']'); } catch {}
+    }
     throw new Error('AI 返回的脚本格式无法解析，请重试');
   }
 
