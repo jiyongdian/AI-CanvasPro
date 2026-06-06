@@ -15,6 +15,25 @@ import ScriptEditorModal from '../components/ScriptEditorModal';
 import styles from './ProjectList.module.css';
 
 const { TextArea } = Input;
+const CREATE_DRAFT_STORAGE_KEYS = {
+  name: 'pl_name',
+  novel: 'pl_novel',
+  mode: 'pl_mode',
+  requirement: 'pl_req',
+  template: 'pl_template',
+  provider: 'pl_provider',
+  model: 'pl_model',
+} as const;
+
+const loadCreateDraft = () => ({
+  name: localStorage.getItem(CREATE_DRAFT_STORAGE_KEYS.name) || '',
+  novel: localStorage.getItem(CREATE_DRAFT_STORAGE_KEYS.novel) || '',
+  mode: (localStorage.getItem(CREATE_DRAFT_STORAGE_KEYS.mode) as ScriptMode) || 'dialogue',
+  requirement: localStorage.getItem(CREATE_DRAFT_STORAGE_KEYS.requirement) || '',
+  template: localStorage.getItem(CREATE_DRAFT_STORAGE_KEYS.template) || undefined,
+  provider: localStorage.getItem(CREATE_DRAFT_STORAGE_KEYS.provider) || undefined,
+  model: localStorage.getItem(CREATE_DRAFT_STORAGE_KEYS.model) || undefined,
+});
 
 const ProjectList: React.FC = () => {
   const navigate = useNavigate();
@@ -22,10 +41,10 @@ const ProjectList: React.FC = () => {
   const [currentProject, setCurrentProject] = useRecoilState(currentProjectState);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [newProjectName, setNewProjectName] = useState(() => localStorage.getItem('pl_name') || '');
-  const [novelContent, setNovelContent] = useState(() => localStorage.getItem('pl_novel') || '');
-  const [scriptMode, setScriptMode] = useState<ScriptMode>(() => (localStorage.getItem('pl_mode') as ScriptMode) || 'dialogue');
-  const [customRequirement, setCustomRequirement] = useState(() => localStorage.getItem('pl_req') || '');
+  const [newProjectName, setNewProjectName] = useState(() => loadCreateDraft().name);
+  const [novelContent, setNovelContent] = useState(() => loadCreateDraft().novel);
+  const [scriptMode, setScriptMode] = useState<ScriptMode>(() => loadCreateDraft().mode);
+  const [customRequirement, setCustomRequirement] = useState(() => loadCreateDraft().requirement);
   const [generating, setGenerating] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [generatingModal, setGeneratingModal] = useState(false);
@@ -36,31 +55,63 @@ const ProjectList: React.FC = () => {
 
   // 脚本模板
   const [scriptTemplates, setScriptTemplates] = useState<PromptTemplate[]>([]);
-  const [selectedScriptTemplateId, setSelectedScriptTemplateId] = useState<string | undefined>(() => localStorage.getItem('pl_template') || undefined);
+  const [selectedScriptTemplateId, setSelectedScriptTemplateId] = useState<string | undefined>(() => loadCreateDraft().template);
 
   useEffect(() => { getAllPromptTemplates().then(d => setScriptTemplates(d.filter(t => t.type === 'script'))).catch(() => {}); }, []);
   // 弹窗字段持久化
-  useEffect(() => { localStorage.setItem('pl_name', newProjectName); }, [newProjectName]);
-  useEffect(() => { localStorage.setItem('pl_novel', novelContent); }, [novelContent]);
-  useEffect(() => { localStorage.setItem('pl_mode', scriptMode); }, [scriptMode]);
-  useEffect(() => { localStorage.setItem('pl_req', customRequirement); }, [customRequirement]);
-  useEffect(() => { if (selectedScriptTemplateId) localStorage.setItem('pl_template', selectedScriptTemplateId); else localStorage.removeItem('pl_template'); }, [selectedScriptTemplateId]);
-  const clearDialogFields = () => { setNewProjectName(''); setNovelContent(''); setCustomRequirement(''); localStorage.removeItem('pl_name'); localStorage.removeItem('pl_novel'); localStorage.removeItem('pl_req'); };
+  const persistCreateDraftValue = (key: string, value?: string) => {
+    if (editingProject) return;
+    if (value && value.length > 0) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
+  };
+  useEffect(() => { persistCreateDraftValue(CREATE_DRAFT_STORAGE_KEYS.name, newProjectName); }, [newProjectName, editingProject]);
+  useEffect(() => { persistCreateDraftValue(CREATE_DRAFT_STORAGE_KEYS.novel, novelContent); }, [novelContent, editingProject]);
+  useEffect(() => { persistCreateDraftValue(CREATE_DRAFT_STORAGE_KEYS.mode, scriptMode); }, [scriptMode, editingProject]);
+  useEffect(() => { persistCreateDraftValue(CREATE_DRAFT_STORAGE_KEYS.requirement, customRequirement); }, [customRequirement, editingProject]);
+  useEffect(() => { persistCreateDraftValue(CREATE_DRAFT_STORAGE_KEYS.template, selectedScriptTemplateId); }, [selectedScriptTemplateId, editingProject]);
+  const applyCreateDraft = () => {
+    const draft = loadCreateDraft();
+    setNewProjectName(draft.name);
+    setNovelContent(draft.novel);
+    setScriptMode(draft.mode);
+    setCustomRequirement(draft.requirement);
+    setSelectedScriptTemplateId(draft.template);
+    setSelectedProviderId(draft.provider);
+    setSelectedModel(draft.model);
+  };
+  const clearCreateDraft = () => {
+    setNewProjectName('');
+    setNovelContent('');
+    setScriptMode('dialogue');
+    setCustomRequirement('');
+    setSelectedScriptTemplateId(undefined);
+    setSelectedProviderId(undefined);
+    setSelectedModel(undefined);
+    Object.values(CREATE_DRAFT_STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
+  };
 
   // 模型选择
   const [providers, setProviders] = useState<ApiProvider[]>([]);
-  const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>(undefined);
-  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>(() => loadCreateDraft().provider);
+  const [selectedModel, setSelectedModel] = useState<string | undefined>(() => loadCreateDraft().model);
 
   useEffect(() => {
     (async () => {
       const list = await loadApiProviders();
-      setProviders(list.filter(p => p.enabled !== false));
-      if (list.length > 0) {
-        const first = list.find(p => p.enabled !== false);
-        if (first && !selectedProviderId) {
-          setSelectedProviderId(first.id);
-        }
+      const enabledProviders = list.filter(p => p.enabled !== false);
+      setProviders(enabledProviders);
+      if (enabledProviders.length === 0) {
+        setSelectedProviderId(undefined);
+        setSelectedModel(undefined);
+        return;
+      }
+
+      const draft = loadCreateDraft();
+      const providerExists = draft.provider ? enabledProviders.some(p => p.id === draft.provider) : false;
+      if (providerExists) {
+        setSelectedProviderId(draft.provider);
+      } else {
+        setSelectedProviderId(enabledProviders[0].id);
       }
     })();
   }, []);
@@ -68,6 +119,22 @@ const ProjectList: React.FC = () => {
   // 当前选中provider的模型列表
   const selectedProvider = providers.find(p => p.id === selectedProviderId);
   const availableModels = selectedProvider?.models || [];
+  useEffect(() => {
+    persistCreateDraftValue(CREATE_DRAFT_STORAGE_KEYS.provider, selectedProviderId);
+  }, [selectedProviderId, editingProject]);
+  useEffect(() => {
+    if (editingProject) return;
+    if (!selectedProvider) {
+      if (selectedModel) setSelectedModel(undefined);
+      return;
+    }
+    if (selectedModel && !selectedProvider.models.some(m => m.id === selectedModel)) {
+      setSelectedModel(undefined);
+    }
+  }, [selectedProvider, selectedModel, editingProject]);
+  useEffect(() => {
+    persistCreateDraftValue(CREATE_DRAFT_STORAGE_KEYS.model, selectedModel);
+  }, [selectedModel, editingProject]);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,7 +221,7 @@ const ProjectList: React.FC = () => {
       setTimeout(() => {
         setGeneratingModal(false);
         setModalVisible(false);
-        clearDialogFields();
+        clearCreateDraft();
         setCurrentProject(newProject);
         navigate(`/workspace/${newProject.id}`);
       }, 1500);
@@ -183,7 +250,7 @@ const ProjectList: React.FC = () => {
       setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
       setEditingProject(null);
       setModalVisible(false);
-      setNewProjectName('');
+      applyCreateDraft();
       message.success('项目更新成功');
     } catch (error) {
       message.error('更新项目失败');
@@ -307,9 +374,7 @@ const ProjectList: React.FC = () => {
         setGeneratingModal(false);
         setModalVisible(false);
         setEditingProject(null);
-        setNewProjectName('');
-        setNovelContent('');
-        setCustomRequirement('');
+        applyCreateDraft();
       }, 1500);
     } catch (error) {
       setGeneratingLog(prev => [...prev, `❌ 导入失败: ${error instanceof Error ? error.message : '请检查API配置'}`]);
@@ -321,10 +386,7 @@ const ProjectList: React.FC = () => {
 
   const openCreateModal = () => {
     setEditingProject(null);
-    setNewProjectName('');
-    setNovelContent('');
-    setScriptMode('dialogue');
-    setCustomRequirement('');
+    applyCreateDraft();
     setModalVisible(true);
   };
 
@@ -405,17 +467,13 @@ const ProjectList: React.FC = () => {
         onCancel={() => {
           setModalVisible(false);
           setEditingProject(null);
-          setNewProjectName('');
-          setNovelContent('');
-          setCustomRequirement('');
+          if (editingProject) applyCreateDraft();
         }}
         footer={editingProject ? [
           <Button key="cancel" onClick={() => {
             setModalVisible(false);
             setEditingProject(null);
-            setNewProjectName('');
-            setNovelContent('');
-            setCustomRequirement('');
+            applyCreateDraft();
           }}>取消</Button>,
           editingProject.script.length > 0 && (
             <Button 
@@ -432,9 +490,6 @@ const ProjectList: React.FC = () => {
         ].filter(Boolean) : [
           <Button key="cancel" onClick={() => {
             setModalVisible(false);
-            setNewProjectName('');
-            setNovelContent('');
-            setCustomRequirement('');
           }}>取消</Button>,
           <Button 
             key="generate" 
