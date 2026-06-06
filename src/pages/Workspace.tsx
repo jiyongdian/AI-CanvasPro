@@ -11,6 +11,7 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRecoilState, useSetRecoilState } from 'recoil';
 import { currentProjectState, characterListState } from '../store/projectStore';
+import { themeState, getNextThemeMode } from '../store/themeStore';
 import { getProject, saveProject, getAllCharacters, getAllStyles, getAllPromptTemplates } from '../services/database';
 import { migrateOldMediaData, preloadMedia, getMedia } from '../services/mediaService';
 import { saveImageToLocalFile } from '../utils/imageUtils';
@@ -63,6 +64,7 @@ const Workspace: React.FC = () => {
   const navigate = useNavigate();
   const [project, setProject] = useRecoilState(currentProjectState);
   const setCharacters = useSetRecoilState(characterListState);
+  const [currentTheme, setCurrentTheme] = useRecoilState(themeState);
   const [loading, setLoading] = useState(true);
 
   const [styleList, setStyleList] = useState<Style[]>([]);
@@ -91,7 +93,6 @@ const Workspace: React.FC = () => {
   const [directorPreviewOpen, setDirectorPreviewOpen] = useState(false);
   const [directorResult, setDirectorResult] = useState('');
   const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [isDark, setIsDark] = useState(() => { const t = localStorage.getItem('theme'); return t !== 'light'; });
   const [templateSelectOpen, setTemplateSelectOpen] = useState(false);
   const [addConfirmOpen, setAddConfirmOpen] = useState(false);
   const [previewImportOpen, setPreviewImportOpen] = useState(false);
@@ -165,7 +166,6 @@ const Workspace: React.FC = () => {
     } catch { message.error('保存失败'); }
   };
 
-  useEffect(() => { document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light'); }, [isDark]);
   useEffect(() => { getAllPromptTemplates().then(d => setPromptTemplates(d)).catch(() => {}); }, []);
 
   const activeScene = useMemo(() => project?.script.find(s => s.id === activeSceneId) || null, [project, activeSceneId]);
@@ -174,7 +174,10 @@ const Workspace: React.FC = () => {
   const getSelectedTemplateId = (type: string) => type === 'image' ? selectedImageTemplateId : type === 'video' ? selectedVideoTemplateId : selectedDirectorTemplateId;
   const setSelectedTemplateId = (type: string, id: string | undefined) => { if (type === 'image') setSelectedImageTemplateId(id); else if (type === 'video') setSelectedVideoTemplateId(id); else setSelectedDirectorTemplateId(id); };
 
-  const toggleTheme = () => { setIsDark(p => { const n = !p; localStorage.setItem('theme', n ? 'dark' : 'light'); document.documentElement.setAttribute('data-theme', n ? 'dark' : 'light'); return n; }); };
+  const isDark = currentTheme === 'dark';
+  const toggleTheme = () => {
+    setCurrentTheme((prev) => getNextThemeMode(prev));
+  };
   const handleBack = () => { setProject(null as any); navigate('/projects'); };
   const buildScenePrompt = (s: Scene | undefined, preferMode?: PreviewMode): string => {
     if (!s) return '';

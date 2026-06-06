@@ -18,11 +18,6 @@ import 'antd/dist/reset.css';
 const App: React.FC = () => {
   const currentTheme = useRecoilValue(themeState);
 
-  useEffect(() => {
-    // 确保初始化时正确设置 data-theme 属性，以便纯 CSS 变量也同步生效
-    document.documentElement.setAttribute('data-theme', currentTheme);
-  }, [currentTheme]);
-
   // 启动时静默检查更新
   useEffect(() => {
     checkForUpdate().catch(() => {

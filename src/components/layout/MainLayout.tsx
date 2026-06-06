@@ -4,7 +4,7 @@ import { Layout, Menu } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useRecoilValue, useRecoilState } from 'recoil';
 import { currentProjectState } from '../../store/projectStore';
-import { themeState } from '../../store/themeStore';
+import { themeState, getNextThemeMode } from '../../store/themeStore';
 import {
   FolderOutlined,
   UserOutlined,
@@ -29,7 +29,7 @@ const MainLayout: React.FC = () => {
   const [theme, setTheme] = useRecoilState(themeState);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+    setTheme((prev) => getNextThemeMode(prev));
   };
 
   const menuItems = useMemo(() => {
