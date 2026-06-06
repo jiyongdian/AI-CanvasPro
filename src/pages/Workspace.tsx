@@ -84,6 +84,7 @@ const Workspace: React.FC = () => {
   const [previewMode, setPreviewMode] = useState<PreviewMode>('image');
   const [promptText, setPromptText] = useState('');
   const promptRef = useRef(promptText);
+  const promptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const setPrompt = (v: string) => { promptRef.current = v; setPromptText(v); };
   const [promptExpanded, setPromptExpanded] = useState(() => sessionStorage.getItem('ws_prompt_expanded') === 'true');
   const [generating, setGenerating] = useState(false);
@@ -99,6 +100,7 @@ const Workspace: React.FC = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const leftListRef = useRef<HTMLDivElement>(null);
+  const savePromptRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 模型关联
   const [providers, setProviders] = useState<ApiProvider[]>([]);
@@ -110,6 +112,9 @@ const Workspace: React.FC = () => {
   const [imageRatio, setImageRatio] = useState<string>(() => localStorage.getItem('ws_image_ratio') || '16:9 宽屏');
   const [videoDuration, setVideoDuration] = useState<number>(() => parseInt(localStorage.getItem('ws_video_duration') || '5'));
   const [videoQuality, setVideoQuality] = useState<string>(() => localStorage.getItem('ws_video_quality') || '1080p 全高清');
+  const inferInFlightRef = useRef(false);
+  const directorInFlightRef = useRef(false);
+  const generateInFlightRef = useRef(false);
 
   const selPlatform = useMemo(() => providers.find(p => p.id === selPlatformId), [providers, selPlatformId]);
   // 分类模型列表（其它类别在所有选择器中出现）
@@ -138,6 +143,25 @@ const Workspace: React.FC = () => {
   const [taskHistory, setTaskHistory] = useState<TaskHistoryItem[]>(() => loadTaskHistory(projectId || ''));
 
   const getProviderForModel = useCallback((modelId: string) => providers.find(p => p.models.some(m => m.id === modelId)), [providers]);
+  const getLatestPromptValue = useCallback(() => {
+    const domValue = promptTextareaRef.current?.value;
+    const latest = typeof domValue === 'string' ? domValue : promptRef.current;
+    if (latest !== promptRef.current) {
+      promptRef.current = latest;
+    }
+    return latest ?? '';
+  }, []);
+  const syncLatestPromptToState = useCallback(() => {
+    const latest = getLatestPromptValue();
+    setPromptText(prev => prev === latest ? prev : latest);
+    return latest;
+  }, [getLatestPromptValue]);
+  const clearPendingPromptSave = useCallback(() => {
+    if (savePromptRef.current) {
+      clearTimeout(savePromptRef.current);
+      savePromptRef.current = null;
+    }
+  }, []);
   const resolveModelConfig = (modelId?: string) => {
     if (!modelId) return { error: '请先在右侧模型设置中选择模型' };
     // 优先使用用户选中的平台，再回退查找模型所属平台
@@ -178,7 +202,11 @@ const Workspace: React.FC = () => {
   const toggleTheme = () => {
     setCurrentTheme((prev) => getNextThemeMode(prev));
   };
-  const handleBack = () => { setProject(null as any); navigate('/projects'); };
+  const handleBack = () => {
+    persistPromptSnapshot();
+    setProject(null as any);
+    navigate('/projects');
+  };
   const buildScenePrompt = (s: Scene | undefined, preferMode?: PreviewMode): string => {
     if (!s) return '';
     const existing = preferMode === 'image' ? s.imagePrompt : preferMode === 'video' ? s.videoPrompt : undefined;
@@ -242,12 +270,23 @@ const Workspace: React.FC = () => {
 
   const handleUpdateProject = useCallback(async (p: Project) => { const ts = { ...p, updatedAt: new Date() }; setProject(ts); try { await saveProject(ts); } catch {} }, [setProject]);
   const handleUpdateScene = useCallback((sid: string, updates: Partial<Scene>) => { setProject(prev => { if (!prev) return prev; const script = prev.script.map(s => s.id === sid ? { ...s, ...updates } : s); const np = { ...prev, script, updatedAt: new Date() }; saveProject(np).catch(()=>{}); return np; }); }, [setProject]);
-  const doAddScene = async () => { if (!project || !activeSceneId) return; const idx = project.script.findIndex(s => s.id === activeSceneId); const ns: Scene = { id: crypto.randomUUID(), order: idx + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' }; const script = [...project.script.slice(0, idx + 1), ns, ...project.script.slice(idx + 1)].map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); setActiveSceneId(ns.id); setPrompt(''); sessionStorage.setItem(`ws_active_${projectId}`, ns.id); setAddConfirmOpen(false); };
-  const doDeleteScene = async () => { if (!project || !activeSceneId) return; if (project.script.length <= 1) { message.warning('至少保留一个分镜'); return; } const script = project.script.filter(s => s.id !== activeSceneId).map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); const nextId = script[0]?.id || null; setActiveSceneId(nextId); setPrompt(buildScenePrompt(script[0])); if (nextId) sessionStorage.setItem(`ws_active_${projectId}`, nextId); setDeleteConfirmOpen(false); };
-  const selectScene = (sid: string) => { setActiveSceneId(sid); const s = project?.script.find(x => x.id === sid); const savedMode = sessionStorage.getItem(`ws_pmode_${sid}`) as PreviewMode | null; const mode = savedMode || 'image'; setPreviewMode(mode); setPrompt(mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s))); sessionStorage.setItem(`ws_active_${projectId}`, sid); };
+  const persistPromptSnapshot = useCallback((sceneArg?: Scene | null, modeArg?: PreviewMode, overridePrompt?: string) => {
+    const targetScene = sceneArg ?? activeScene;
+    if (!targetScene) return '';
+    clearPendingPromptSave();
+    const latest = overridePrompt ?? syncLatestPromptToState();
+    handleUpdateScene(
+      targetScene.id,
+      { [((modeArg ?? previewMode) === 'image' ? 'imagePrompt' : 'videoPrompt')]: latest } as any
+    );
+    return latest;
+  }, [activeScene, previewMode, handleUpdateScene, syncLatestPromptToState, clearPendingPromptSave]);
+  const doAddScene = async () => { if (!project || !activeSceneId) return; persistPromptSnapshot(); const idx = project.script.findIndex(s => s.id === activeSceneId); const ns: Scene = { id: crypto.randomUUID(), order: idx + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' }; const script = [...project.script.slice(0, idx + 1), ns, ...project.script.slice(idx + 1)].map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); setActiveSceneId(ns.id); setPrompt(''); sessionStorage.setItem(`ws_active_${projectId}`, ns.id); setAddConfirmOpen(false); };
+  const doDeleteScene = async () => { if (!project || !activeSceneId) return; persistPromptSnapshot(); if (project.script.length <= 1) { message.warning('至少保留一个分镜'); return; } const script = project.script.filter(s => s.id !== activeSceneId).map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); const nextId = script[0]?.id || null; setActiveSceneId(nextId); setPrompt(buildScenePrompt(script[0])); if (nextId) sessionStorage.setItem(`ws_active_${projectId}`, nextId); setDeleteConfirmOpen(false); };
+  const selectScene = (sid: string) => { persistPromptSnapshot(); setActiveSceneId(sid); const s = project?.script.find(x => x.id === sid); const savedMode = sessionStorage.getItem(`ws_pmode_${sid}`) as PreviewMode | null; const mode = savedMode || 'image'; setPreviewMode(mode); setPrompt(mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s))); sessionStorage.setItem(`ws_active_${projectId}`, sid); };
 
   const switchPreviewMode = (mode: PreviewMode) => {
-    if (activeScene) handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: promptText } as any);
+    if (activeScene) persistPromptSnapshot(activeScene, previewMode);
     setPreviewMode(mode); sessionStorage.setItem(`ws_pmode_${activeSceneId}`, mode);
     const s = project?.script.find(x => x.id === activeSceneId);
     setPrompt(mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s)));
@@ -266,9 +305,12 @@ const Workspace: React.FC = () => {
   // ==================== 推理 (文本优化，绑定当前模式模板) ====================
   const handleInfer = async () => {
     if (!activeScene || !project) return;
+    if (inferInFlightRef.current) return;
+    inferInFlightRef.current = true;
     setInferLoading(true);
     try {
-      const curPrompt = promptRef.current;
+      clearPendingPromptSave();
+      const curPrompt = syncLatestPromptToState();
       const prompt = (curPrompt?.trim?.() || '')
         || (activeScene.imagePrompt?.trim?.() || '')
         || (activeScene.videoPrompt?.trim?.() || '')
@@ -299,14 +341,18 @@ const Workspace: React.FC = () => {
       handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: accumulated || result } as any);
       message.success('推理完成');
     } catch (e: any) { message.error(e.message || '推理失败'); }
-    finally { setInferLoading(false); }
+    finally { inferInFlightRef.current = false; setInferLoading(false); }
   };
 
   // ==================== AI导演 (流式+绑定导演模板) ====================
   const handleDirector = async () => {
     if (!activeScene || !project) return;
+    if (directorInFlightRef.current) return;
+    directorInFlightRef.current = true;
     setDirectorLoading(true); setDirectorResult('');
     try {
+      clearPendingPromptSave();
+      const curPrompt = syncLatestPromptToState();
       const mc = resolveModelConfig(selTextModel);
       if ((mc as any).error) { message.error((mc as any).error); setDirectorLoading(false); return; }
       const template = selectedDirectorTemplateId ? promptTemplates.find(t => t.id === selectedDirectorTemplateId) : undefined;
@@ -314,7 +360,7 @@ const Workspace: React.FC = () => {
       let rafId2 = 0;
       const prevPrompt = getPreviousScenePrompt();
       console.log('[AI导演] 模型:', selTextModel, 'mode:', previewMode, 'hasPrev:', !!prevPrompt);
-      const dirScene = { ...activeScene, prompt: promptRef.current };
+      const dirScene = { ...activeScene, prompt: curPrompt };
       await aiService.generatePrompt(
         dirScene, previewMode, undefined, prevPrompt,
         (text) => {
@@ -330,7 +376,7 @@ const Workspace: React.FC = () => {
       setDirectorPreviewOpen(true);
       message.success('AI导演优化完成');
     } catch (e: any) { message.error(e.message || 'AI导演失败'); }
-    finally { setDirectorLoading(false); }
+    finally { directorInFlightRef.current = false; setDirectorLoading(false); }
   };
   const applyDirectorResult = () => {
     if (!activeScene) return;
@@ -368,29 +414,33 @@ const Workspace: React.FC = () => {
   // ==================== 生成 ====================
   const handleGenerate = async () => {
     if (!activeScene || !project) return;
+    if (generateInFlightRef.current) return;
+    generateInFlightRef.current = true;
     setGenerating(true); setGenProgress(0);
     try {
+      clearPendingPromptSave();
+      const latestPrompt = syncLatestPromptToState();
       if (previewMode === 'image') {
-        const prompt = promptText || activeScene.prompt || activeScene.description;
+        const prompt = latestPrompt || activeScene.prompt || activeScene.description;
         if (!prompt) { message.warning('请输入提示词'); return; }
         const mc = resolveModelConfig(selImageModel);
         if ((mc as any).error) { message.error((mc as any).error); setGenerating(false); return; }
         setGenProgress(30);
-        console.log('[图片生成] 模型:', selImageModel, '提示词:', (promptText || activeScene.prompt).slice(0,50));
+        console.log('[图片生成] 模型:', selImageModel, '提示词:', (prompt || activeScene.prompt).slice(0,50));
         // 动态传入当前输入框提示词
-        const imgScene = { ...activeScene, prompt: promptText || activeScene.prompt };
+        const imgScene = { ...activeScene, prompt };
         const result = await aiService.generateImage(imgScene, undefined, { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0], providerId: (mc as any).providerId });
         setGenProgress(100);
-        handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: result }, imagePrompt: promptText || undefined, status: 'completed', imageStatus: 'completed' });
-        addTaskToHistory({ id: crypto.randomUUID(), type: 'image', url: result, sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt: promptText, model: selImageModel });
+        handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: result }, imagePrompt: prompt || undefined, status: 'completed', imageStatus: 'completed' });
+        addTaskToHistory({ id: crypto.randomUUID(), type: 'image', url: result, sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt, model: selImageModel });
         message.success('图片生成完成');
       } else {
-        const prompt = promptText || activeScene.videoPrompt || activeScene.jiMengPrompt || activeScene.prompt;
+        const prompt = latestPrompt || activeScene.videoPrompt || activeScene.jiMengPrompt || activeScene.prompt;
         if (!prompt) { message.warning('请输入视频提示词'); return; }
         const mc = resolveModelConfig(selVideoModel);
         if ((mc as any).error) { message.error((mc as any).error); setGenerating(false); return; }
         console.log('[视频生成] 模型:', selVideoModel, 'provider:', (mc as any).providerId);
-        handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined });
+        handleUpdateScene(activeScene.id, { videoPrompt: prompt || undefined });
         const selIds = activeScene?.selectedCharacterIds || [];
         const sceneChars = characters.filter(c => selIds.includes(c.id));
         // 参考图: 优先保留HTTP URL, 仅当完全缺失时才从media store恢复
@@ -402,29 +452,29 @@ const Workspace: React.FC = () => {
         }
         console.log('[视频生成] 出场角色:', sceneChars.map(c => ({ name: c.name, hasRef: !!c.referenceImage })));
         const vidResult = await aiService.generateVideo(
-          { ...activeScene, prompt: promptText || activeScene.videoPrompt || activeScene.prompt, useImageAsReference: !!activeScene.images?.keyFrame },
+          { ...activeScene, prompt, useImageAsReference: !!activeScene.images?.keyFrame },
           sceneChars.length > 0 ? sceneChars.map(c => ({ id: c.id, name: c.name, voiceType: c.voiceType || '', referenceImage: c.referenceImage || '' })) as any : undefined,
           { model: selVideoModel, providerId: (mc as any).providerId, duration: videoDuration, resolution: videoQuality, aspectRatio: imageRatio } as any
         );
-        handleUpdateScene(activeScene.id, { videoPrompt: promptText || undefined, videoStatus: 'generating' });
+        handleUpdateScene(activeScene.id, { videoPrompt: prompt || undefined, videoStatus: 'generating' });
         // 加入任务历史(生成中)
-        addTaskToHistory({ id: vidResult.taskId, type: 'video', url: '', sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt: promptText, model: selVideoModel, status: 'generating' as const });
+        addTaskToHistory({ id: vidResult.taskId, type: 'video', url: '', sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt, model: selVideoModel, status: 'generating' as const });
         message.success('视频生成任务已提交，正在后台生成...');
         // 异步轮询
         pollVideoTask(vidResult.taskId, vidResult.isVeoTask, activeScene.id, (mc as any).providerId, selVideoModel);
       }
     } catch (e: any) { message.error(e.message || '生成失败'); }
-    finally { setGenerating(false); setGenProgress(0); }
+    finally { generateInFlightRef.current = false; setGenerating(false); setGenProgress(0); }
   };
-  const savePromptRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savePrompt = useCallback((immediate?: boolean) => {
     if (!activeScene) return;
     const cur = promptRef.current;
     const save = () => handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: cur } as any);
-    if (immediate) { save(); return; }
-    if (savePromptRef.current) clearTimeout(savePromptRef.current);
+    if (immediate) { clearPendingPromptSave(); save(); return; }
+    clearPendingPromptSave();
     savePromptRef.current = setTimeout(save, 800);
-  }, [activeScene, previewMode, handleUpdateScene]);
+  }, [activeScene, previewMode, handleUpdateScene, clearPendingPromptSave]);
+  useEffect(() => () => clearPendingPromptSave(), [clearPendingPromptSave]);
 
   // ==================== 提示词展开/收起 ====================
   const togglePromptExpand = () => {
@@ -508,7 +558,7 @@ const Workspace: React.FC = () => {
               </button>
               <span style={{marginLeft:'auto',fontSize:11,color:'var(--text-tertiary)'}}>{activeScene ? `分镜 ${activeIdx + 1}` : '未选择'}</span>
             </div>
-            <textarea className={styles.promptInput} placeholder="输入提示词描述..." value={promptText} onChange={e => { setPrompt(e.target.value); savePrompt(); }} onBlur={() => savePrompt(true)} />
+            <textarea ref={promptTextareaRef} className={styles.promptInput} placeholder="输入提示词描述..." value={promptText} onChange={e => { setPrompt(e.target.value); savePrompt(); }} onBlur={() => savePrompt(true)} />
             <div className={styles.promptActions}>
               <Button size="small" icon={<ThunderboltOutlined />} onClick={handleInfer} loading={inferLoading}>推理</Button>
               <Button size="small" icon={<BulbOutlined />} onClick={handleDirector} loading={directorLoading}>AI导演</Button>
