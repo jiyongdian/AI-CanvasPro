@@ -92,26 +92,36 @@ const ProjectList: React.FC = () => {
 
   // 模型选择
   const [providers, setProviders] = useState<ApiProvider[]>([]);
+  const [providersLoaded, setProvidersLoaded] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>(() => loadCreateDraft().provider);
   const [selectedModel, setSelectedModel] = useState<string | undefined>(() => loadCreateDraft().model);
 
   useEffect(() => {
     (async () => {
-      const list = await loadApiProviders();
-      const enabledProviders = list.filter(p => p.enabled !== false);
-      setProviders(enabledProviders);
-      if (enabledProviders.length === 0) {
-        setSelectedProviderId(undefined);
-        setSelectedModel(undefined);
-        return;
-      }
+      try {
+        const list = await loadApiProviders();
+        const enabledProviders = list.filter(p => p.enabled !== false);
+        setProviders(enabledProviders);
 
-      const draft = loadCreateDraft();
-      const providerExists = draft.provider ? enabledProviders.some(p => p.id === draft.provider) : false;
-      if (providerExists) {
-        setSelectedProviderId(draft.provider);
-      } else {
-        setSelectedProviderId(enabledProviders[0].id);
+        if (enabledProviders.length === 0) {
+          setSelectedProviderId(undefined);
+          setSelectedModel(undefined);
+          return;
+        }
+
+        const draft = loadCreateDraft();
+        const restoredProviderId = draft.provider && enabledProviders.some(p => p.id === draft.provider)
+          ? draft.provider
+          : enabledProviders[0].id;
+        const restoredProvider = enabledProviders.find(p => p.id === restoredProviderId);
+        const restoredModel = draft.model && restoredProvider?.models.some(m => m.id === draft.model)
+          ? draft.model
+          : undefined;
+
+        setSelectedProviderId(restoredProviderId);
+        setSelectedModel(restoredModel);
+      } finally {
+        setProvidersLoaded(true);
       }
     })();
   }, []);
@@ -123,7 +133,7 @@ const ProjectList: React.FC = () => {
     persistCreateDraftValue(CREATE_DRAFT_STORAGE_KEYS.provider, selectedProviderId);
   }, [selectedProviderId, editingProject]);
   useEffect(() => {
-    if (editingProject) return;
+    if (editingProject || !providersLoaded) return;
     if (!selectedProvider) {
       if (selectedModel) setSelectedModel(undefined);
       return;
@@ -131,7 +141,7 @@ const ProjectList: React.FC = () => {
     if (selectedModel && !selectedProvider.models.some(m => m.id === selectedModel)) {
       setSelectedModel(undefined);
     }
-  }, [selectedProvider, selectedModel, editingProject]);
+  }, [selectedProvider, selectedModel, editingProject, providersLoaded]);
   useEffect(() => {
     persistCreateDraftValue(CREATE_DRAFT_STORAGE_KEYS.model, selectedModel);
   }, [selectedModel, editingProject]);
