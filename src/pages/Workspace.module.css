@@ -201,20 +201,25 @@
   background:rgba(37,99,235,0.10);
   border-color:rgba(37,99,235,0.22);
 }
+.promptStatusSaving {
+  color:#0369a1;
+  background:rgba(14,165,233,0.10);
+  border-color:rgba(14,165,233,0.22);
+}
 .promptStatusSaved {
   color:#16a34a;
   background:rgba(34,197,94,0.10);
   border-color:rgba(34,197,94,0.20);
 }
-.promptStatusRestored {
-  color:#7c3aed;
-  background:rgba(139,92,246,0.10);
-  border-color:rgba(139,92,246,0.22);
-}
 .promptStatusAi {
   color:#ea580c;
   background:rgba(249,115,22,0.10);
   border-color:rgba(249,115,22,0.22);
+}
+.promptStatusError {
+  color:#dc2626;
+  background:rgba(239,68,68,0.10);
+  border-color:rgba(239,68,68,0.22);
 }
 .promptInput {
   position:relative; z-index:1; flex:1; padding:14px 18px;
