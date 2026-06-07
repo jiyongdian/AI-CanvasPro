@@ -1,30 +1,243 @@
 /* 场景管理弹窗 */
-.modal :global(.ant-modal-content) { border-radius:20px !important; }
+.modal :global(.ant-modal-content),
+.createModal :global(.ant-modal-content) {
+  border-radius:24px !important;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at top right, rgba(99,102,241,0.16), transparent 30%),
+    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015)),
+    var(--panel-bg-gradient) !important;
+  border:1px solid rgba(139,92,246,0.14) !important;
+  box-shadow: 0 24px 80px rgba(15,23,42,0.24), 0 8px 24px rgba(15,23,42,0.12) !important;
+}
+.modal :global(.ant-modal-header),
+.createModal :global(.ant-modal-header) { display:none !important; }
+.modal :global(.ant-modal-body),
+.createModal :global(.ant-modal-body) { padding:0 !important; }
+.modal :global(.ant-modal-close),
+.createModal :global(.ant-modal-close) {
+  top:14px !important; right:14px !important;
+  width:34px !important; height:34px !important; border-radius:12px !important;
+  color:var(--text-secondary) !important;
+  background:rgba(255,255,255,0.04) !important;
+  border:1px solid rgba(255,255,255,0.06) !important;
+}
+.createModal :global(.ant-modal-footer) {
+  margin:0 !important;
+  padding:16px 24px 20px !important;
+  border-top:1px solid rgba(255,255,255,0.06) !important;
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)) !important;
+}
+.createModal :global(.ant-modal-footer) :global(.ant-btn) {
+  min-width:88px; height:38px; border-radius:12px !important;
+}
+.createModal :global(.ant-modal-footer) :global(.ant-btn-primary) {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed) !important;
+  border: none !important;
+  box-shadow: 0 10px 24px rgba(139,92,246,0.24) !important;
+}
 
-.headerBar { display:flex; align-items:center; margin-bottom:20px; }
+.modalHead,
+.createHead {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:22px 24px 18px;
+  background:linear-gradient(135deg, rgba(99,102,241,0.10), rgba(139,92,246,0.05));
+  border-bottom:1px solid rgba(139,92,246,0.12);
+}
+.createHead { justify-content:flex-start; font-size:17px; font-weight:700; color:var(--body-color); }
+.modalHeadTitleWrap { display:flex; flex-direction:column; gap:4px; }
+.modalHeadTitle { font-size:17px; font-weight:700; color:var(--body-color); }
+.modalHeadMeta { font-size:12px; color:var(--text-tertiary); }
+.modalBody,
+.createBody { padding:22px 24px 24px; }
+.emptyWrap {
+  display:flex; align-items:center; justify-content:center; min-height:320px;
+  border-radius:18px; border:1px dashed rgba(255,255,255,0.08);
+  background:rgba(15,23,42,0.12);
+}
+.primaryAction {
+  height:38px !important; padding:0 16px !important; border-radius:12px !important;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed) !important;
+  border: none !important;
+  box-shadow: 0 10px 24px rgba(139,92,246,0.24) !important;
+}
+.secondaryAction {
+  height:38px !important; border-radius:12px !important;
+  background: rgba(255,255,255,0.04) !important;
+  border:1px solid rgba(255,255,255,0.06) !important;
+}
 
 /* 场景卡片网格 */
 .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:16px; }
 
 .card {
-  background:var(--panel-bg-gradient); border:1px solid var(--panel-border);
-  border-radius:16px; overflow:hidden;
-  box-shadow:0 1px 2px rgba(0,0,0,0.04),0 3px 8px rgba(0,0,0,0.06),0 8px 24px rgba(0,0,0,0.04);
+  background:linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015));
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:18px; overflow:hidden;
+  box-shadow:0 10px 24px rgba(15,23,42,0.10);
   transition:all 0.3s cubic-bezier(0.22,1,0.36,1);
 }
-.card:hover { transform:translateY(-2px); border-color:rgba(139,92,246,0.22); }
+.card:hover { transform:translateY(-2px); border-color:rgba(139,92,246,0.22); box-shadow:0 16px 30px rgba(15,23,42,0.12); }
 
 .cardPreview {
-  height:160px; background:var(--input-bg); cursor:pointer;
+  height:168px; background:rgba(15,23,42,0.16); cursor:pointer;
   display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative;
 }
 .cardPreview img { width:100%; height:100%; object-fit:cover; }
-.cardPlaceholder { /* empty */ }
+.cardPlaceholder { color:var(--text-tertiary); }
 .cardLoading { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:rgba(0,0,0,0.4); }
 
-.cardBody { padding:12px 14px 8px; }
-.cardLabel { font-size:13px; font-weight:600; color:var(--body-color); }
-.cardDesc { font-size:11px; color:var(--text-tertiary); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.cardMeta { font-size:11px; color:var(--text-tertiary); margin-top:2px; }
+.cardBody { padding:14px 14px 8px; }
+.cardLabel { font-size:13px; font-weight:700; color:var(--body-color); }
+.cardDesc { font-size:11px; color:var(--text-secondary); margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cardMeta { font-size:11px; color:var(--text-tertiary); margin-top:4px; }
 
 .cardActions { display:flex; gap:6px; padding:0 14px 12px; }
+.cardActions :global(.ant-btn) { border-radius:10px !important; }
+
+.fieldBlock { display:flex; flex-direction:column; gap:8px; }
+.fieldLabel,
+.miniLabel {
+  font-size:12px; font-weight:700; color:var(--text-label);
+  text-transform:uppercase; letter-spacing:0.08em;
+}
+.createActions { display:flex; gap:8px; flex-wrap:wrap; }
+.createTextarea :global(.ant-input) {
+  background: rgba(15,23,42,0.12) !important;
+  border:1px solid rgba(255,255,255,0.06) !important;
+  border-radius:14px !important;
+  color:var(--body-color) !important;
+}
+.createTextarea :global(.ant-input)::placeholder {
+  color: var(--placeholder-color) !important;
+}
+.promptBox {
+  padding:14px;
+  background:linear-gradient(180deg, rgba(15,23,42,0.20), rgba(255,255,255,0.015));
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;
+}
+.promptPre {
+  margin:0; white-space:pre-wrap; font-size:12px; line-height:1.7;
+  color:var(--body-color); max-height:160px; overflow:auto;
+}
+.createPreview {
+  text-align:center; background:rgba(15,23,42,0.14);
+  border-radius:16px; padding:14px; border:1px solid rgba(255,255,255,0.06);
+}
+.createPreviewImage { max-width:100%; max-height:300px; border-radius:12px; box-shadow:0 12px 28px rgba(15,23,42,0.14); }
+.previewModal :global(.ant-modal-content) {
+  background: transparent !important;
+  box-shadow:none !important;
+  padding:0 !important;
+}
+.previewModal :global(.ant-modal-body) { padding:0 !important; }
+.previewModalImage { max-width:80vw; max-height:80vh; border-radius:16px; box-shadow:0 24px 60px rgba(15,23,42,0.28); }
+
+/* ===== 亮色主题专用修正 ===== */
+:root[data-theme='light'] .modal :global(.ant-modal-content),
+:root[data-theme='light'] .createModal :global(.ant-modal-content) {
+  background: #ffffff !important;
+  border-color: #d9e1ec !important;
+  box-shadow: 0 20px 40px rgba(15,23,42,0.10), 0 4px 12px rgba(15,23,42,0.05) !important;
+}
+
+:root[data-theme='light'] .modal :global(.ant-modal-close),
+:root[data-theme='light'] .createModal :global(.ant-modal-close) {
+  background: #f8fafc !important;
+  border-color: #d7dee9 !important;
+}
+
+:root[data-theme='light'] .createModal :global(.ant-modal-footer) {
+  background: #f8fafc !important;
+  border-top-color: #e1e8f2 !important;
+}
+
+:root[data-theme='light'] .createModal :global(.ant-modal-footer) :global(.ant-btn:not(.ant-btn-primary)) {
+  background: #ffffff !important;
+  border-color: #d7dee9 !important;
+  color: #475569 !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme='light'] .modalHead,
+:root[data-theme='light'] .createHead {
+  background: linear-gradient(180deg, #f9fbff, #f2f6fb) !important;
+  border-bottom-color: #e1e8f2 !important;
+}
+
+:root[data-theme='light'] .emptyWrap,
+:root[data-theme='light'] .cardPreview,
+:root[data-theme='light'] .createPreview,
+:root[data-theme='light'] .promptBox {
+  background: #f8fafc !important;
+  border-color: #d9e1ec !important;
+}
+
+:root[data-theme='light'] .card {
+  background: #ffffff !important;
+  border-color: #d9e1ec !important;
+  box-shadow: 0 12px 24px rgba(15,23,42,0.08) !important;
+}
+
+:root[data-theme='light'] .card:hover {
+  background: #fbfcff !important;
+  border-color: #c9d7ff !important;
+  box-shadow: 0 16px 28px rgba(15,23,42,0.10) !important;
+}
+
+:root[data-theme='light'] .secondaryAction {
+  background: #f8fafc !important;
+  border-color: #d7dee9 !important;
+  color: #475569 !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme='light'] .cardActions :global(.ant-btn:not(.ant-btn-primary)) {
+  background: #ffffff !important;
+  border-color: #d7dee9 !important;
+  color: #475569 !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme='light'] .cardActions :global(.ant-btn-primary) {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
+  border: none !important;
+  box-shadow: 0 8px 18px rgba(124,58,237,0.14) !important;
+}
+
+:root[data-theme='light'] .cardActions :global(.ant-btn-dangerous) {
+  color: #dc2626 !important;
+  border-color: #fecaca !important;
+  background: #fff5f5 !important;
+}
+
+:root[data-theme='light'] .createTextarea :global(.ant-input) {
+  background: #f8fafc !important;
+  border-color: #d7dee9 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.85) !important;
+}
+
+:root[data-theme='light'] .primaryAction,
+:root[data-theme='light'] .createModal :global(.ant-modal-footer) :global(.ant-btn-primary) {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
+  box-shadow: 0 10px 20px rgba(124,58,237,0.16) !important;
+}
+
+:root[data-theme='light'] .emptyWrap :global(.ant-empty-description) {
+  color: #64748b !important;
+}
+
+:root[data-theme='light'] .previewModalImage {
+  box-shadow: 0 20px 44px rgba(15,23,42,0.14);
+}
+
+:root[data-theme='light'] .cardLoading :global(.ant-progress-bg),
+:root[data-theme='light'] .createBody :global(.ant-progress-bg) {
+  background: linear-gradient(90deg, #818cf8, #8b5cf6) !important;
+}
+
+:root[data-theme='light'] .cardLoading :global(.ant-progress-inner),
+:root[data-theme='light'] .createBody :global(.ant-progress-inner) {
+  background: #e8edf5 !important;
+}

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Input, Button, Checkbox, message, Modal, Spin, Progress, Upload } from 'antd';
+import { Input, Button, Checkbox, Modal, Spin, Progress, Upload } from 'antd';
+import { appMessage as message, appModal } from '../../utils/antdApp';
 import { RedoOutlined, DeleteOutlined, DragOutlined, PlusOutlined, ThunderboltOutlined, DownloadOutlined, UploadOutlined, ClearOutlined, ExpandOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { LazyImage, LazyVideoThumbnail, FullscreenPromptEditor } from '../common';
 import PromptInput, { type PromptInputRef } from './PromptInput';
@@ -1391,7 +1392,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
             danger 
             size="small" 
             onClick={() => {
-              Modal.confirm({
+              appModal.confirm({
                 title: '确认清空',
                 content: '确定要清空所有图片历史记录吗？此操作不可恢复。',
                 okText: '确认清空',
@@ -1444,7 +1445,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
                     className={styles.imageDeleteBtn}
                     onClick={(e) => {
                       e.stopPropagation();
-                      Modal.confirm({
+                      appModal.confirm({
                         title: '确认删除',
                         content: '确定要删除这张图片吗？',
                         okText: '确认删除',
@@ -1488,7 +1489,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
             danger 
             size="small" 
             onClick={() => {
-              Modal.confirm({
+              appModal.confirm({
                 title: '确认清空',
                 content: '确定要清空所有视频任务和历史记录吗？此操作不可恢复。',
                 okText: '确认清空',
@@ -1539,7 +1540,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
                   size="small" 
                   className={styles.taskDeleteBtn}
                   onClick={() => {
-                    Modal.confirm({
+                    appModal.confirm({
                       title: '确认删除',
                       content: '确定要删除这个视频任务吗？',
                       okText: '确认删除',
@@ -1616,7 +1617,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
                 icon={<ClearOutlined />} 
                 className={styles.previewClearBtn}
                 onClick={() => {
-                  Modal.confirm({
+                  appModal.confirm({
                     title: '确认清空',
                     content: '确定要清空当前显示的图片吗？历史记录中的图片不会被删除。',
                     okText: '确定',

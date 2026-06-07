@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useEffect } from 'react';
-import { ConfigProvider, theme } from 'antd';
+import { App as AntdApp, ConfigProvider, theme } from 'antd';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useRecoilValue } from 'recoil';
 import { themeState } from './store/themeStore';
@@ -13,6 +13,7 @@ import AICharacter from './pages/AICharacter';
 import Settings from './pages/Settings';
 import StyleLibrary from './pages/StyleLibrary';
 import PromptTemplates from './pages/PromptTemplates';
+import { AntdAppBridge } from './utils/antdApp';
 import 'antd/dist/reset.css';
 
 const App: React.FC = () => {
@@ -172,20 +173,23 @@ const App: React.FC = () => {
         components: isDark ? darkComponents : lightComponents,
       }}
     >
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <Routes>
-          <Route path="/" element={<MainLayout />}>
-            <Route index element={<Navigate to="/projects" replace />} />
-            <Route path="projects" element={<ProjectList />} />
-            <Route path="ai-character" element={<AICharacter />} />
-            <Route path="characters" element={<CharacterLibrary />} />
-            <Route path="styles" element={<StyleLibrary />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="prompt-templates" element={<PromptTemplates />} />
-          </Route>
-          <Route path="workspace/:projectId" element={<Workspace />} />
-        </Routes>
-      </BrowserRouter>
+      <AntdApp>
+        <AntdAppBridge />
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <Routes>
+            <Route path="/" element={<MainLayout />}>
+              <Route index element={<Navigate to="/projects" replace />} />
+              <Route path="projects" element={<ProjectList />} />
+              <Route path="ai-character" element={<AICharacter />} />
+              <Route path="characters" element={<CharacterLibrary />} />
+              <Route path="styles" element={<StyleLibrary />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="prompt-templates" element={<PromptTemplates />} />
+            </Route>
+            <Route path="workspace/:projectId" element={<Workspace />} />
+          </Routes>
+        </BrowserRouter>
+      </AntdApp>
     </ConfigProvider>
   );
 };

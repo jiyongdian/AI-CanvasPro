@@ -15,7 +15,6 @@ import {
   FormatPainterOutlined,
   SunOutlined,
   MoonOutlined,
-  AppstoreOutlined,
   FileTextOutlined,
 } from '@ant-design/icons';
 import styles from './MainLayout.module.css';
@@ -33,47 +32,55 @@ const MainLayout: React.FC = () => {
   };
 
   const menuItems = useMemo(() => {
+    const createMenuIcon = (icon: React.ReactNode) => (
+      <span className={styles.menuIcon}>{icon}</span>
+    );
+
+    const createMenuLabel = (label: string) => (
+      <span className={styles.menuLabel}>{label}</span>
+    );
+
     const items = [
       {
         key: '/projects',
-        icon: <FolderOutlined style={{ fontSize: 18 }} />,
-        label: '作品区',
+        icon: createMenuIcon(<FolderOutlined />),
+        label: createMenuLabel('作品区'),
       },
     ];
 
     if (currentProject) {
       items.push({
         key: `/workspace/${currentProject.id}`,
-        icon: <DesktopOutlined style={{ fontSize: 18 }} />,
-        label: '工作台',
+        icon: createMenuIcon(<DesktopOutlined />),
+        label: createMenuLabel('工作台'),
       });
     }
 
     items.push(
       {
         key: '/prompt-templates',
-        icon: <FileTextOutlined style={{ fontSize: 18 }} />,
-        label: '提示词库',
+        icon: createMenuIcon(<FileTextOutlined />),
+        label: createMenuLabel('提示词库'),
       },
       {
         key: '/ai-character',
-        icon: <RobotOutlined style={{ fontSize: 18 }} />,
-        label: 'AI角色',
+        icon: createMenuIcon(<RobotOutlined />),
+        label: createMenuLabel('AI角色'),
       },
       {
         key: '/characters',
-        icon: <UserOutlined style={{ fontSize: 18 }} />,
-        label: '角色库',
+        icon: createMenuIcon(<UserOutlined />),
+        label: createMenuLabel('角色库'),
       },
       {
         key: '/styles',
-        icon: <FormatPainterOutlined style={{ fontSize: 18 }} />,
-        label: '风格库',
+        icon: createMenuIcon(<FormatPainterOutlined />),
+        label: createMenuLabel('风格库'),
       },
       {
         key: '/settings',
-        icon: <SettingOutlined style={{ fontSize: 18 }} />,
-        label: '设置',
+        icon: createMenuIcon(<SettingOutlined />),
+        label: createMenuLabel('设置'),
       }
     );
 
@@ -103,14 +110,16 @@ const MainLayout: React.FC = () => {
         </div>
       </Header>
       <Layout>
-        <Sider width={220} className={styles.sider}>
-          <Menu
-            mode="inline"
-            selectedKeys={[getSelectedKey()]}
-            items={menuItems}
-            onClick={({ key }) => navigate(key)}
-            className={styles.menu}
-          />
+        <Sider width={236} className={styles.sider}>
+          <div className={styles.navShell}>
+            <Menu
+              mode="inline"
+              selectedKeys={[getSelectedKey()]}
+              items={menuItems}
+              onClick={({ key }) => navigate(key)}
+              className={styles.menu}
+            />
+          </div>
         </Sider>
         <Content className={styles.content}>
           <Outlet />

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Modal, message, Empty, Button, Input, Spin, Progress } from 'antd';
+import { Modal, Empty, Button, Input, Spin, Progress } from 'antd';
+import { appMessage as message } from '../../utils/antdApp';
 import { PlusOutlined, ThunderboltOutlined, PictureOutlined, UploadOutlined, CameraOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import { Scene, Style, SceneLocationData } from '../../types';
 import { aiService } from '../../services/aiService';
@@ -249,15 +250,19 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
 
   return (
     <>
-      <Modal title="场景管理" open={visible} onCancel={onClose} footer={null}
-        width="85vw" style={{ top: '5vh' }} styles={{ body: { height: '72vh', overflow: 'auto' } }}
+      <Modal title={null} open={visible} onCancel={onClose} footer={null}
+        width="85vw" style={{ top: '5vh' }} styles={{ body: { height: '72vh', overflow: 'auto', padding: 0 } }}
         forceRender destroyOnHidden={false} className={styles.modal}>
-        <div className={styles.headerBar}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>创建场景</Button>
-          <span style={{fontSize:13,color:'var(--text-tertiary)',marginLeft:12}}>{sceneLocations.length} 个场景</span>
+        <div className={styles.modalHead}>
+          <div className={styles.modalHeadTitleWrap}>
+            <span className={styles.modalHeadTitle}>场景管理</span>
+            <span className={styles.modalHeadMeta}>{sceneLocations.length} 个场景</span>
+          </div>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)} className={styles.primaryAction}>创建场景</Button>
         </div>
+        <div className={styles.modalBody}>
         {sceneLocations.length === 0 ? (
-          <Empty description="暂无场景，点击「创建场景」开始" style={{marginTop:60}} />
+          <div className={styles.emptyWrap}><Empty description="暂无场景，点击“创建场景”开始" /></div>
         ) : (
           <div className={styles.grid}>
             {sceneLocations.map((loc, i) => (
@@ -289,58 +294,53 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
             ))}
           </div>
         )}
+        </div>
       </Modal>
 
       {/* 创建场景弹窗 */}
-      <Modal title="创建场景" open={createOpen} onCancel={() => setCreateOpen(false)}
+      <Modal title={null} open={createOpen} onCancel={() => setCreateOpen(false)}
         footer={[
           <Button key="cancel" onClick={() => setCreateOpen(false)}>取消</Button>,
           <Button key="save" type="primary" onClick={handleSaveScene} disabled={!createImage}>保存场景</Button>,
-        ]} width={680} centered forceRender destroyOnHidden={false}>
-        <div style={{display:'flex',flexDirection:'column',gap:16}}>
-          <div>
-            <label style={s.label}>场景描述</label>
+        ]} width={680} centered forceRender destroyOnHidden={false} className={styles.createModal}>
+        <div className={styles.createHead}><span>创建场景</span></div>
+        <div className={styles.createBody}>
+          <div className={styles.fieldBlock}>
+            <label className={styles.fieldLabel}>场景描述</label>
             <Input.TextArea rows={2} placeholder="输入场景描述，如：古代宫殿大殿，金碧辉煌，龙柱林立..."
-              value={createDesc} onChange={e => setCreateDesc(e.target.value)} />
+              value={createDesc} onChange={e => setCreateDesc(e.target.value)} className={styles.createTextarea} />
           </div>
-          <div style={{display:'flex',gap:8}}>
-            <Button icon={<ThunderboltOutlined />} loading={createOptimizing} onClick={handleOptimizeDesc}>
+          <div className={styles.createActions}>
+            <Button icon={<ThunderboltOutlined />} loading={createOptimizing} onClick={handleOptimizeDesc} className={styles.secondaryAction}>
               AI优化描述
             </Button>
             <Button icon={<CameraOutlined />} loading={createGenerating} onClick={handleGenerateScene}
-              disabled={!(createPrompt || createDesc).trim()} type="primary">
+              disabled={!(createPrompt || createDesc).trim()} type="primary" className={styles.primaryAction}>
               生成6视角场景
             </Button>
-            <Button icon={<UploadOutlined />} onClick={handleImportLocal}>导入本地图片</Button>
+            <Button icon={<UploadOutlined />} onClick={handleImportLocal} className={styles.secondaryAction}>导入本地图片</Button>
           </div>
           {createPrompt && (
-            <div style={s.promptBox}>
-              <div style={s.miniLabel}>优化后的提示词</div>
-              <pre style={s.pre}>{createPrompt}</pre>
+            <div className={styles.promptBox}>
+              <div className={styles.miniLabel}>优化后的提示词</div>
+              <pre className={styles.promptPre}>{createPrompt}</pre>
             </div>
           )}
           {createGenerating && <Progress percent={createGenProgress} size="small" />}
           {createImage && (
-            <div style={{textAlign:'center',background:'var(--input-bg)',borderRadius:12,padding:12}}>
-              <img src={createImage} alt="" style={{maxWidth:'100%',maxHeight:300,borderRadius:8}} />
+            <div className={styles.createPreview}>
+              <img src={createImage} alt="" className={styles.createPreviewImage} />
             </div>
           )}
         </div>
       </Modal>
 
       {/* 图片预览 */}
-      <Modal open={!!previewImage} onCancel={() => setPreviewImage(null)} footer={null} width="auto" centered>
-        {previewImage && <img src={previewImage} alt="" style={{maxWidth:'80vw',maxHeight:'80vh',borderRadius:8}} />}
+      <Modal open={!!previewImage} onCancel={() => setPreviewImage(null)} footer={null} width="auto" centered className={styles.previewModal}>
+        {previewImage && <img src={previewImage} alt="" className={styles.previewModalImage} />}
       </Modal>
     </>
   );
-};
-
-const s: Record<string, React.CSSProperties> = {
-  label: { display:'block',marginBottom:6,fontSize:12,fontWeight:600,color:'var(--text-label)',textTransform:'uppercase',letterSpacing:0.4 },
-  miniLabel: { fontSize:11,fontWeight:600,color:'var(--text-label)',marginBottom:6 },
-  pre: { margin:0,whiteSpace:'pre-wrap',fontSize:12,lineHeight:1.6,color:'var(--body-color)',maxHeight:120,overflow:'auto' },
-  promptBox: { padding:12,background:'var(--input-bg)',border:'1px solid var(--panel-border)',borderRadius:10 },
 };
 
 export default SceneManagerModal;
