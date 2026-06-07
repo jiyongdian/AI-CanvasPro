@@ -44,6 +44,13 @@ interface PromptHistoryEntry {
   source: PromptSource;
 }
 
+interface PreviewDisplayState {
+  sceneId: string | null;
+  mode: PreviewMode;
+  kind: 'image' | 'video' | 'empty';
+  src?: string;
+}
+
 const TEMPLATE_TYPE_LABELS: Record<string, string> = { image: '图片模板', video: '视频模板', director: '导演模板' };
 const TEMPLATE_TYPE_ICONS: Record<string, React.ReactNode> = { image: <PictureOutlined />, video: <PlayCircleOutlined />, director: <BulbOutlined /> };
 const IMAGE_RATIOS = ['1:1 方形', '3:2 标准', '4:3 经典', '16:9 宽屏', '9:16 竖屏', '2:3 肖像', '3:4', '21:9 超宽'];
@@ -115,11 +122,14 @@ const Workspace: React.FC = () => {
   const [promptStatus, setPromptStatus] = useState<'idle' | 'editing' | 'saved' | 'restored' | 'ai_preview'>('idle');
   const [canUndoPrompt, setCanUndoPrompt] = useState(false);
   const [canRedoPrompt, setCanRedoPrompt] = useState(false);
+  const [displayPreview, setDisplayPreview] = useState<PreviewDisplayState>({ sceneId: null, mode: 'image', kind: 'empty' });
+  const [previewSwitching, setPreviewSwitching] = useState(false);
   const leftListRef = useRef<HTMLDivElement>(null);
   const savePromptRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restorePromptRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const promptRuntimeRef = useRef<PromptRuntimeState>({ sceneId: null, mode: 'image', value: '', source: 'system' });
   const promptHistoryRef = useRef<Record<string, { past: PromptHistoryEntry[]; future: PromptHistoryEntry[] }>>({});
+  const previewLoadTokenRef = useRef(0);
 
   // 模型关联
   const [providers, setProviders] = useState<ApiProvider[]>([]);
@@ -282,6 +292,89 @@ const Workspace: React.FC = () => {
   useEffect(() => { getAllPromptTemplates().then(d => setPromptTemplates(d)).catch(() => {}); }, []);
 
   const activeScene = useMemo(() => project?.script.find(s => s.id === activeSceneId) || null, [project, activeSceneId]);
+  const previewImg = activeScene?.images?.keyFrame;
+  const previewVid = activeScene?.videos?.[activeScene.videos.length - 1];
+  const desiredPreview = useMemo<PreviewDisplayState>(() => {
+    if (!activeScene) return { sceneId: null, mode: previewMode, kind: 'empty' };
+    if (previewMode === 'image') {
+      return previewImg
+        ? { sceneId: activeScene.id, mode: previewMode, kind: 'image', src: previewImg }
+        : { sceneId: activeScene.id, mode: previewMode, kind: 'empty' };
+    }
+    return previewVid
+      ? { sceneId: activeScene.id, mode: previewMode, kind: 'video', src: previewVid }
+      : { sceneId: activeScene.id, mode: previewMode, kind: 'empty' };
+  }, [activeScene, previewMode, previewImg, previewVid]);
+  useEffect(() => {
+    const samePreview =
+      displayPreview.sceneId === desiredPreview.sceneId &&
+      displayPreview.mode === desiredPreview.mode &&
+      displayPreview.kind === desiredPreview.kind &&
+      displayPreview.src === desiredPreview.src;
+    if (samePreview) {
+      setPreviewSwitching(false);
+      return;
+    }
+
+    const token = ++previewLoadTokenRef.current;
+    if (desiredPreview.kind === 'empty' || !desiredPreview.src) {
+      setDisplayPreview(desiredPreview);
+      setPreviewSwitching(false);
+      return;
+    }
+
+    setPreviewSwitching(true);
+    if (desiredPreview.kind === 'image') {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => {
+        if (previewLoadTokenRef.current !== token) return;
+        setDisplayPreview(desiredPreview);
+        requestAnimationFrame(() => {
+          if (previewLoadTokenRef.current === token) setPreviewSwitching(false);
+        });
+      };
+      img.onerror = () => {
+        if (previewLoadTokenRef.current !== token) return;
+        setDisplayPreview(desiredPreview);
+        setPreviewSwitching(false);
+      };
+      img.src = desiredPreview.src;
+      if (img.complete) {
+        setDisplayPreview(desiredPreview);
+        setPreviewSwitching(false);
+      }
+      return;
+    }
+
+    const video = document.createElement('video');
+    const finalize = () => {
+      if (previewLoadTokenRef.current !== token) return;
+      setDisplayPreview(desiredPreview);
+      requestAnimationFrame(() => {
+        if (previewLoadTokenRef.current === token) setPreviewSwitching(false);
+      });
+    };
+    const fail = () => {
+      if (previewLoadTokenRef.current !== token) return;
+      setDisplayPreview(desiredPreview);
+      setPreviewSwitching(false);
+    };
+    video.preload = 'metadata';
+    video.muted = true;
+    video.onloadeddata = finalize;
+    video.oncanplay = finalize;
+    video.onerror = fail;
+    video.src = desiredPreview.src;
+    video.load();
+    return () => {
+      video.onloadeddata = null;
+      video.oncanplay = null;
+      video.onerror = null;
+      video.removeAttribute('src');
+      video.load();
+    };
+  }, [desiredPreview, displayPreview]);
   const selectedStyle = useMemo(() => styleList.find(s => s.id === selectedStyleId), [styleList, selectedStyleId]);
   const templatesByType = useMemo(() => ({ image: promptTemplates.filter(t => t.type === 'image'), video: promptTemplates.filter(t => t.type === 'video'), director: promptTemplates.filter(t => t.type === 'director') }), [promptTemplates]);
   const getSelectedTemplateId = (type: string) => type === 'image' ? selectedImageTemplateId : type === 'video' ? selectedVideoTemplateId : selectedDirectorTemplateId;
@@ -394,7 +487,7 @@ const Workspace: React.FC = () => {
   }, [activeScene, previewMode, clearPendingPromptRestore, restoreScenePromptIfNeeded]);
   const doAddScene = async () => { if (!project || !activeSceneId) return; persistPromptSnapshot(); const idx = project.script.findIndex(s => s.id === activeSceneId); const ns: Scene = { id: crypto.randomUUID(), order: idx + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' }; const script = [...project.script.slice(0, idx + 1), ns, ...project.script.slice(idx + 1)].map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); setActiveSceneId(ns.id); applyPromptRuntimeState('', 'system', ns.id, previewMode); resetPromptHistory('', 'system', ns.id, previewMode); setPromptStatus('idle'); sessionStorage.setItem(`ws_active_${projectId}`, ns.id); setAddConfirmOpen(false); };
   const doDeleteScene = async () => { if (!project || !activeSceneId) return; persistPromptSnapshot(); if (project.script.length <= 1) { message.warning('至少保留一个分镜'); return; } const script = project.script.filter(s => s.id !== activeSceneId).map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); const nextId = script[0]?.id || null; const nextPrompt = buildScenePrompt(script[0]); setActiveSceneId(nextId); applyPromptRuntimeState(nextPrompt, 'system', nextId, previewMode); resetPromptHistory(nextPrompt, 'system', nextId, previewMode); setPromptStatus('idle'); if (nextId) sessionStorage.setItem(`ws_active_${projectId}`, nextId); setDeleteConfirmOpen(false); };
-  const selectScene = (sid: string) => { persistPromptSnapshot(); const s = project?.script.find(x => x.id === sid); const savedMode = sessionStorage.getItem(`ws_pmode_${sid}`) as PreviewMode | null; const mode = savedMode || 'image'; const nextPrompt = mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s)); setActiveSceneId(sid); setPreviewMode(mode); applyPromptRuntimeState(nextPrompt, 'system', sid, mode); resetPromptHistory(nextPrompt, 'system', sid, mode); setPromptStatus('idle'); sessionStorage.setItem(`ws_active_${projectId}`, sid); };
+  const selectScene = (sid: string) => { if (sid === activeSceneId) return; persistPromptSnapshot(); const s = project?.script.find(x => x.id === sid); const savedMode = sessionStorage.getItem(`ws_pmode_${sid}`) as PreviewMode | null; const mode = savedMode || 'image'; const nextPrompt = mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s)); setActiveSceneId(sid); setPreviewMode(mode); applyPromptRuntimeState(nextPrompt, 'system', sid, mode); resetPromptHistory(nextPrompt, 'system', sid, mode); setPromptStatus('idle'); sessionStorage.setItem(`ws_active_${projectId}`, sid); };
 
   const switchPreviewMode = (mode: PreviewMode) => {
     if (activeScene) persistPromptSnapshot(activeScene, previewMode);
@@ -651,8 +744,6 @@ const Workspace: React.FC = () => {
   if (loading) return <div className={styles.loadingContainer}><Spin size="large" /></div>;
   if (!project) return null;
 
-  const previewImg = activeScene?.images?.keyFrame;
-  const previewVid = activeScene?.videos?.[activeScene.videos.length - 1];
   const activeIdx = project.script.findIndex(s => s.id === activeSceneId);
   const currentHistory = taskHistory.filter(t => t.sceneId === activeSceneId);
 
@@ -694,10 +785,11 @@ const Workspace: React.FC = () => {
             <div className={styles.toggleMode}><button className={`${styles.toggleBtn} ${previewMode === 'image' ? styles.toggleBtnActive : ''}`} onClick={() => switchPreviewMode('image')}>图片</button><button className={`${styles.toggleBtn} ${previewMode === 'video' ? styles.toggleBtnActive : ''}`} onClick={() => switchPreviewMode('video')}>视频</button></div>
           </div>
 
-          <div className={`${styles.previewArea} ${activeScene ? styles.previewActive : ''}`} onClick={() => activeScene && setPreviewImportOpen(true)} style={{ flex: promptExpanded ? '0 0 0' : 1, overflow: 'hidden', transition: 'flex 0.35s cubic-bezier(0.22,1,0.36,1)' }}>
+          <div className={`${styles.previewArea} ${activeScene ? styles.previewActive : ''} ${previewSwitching ? styles.previewSwitching : ''}`} onClick={() => activeScene && setPreviewImportOpen(true)} style={{ flex: promptExpanded ? '0 0 0' : 1, overflow: 'hidden', transition: 'flex 0.35s cubic-bezier(0.22,1,0.36,1)' }}>
             {generating ? <div className={styles.previewLoading}><Spin size="large" /><Progress percent={genProgress} size="small" style={{width:200}} /></div>
-            : previewMode === 'image' ? (previewImg ? <img src={previewImg} className={styles.previewImage} alt="" /> : <div className={styles.previewEmpty}><PictureOutlined className={styles.previewEmptyIcon} /><span>选择分镜并生成图片</span></div>)
-            : (previewVid ? <video src={previewVid} className={styles.previewVideo} controls /> : <div className={styles.previewEmpty}><PlayCircleOutlined className={styles.previewEmptyIcon} /><span>选择分镜并生成视频</span></div>)}
+            : displayPreview.kind === 'image' && displayPreview.src ? <img src={displayPreview.src} className={styles.previewImage} alt="" />
+            : displayPreview.kind === 'video' && displayPreview.src ? <video src={displayPreview.src} className={styles.previewVideo} controls preload="metadata" />
+            : <div className={styles.previewEmpty}><span className={styles.previewEmptyIconWrap}>{previewMode === 'image' ? <PictureOutlined className={styles.previewEmptyIcon} /> : <PlayCircleOutlined className={styles.previewEmptyIcon} />}</span><span>{previewMode === 'image' ? '选择分镜并生成图片' : '选择分镜并生成视频'}</span></div>}
             {/* 任务历史按钮 */}
             <Button type="text" size="small" icon={<HistoryOutlined />} className={styles.historyBtn} onClick={(e) => { e.stopPropagation(); setHistoryOpen(true); }} title="任务历史" />
           </div>
