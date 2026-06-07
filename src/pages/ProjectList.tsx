@@ -1,6 +1,7 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
-import { Card, Button, Modal, Input, Empty, Spin, message, Row, Col, Popconfirm, Radio, Tag, Select } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import { Card, Button, Modal, Input, Empty, Spin, Row, Col, Popconfirm, Radio, Tag, Select } from 'antd';
+import { appMessage as message } from '../utils/antdApp';
 import { PlusOutlined, DeleteOutlined, EditOutlined, PlayCircleOutlined, RobotOutlined, BulbOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useRecoilState } from 'recoil';
@@ -12,6 +13,7 @@ import { aiService, ScriptMode } from '../services/aiService';
 import { loadApiProviders } from '../services/secureStorage';
 import { getAllPromptTemplates } from '../services/database';
 import ScriptEditorModal from '../components/ScriptEditorModal';
+import { normalizeImportedScenePrompt } from '../utils/scenePrompt';
 import styles from './ProjectList.module.css';
 
 const { TextArea } = Input;
@@ -35,6 +37,8 @@ const loadCreateDraft = () => ({
   model: localStorage.getItem(CREATE_DRAFT_STORAGE_KEYS.model) || undefined,
 });
 
+const normalizeImportedScene = (scene: Scene): Scene => normalizeImportedScenePrompt(scene);
+
 const ProjectList: React.FC = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useRecoilState(projectListState);
@@ -56,8 +60,21 @@ const ProjectList: React.FC = () => {
   // 脚本模板
   const [scriptTemplates, setScriptTemplates] = useState<PromptTemplate[]>([]);
   const [selectedScriptTemplateId, setSelectedScriptTemplateId] = useState<string | undefined>(() => loadCreateDraft().template);
+  const selectedScriptTemplate = useMemo(
+    () => scriptTemplates.find(t => t.id === selectedScriptTemplateId),
+    [scriptTemplates, selectedScriptTemplateId],
+  );
+  const totalScenes = useMemo(
+    () => projects.reduce((sum, project) => sum + project.script.length, 0),
+    [projects],
+  );
 
   useEffect(() => { getAllPromptTemplates().then(d => setScriptTemplates(d.filter(t => t.type === 'script'))).catch(() => {}); }, []);
+  useEffect(() => {
+    if (selectedScriptTemplateId && !scriptTemplates.some(t => t.id === selectedScriptTemplateId)) {
+      setSelectedScriptTemplateId(undefined);
+    }
+  }, [scriptTemplates, selectedScriptTemplateId]);
   // 弹窗字段持久化
   const persistCreateDraftValue = (key: string, value?: string) => {
     if (editingProject) return;
@@ -177,6 +194,11 @@ const ProjectList: React.FC = () => {
       return;
     }
 
+    if (!selectedScriptTemplate) {
+      message.warning('请先从提示词库选择有效的脚本模板，未选择时不允许开始生成');
+      return;
+    }
+
     setGenerating(true);
     setGeneratingModal(true);
     const hasCustomReq = customRequirement.trim().length > 0;
@@ -190,16 +212,15 @@ const ProjectList: React.FC = () => {
     try {
       setGeneratingLog(prev => [...prev, '🤖 AI正在分析小说内容...']);
       setStreamContent('');
-      const selTemplate = selectedScriptTemplateId ? scriptTemplates.find(t => t.id === selectedScriptTemplateId) : undefined;
       const scriptScenes = await aiService.generateScript(
         novelContent.trim(), scriptMode, customRequirement.trim() || undefined,
         { model: selectedModel, providerId: selectedProviderId,
-          template: selTemplate ? { positive_prompt: selTemplate.positive_prompt } : undefined,
+          template: selectedScriptTemplate,
           onChunk: (text) => setStreamContent(text) },
       );
       setGeneratingLog(prev => [...prev, `✅ AI分析完成，共生成 ${scriptScenes.length} 个分镜`]);
       
-      const scenes: Scene[] = scriptScenes.map((s, index) => ({
+      const scenes: Scene[] = scriptScenes.map((s, index) => normalizeImportedScene({
         id: uuidv4(),
         order: s.order || index + 1,
         description: s.sceneDescription,
@@ -308,7 +329,7 @@ const ProjectList: React.FC = () => {
     
     const updatedProject: Project = {
       ...scriptEditorProject,
-      script: scenes,
+      script: scenes.map(normalizeImportedScene),
       updatedAt: new Date(),
     };
     
@@ -329,6 +350,10 @@ const ProjectList: React.FC = () => {
       message.warning('请先输入小说原文');
       return;
     }
+    if (!selectedScriptTemplate) {
+      message.warning('请先从提示词库选择有效的脚本模板，未选择时不允许开始生成');
+      return;
+    }
 
     setGenerating(true);
     setGeneratingModal(true);
@@ -343,11 +368,10 @@ const ProjectList: React.FC = () => {
     try {
       setGeneratingLog(prev => [...prev, '🤖 AI正在分析小说内容...']);
       setStreamContent('');
-      const selTemplate2 = selectedScriptTemplateId ? scriptTemplates.find(t => t.id === selectedScriptTemplateId) : undefined;
       const scriptScenes = await aiService.generateScript(
         novelContent.trim(), scriptMode, customRequirement.trim() || undefined,
         { model: selectedModel, providerId: selectedProviderId,
-          template: selTemplate2 ? { positive_prompt: selTemplate2.positive_prompt } : undefined,
+          template: selectedScriptTemplate,
           onChunk: (text) => setStreamContent(text) },
       );
       setGeneratingLog(prev => [...prev, `✅ AI分析完成，共生成 ${scriptScenes.length} 个分镜`]);
@@ -410,24 +434,38 @@ const ProjectList: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h1>我的作品</h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-          新建项目
-        </Button>
+      <div className={styles.hero}>
+        <div className={styles.heroMain}>
+          <div className={styles.heroTitleRow}>
+            <h1>我的作品</h1>
+            <span className={styles.heroCount}>{projects.length}</span>
+          </div>
+          <p className={styles.heroSubtle}>项目、分镜与创作入口统一管理</p>
+        </div>
+        <div className={styles.heroActions}>
+          <div className={styles.heroStat}>
+            <span>总分镜</span>
+            <strong>{totalScenes}</strong>
+          </div>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+            新建项目
+          </Button>
+        </div>
       </div>
 
       {projects.length === 0 ? (
-        <Empty
-          description="还没有任何项目"
-          className={styles.empty}
-        >
-          <Button type="primary" onClick={openCreateModal}>
-            创建第一个项目
-          </Button>
-        </Empty>
+        <div className={styles.emptyPanel}>
+          <Empty
+            description="还没有任何项目"
+            className={styles.empty}
+          >
+            <Button type="primary" onClick={openCreateModal}>
+              创建第一个项目
+            </Button>
+          </Empty>
+        </div>
       ) : (
-        <Row gutter={[24, 24]}>
+        <Row gutter={[24, 24]} className={styles.projectGrid}>
           {projects.map(project => (
             <Col key={project.id} xs={24} sm={12} md={8} lg={6}>
               <Card
@@ -435,6 +473,7 @@ const ProjectList: React.FC = () => {
                 className={styles.projectCard}
                 cover={
                   <div className={styles.cardCover}>
+                    <div className={styles.coverBadge}>{project.script.length} 镜</div>
                     {project.cover ? (
                       <img src={project.cover} alt={project.name} />
                     ) : project.script?.[0]?.images?.keyFrame ? (
@@ -460,10 +499,16 @@ const ProjectList: React.FC = () => {
                 ]}
                 onClick={() => handleOpenProject(project)}
               >
-                <Card.Meta
-                  title={project.name}
-                  description={`${project.script.length} 个分镜 · ${new Date(project.updatedAt).toLocaleDateString()}`}
-                />
+                <div className={styles.cardMeta}>
+                  <div className={styles.cardTitleRow}>
+                    <div className={styles.cardTitle}>{project.name}</div>
+                    <Tag className={styles.sceneTag}>{project.script.length} 分镜</Tag>
+                  </div>
+                  <div className={styles.cardDesc}>
+                    <span>最近更新</span>
+                    <strong>{new Date(project.updatedAt).toLocaleDateString()}</strong>
+                  </div>
+                </div>
               </Card>
             </Col>
           ))}
@@ -471,156 +516,207 @@ const ProjectList: React.FC = () => {
       )}
 
       <Modal
-        className="premium-modal"
-        title={editingProject ? '编辑项目' : '新建项目'}
+        className={styles.projectEditorModal}
+        title={null}
         open={modalVisible}
         onCancel={() => {
           setModalVisible(false);
           setEditingProject(null);
           if (editingProject) applyCreateDraft();
         }}
-        footer={editingProject ? [
-          <Button key="cancel" onClick={() => {
-            setModalVisible(false);
-            setEditingProject(null);
-            applyCreateDraft();
-          }}>取消</Button>,
-          editingProject.script.length > 0 && (
-            <Button 
-              key="import" 
-              type="default" 
-              icon={<RobotOutlined />}
-              loading={generating}
-              onClick={handleImportScript}
+        footer={
+          <div className={styles.projectEditorFooter}>
+            <Button onClick={() => {
+              setModalVisible(false);
+              if (editingProject) {
+                setEditingProject(null);
+                applyCreateDraft();
+              }
+            }}
             >
-              重新导入脚本
+              取消
             </Button>
-          ),
-          <Button key="ok" type="primary" onClick={handleUpdateProject}>保存</Button>
-        ].filter(Boolean) : [
-          <Button key="cancel" onClick={() => {
-            setModalVisible(false);
-          }}>取消</Button>,
-          <Button 
-            key="generate" 
-            type="primary" 
-            icon={<RobotOutlined />}
-            loading={generating}
-            onClick={handleCreateProject}
-          >
-            AI 生成脚本
-          </Button>
-        ]}
-        width="95vw"
-        style={{ top: '2.5vh', maxWidth: 1200 }}
-        styles={{ body: { height: '85vh', overflow: 'auto' } }}
+            {editingProject?.script.length ? (
+              <Button
+                type="default"
+                icon={<RobotOutlined />}
+                loading={generating}
+                disabled={!selectedScriptTemplate}
+                onClick={handleImportScript}
+              >
+                重新导入脚本
+              </Button>
+            ) : null}
+            {editingProject ? (
+              <Button type="primary" onClick={handleUpdateProject}>
+                保存项目
+              </Button>
+            ) : (
+              <Button
+                type="primary"
+                icon={<RobotOutlined />}
+                loading={generating}
+                disabled={!selectedScriptTemplate}
+                onClick={handleCreateProject}
+              >
+                AI 生成脚本
+              </Button>
+            )}
+          </div>
+        }
+        width={1120}
+        centered
+        styles={{ body: { height: '86vh', overflow: 'auto', padding: 0 } }}
         forceRender
         destroyOnHidden={false}
       >
-        <div className={styles.modalForm}>
-          <div className={styles.formItem}>
-            <label>项目名称</label>
-            <Input
-              placeholder="请输入项目名称"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className={styles.formItem}>
-            <label>脚本模式</label>
-            <Radio.Group 
-              value={scriptMode} 
-              onChange={(e) => setScriptMode(e.target.value)}
-              className={styles.modeSelector}
-            >
-              <Radio.Button value="dialogue">纯对话剧本</Radio.Button>
-              <Radio.Button value="narration">解说对话模式</Radio.Button>
-            </Radio.Group>
-            <p className={styles.modeHint}>
-              {scriptMode === 'dialogue' 
-                ? '纯对话剧本：只包含角色之间的对话，适合对话驱动的故事' 
-                : '解说对话模式：包含旁白解说词和角色对话，适合需要场景描述的故事'}
-            </p>
-          </div>
-
-          {/* 脚本模板选择器 */}
-          {scriptTemplates.length > 0 && (
-            <div className={styles.formItem}>
-              <label>脚本模板 <Tag color="purple" style={{ marginLeft: 6, fontSize: 11 }}>可选</Tag></label>
-              <Select
-                placeholder="选择提示词库中的脚本模板"
-                value={selectedScriptTemplateId}
-                onChange={setSelectedScriptTemplateId}
-                allowClear
-                options={scriptTemplates.map(t => ({ label: t.name, value: t.id }))}
-              />
-              <p className={styles.modeHint} style={{ marginTop: 6 }}>
-                选择模板后AI将按模板格式生成脚本，模板可在提示词库中自定义创建
-              </p>
+        <div className={styles.projectEditorHead}>
+          <EditOutlined className={styles.projectEditorHeadIcon} />
+          <div className={styles.projectEditorHeadText}>
+            <div className={styles.projectEditorHeadTitle}>
+              {editingProject ? '编辑项目信息' : '新建作品项目'}
             </div>
-          )}
-
-          {/* 模型选择器 */}
-          {providers.length > 0 && (
-            <div className={styles.formItem}>
-              <label>AI模型选择</label>
-              <div className={styles.modelSelectorRow}>
-                <Select
-                  placeholder="选择API平台"
-                  value={selectedProviderId}
-                  onChange={(val) => {
-                    setSelectedProviderId(val);
-                    setSelectedModel(undefined);
-                  }}
-                  className={styles.providerSelect}
-                  options={providers.map(p => ({ label: p.name, value: p.id }))}
-                />
-                <Select
-                  placeholder="选择模型"
-                  value={selectedModel}
-                  onChange={setSelectedModel}
-                  className={styles.modelSelect}
-                  options={availableModels.map(m => ({ label: m.id, value: m.id }))}
-                  showSearch
-                  filterOption={(input, option) =>
-                    (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-                  }
+            <div className={styles.projectEditorHeadSubtitle}>
+              {editingProject
+                ? '快速调整参数，并把更多空间留给正文编辑'
+                : '顶部参数简洁配置，主体区域专注原文与要求编辑'}
+            </div>
+          </div>
+        </div>
+        <div className={styles.projectEditorBody}>
+          <div className={`${styles.formCard} ${styles.projectMetaCard}`}>
+            <div className={styles.projectSectionHead}>
+              <div>
+                <div className={styles.projectSectionTitle}>生成参数</div>
+                <div className={styles.projectSectionHint}>参数区保持简洁，主空间留给下方输入框</div>
+              </div>
+            </div>
+            <div className={styles.projectMetaTopRow}>
+              <div className={`${styles.formItem} ${styles.projectNameField}`}>
+                <label>项目名称</label>
+                <Input
+                  placeholder="请输入项目名称，例如：第一集 分镜脚本"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  autoFocus
                 />
               </div>
-              <p className={styles.modelSelectorHint}>
-                选择用于生成脚本的API平台和模型
-              </p>
+              <div className={styles.projectMetaStatus}>
+                <span className={styles.projectSectionBadge}>{editingProject ? '编辑中' : '待生成'}</span>
+                <span className={styles.projectSectionBadge}>
+                  {scriptMode === 'dialogue' ? '纯对话剧本' : '解说对话模式'}
+                </span>
+              </div>
             </div>
-          )}
-
-          <div className={styles.formItem}>
-            <label>小说原文</label>
-            <TextArea
-              placeholder="请输入小说原文内容，AI将根据原文自动生成分镜脚本..."
-              value={novelContent}
-              onChange={(e) => setNovelContent(e.target.value)}
-              className={styles.novelInput}
-              autoSize={{ minRows: 12, maxRows: 20 }}
-            />
+            <div className={styles.projectMetaGrid}>
+              <div className={styles.projectConfigBlock}>
+                <div className={styles.projectConfigBlockHead}>
+                  <span className={styles.projectConfigTitle}>脚本模式</span>
+                  <span className={styles.projectConfigHint}>选择输出结构</span>
+                </div>
+                <Radio.Group
+                  value={scriptMode}
+                  onChange={(e) => setScriptMode(e.target.value)}
+                  className={styles.modeSelector}
+                >
+                  <Radio.Button value="dialogue">纯对话剧本</Radio.Button>
+                  <Radio.Button value="narration">解说对话模式</Radio.Button>
+                </Radio.Group>
+              </div>
+              <div className={styles.projectConfigBlock}>
+                <div className={styles.projectConfigBlockHead}>
+                  <span className={styles.projectConfigTitle}>脚本模板 <Tag color="red" style={{ marginLeft: 6, fontSize: 11 }}>必选</Tag></span>
+                  <span className={styles.projectConfigHint}>控制生成风格</span>
+                </div>
+                {scriptTemplates.length > 0 ? (
+                  <Select
+                    placeholder="必须选择提示词库中的脚本模板"
+                    value={selectedScriptTemplateId}
+                    onChange={setSelectedScriptTemplateId}
+                    options={scriptTemplates.map(t => ({ label: t.name, value: t.id }))}
+                  />
+                ) : (
+                  <div className={styles.projectInlineNotice}>
+                    当前没有可用脚本模板，请先去提示词库创建。
+                  </div>
+                )}
+              </div>
+              {providers.length > 0 && (
+                <div className={`${styles.projectConfigBlock} ${styles.projectModelBlock}`}>
+                  <div className={styles.projectConfigBlockHead}>
+                    <span className={styles.projectConfigTitle}>AI模型</span>
+                    <span className={styles.projectConfigHint}>平台与模型组合</span>
+                  </div>
+                  <div className={styles.modelSelectorRow}>
+                    <Select
+                      placeholder="选择API平台"
+                      value={selectedProviderId}
+                      onChange={(val) => {
+                        setSelectedProviderId(val);
+                        setSelectedModel(undefined);
+                      }}
+                      className={styles.providerSelect}
+                      options={providers.map(p => ({ label: p.name, value: p.id }))}
+                    />
+                    <Select
+                      placeholder="选择模型"
+                      value={selectedModel}
+                      onChange={setSelectedModel}
+                      className={styles.modelSelect}
+                      options={availableModels.map(m => ({ label: m.id, value: m.id }))}
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <div className={styles.formItem}>
-            <div className={styles.customReqHeader}>
-              <BulbOutlined className={styles.customReqIcon} />
-              <label>自定义创作要求 <Tag color="purple" style={{ marginLeft: 6, fontSize: 11 }}>可选</Tag></label>
+
+          <div className={styles.projectContentGrid}>
+            <div className={`${styles.formCard} ${styles.projectNovelCard}`}>
+              <div className={styles.projectSectionHead}>
+                <div>
+                  <div className={styles.projectSectionTitle}>小说原文</div>
+                  <div className={styles.projectSectionHint}>主编辑区，优先保证更大的连续输入空间</div>
+                </div>
+              </div>
+              <div className={styles.formItem}>
+                <TextArea
+                  placeholder="请输入小说原文内容，AI 将根据原文自动生成分镜脚本..."
+                  value={novelContent}
+                  onChange={(e) => setNovelContent(e.target.value)}
+                  className={styles.novelInput}
+                  rows={18}
+                />
+              </div>
             </div>
-            <p className={styles.customReqHint}>
-              AI 将严格遵守您的创作要求生成脚本。例如：主角要更强势、减少旁白多写对话、每集控制在20个分镜内、突出感情戏等。
-            </p>
-            <TextArea
-              placeholder="例如：主角说话要更有霸气，不要出现旁白解说，控制每集分镜在15个以内，多写动作描写..."
-              value={customRequirement}
-              onChange={(e) => setCustomRequirement(e.target.value)}
-              className={styles.customReqInput}
-              autoSize={{ minRows: 3, maxRows: 6 }}
-              showCount
-              maxLength={500}
-            />
+
+            <div className={`${styles.formCard} ${styles.projectRequirementCard}`}>
+              <div className={styles.projectSectionHead}>
+                <div>
+                  <div className={styles.projectSectionTitle}>自定义创作要求</div>
+                  <div className={styles.projectSectionHint}>补充风格、节奏、对白和镜头偏好</div>
+                </div>
+              </div>
+              <div className={styles.formItem}>
+                <div className={styles.customReqHeader}>
+                  <BulbOutlined className={styles.customReqIcon} />
+                  <label>创作要求 <Tag color="purple" style={{ marginLeft: 6, fontSize: 11 }}>可选</Tag></label>
+                </div>
+                <TextArea
+                  placeholder="例如：主角说话要更有霸气，不要出现旁白解说，控制每集分镜在15个以内，多写动作描写..."
+                  value={customRequirement}
+                  onChange={(e) => setCustomRequirement(e.target.value)}
+                  className={styles.customReqInput}
+                  rows={8}
+                  showCount
+                  maxLength={500}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </Modal>

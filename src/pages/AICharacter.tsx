@@ -1,11 +1,12 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { Input, Button, Card, Spin, message, Popconfirm, Select, Space, Modal, Upload } from 'antd';
-import { SendOutlined, LoadingOutlined, DeleteOutlined, ImportOutlined, ThunderboltOutlined, PlusOutlined, CloseOutlined, CopyOutlined, DownloadOutlined, UserOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { Input, Button, Card, Spin, Popconfirm, Select, Space, Modal, Upload, Empty, Tag } from 'antd';
+import { appMessage as message } from '../utils/antdApp';
+import { SendOutlined, LoadingOutlined, DeleteOutlined, ImportOutlined, ThunderboltOutlined, PlusOutlined, CloseOutlined, CopyOutlined, DownloadOutlined, UserOutlined, AppstoreOutlined, ClockCircleOutlined, SettingOutlined, ApiOutlined } from '@ant-design/icons';
 import { useRecoilState } from 'recoil';
 import { v4 as uuidv4 } from 'uuid';
-import { aiService, createTempScene } from '../services/aiService';
-import { preloadImage, compressImage } from '../utils/imageUtils';
+import { aiService, CharacterPromptTemplatePreset } from '../services/aiService';
+import { preloadImage } from '../utils/imageUtils';
 import { downloadToDir, saveDirHandle } from '../utils/downloadHelper';
 import { saveCharacter, openDatabase, getAllStyles } from '../services/database';
 import { saveMedia, getMedia } from '../services/mediaService';
@@ -42,6 +43,12 @@ const PROMPT_STORAGE_KEY = 'ai_character_prompt';
 const ASPECT_RATIO_STORAGE_KEY = 'ai_character_aspect_ratio';
 const IMAGE_SIZE_STORAGE_KEY = 'ai_character_image_size';
 const STYLE_STORAGE_KEY = 'ai_character_style';
+const TEMPLATE_PRESET_STORAGE_KEY = 'ai_character_template_preset';
+
+const characterTemplateOptions: Array<{ label: string; value: CharacterPromptTemplatePreset }> = [
+  { label: '四视图模板', value: 'four_view' },
+  { label: '艺术身份板模板', value: 'identity_board' },
+];
 
 const AICharacter: React.FC = () => {
   // 从 localStorage 加载持久化的提示词和参数
@@ -59,6 +66,7 @@ const AICharacter: React.FC = () => {
   const [optimizing, setOptimizing] = useState(false);
   const [customImage, setCustomImage] = useState<string | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [configModalOpen, setConfigModalOpen] = useState(false);
   
   // 角色卡片预览弹窗状态
   const [cardPreviewVisible, setCardPreviewVisible] = useState(false);
@@ -69,6 +77,10 @@ const AICharacter: React.FC = () => {
   const [styleList, setStyleList] = useState<Style[]>([]);
   const [selectedStyleId, setSelectedStyleId] = useState<string | undefined>(() => {
     return localStorage.getItem(STYLE_STORAGE_KEY) || undefined;
+  });
+  const [templatePreset, setTemplatePreset] = useState<CharacterPromptTemplatePreset>(() => {
+    const saved = localStorage.getItem(TEMPLATE_PRESET_STORAGE_KEY);
+    return saved === 'identity_board' ? 'identity_board' : 'four_view';
   });
 
   // 模型配置
@@ -91,7 +103,18 @@ const AICharacter: React.FC = () => {
     selPlatform.models.forEach(m => { if ((m.category === 'text' || m.category === 'other') && !seen.has(m.id)) { seen.add(m.id); r.push(m); } });
     return r;
   }, [selPlatform]);
-
+  const completedCount = useMemo(
+    () => history.filter((item) => item.status === 'completed').length,
+    [history],
+  );
+  const generatingCount = useMemo(
+    () => history.filter((item) => item.status === 'generating').length,
+    [history],
+  );
+  const failedCount = useMemo(
+    () => history.filter((item) => item.status === 'failed').length,
+    [history],
+  );
   const resolveModelConfig = (modelId?: string) => {
     if (!modelId) return { error: '请选择模型' };
     if (!selPlatform) return { error: '请先选择API平台' };
@@ -166,6 +189,9 @@ const AICharacter: React.FC = () => {
       localStorage.removeItem(STYLE_STORAGE_KEY);
     }
   }, [selectedStyleId]);
+  useEffect(() => {
+    localStorage.setItem(TEMPLATE_PRESET_STORAGE_KEY, templatePreset);
+  }, [templatePreset]);
 
   // 从IndexedDB加载历史记录，并处理中断的任务
   useEffect(() => {
@@ -449,7 +475,7 @@ const AICharacter: React.FC = () => {
 
     setOptimizing(true);
     try {
-      const optimizedPrompt = await aiService.optimizeCharacterPrompt(prompt.trim(), (mc as any).providerId, selTextModel);
+      const optimizedPrompt = await aiService.optimizeCharacterPrompt(prompt.trim(), (mc as any).providerId, selTextModel, templatePreset);
       setPrompt(optimizedPrompt);
       message.success('提示词优化成功');
     } catch (error) {
@@ -567,131 +593,233 @@ const AICharacter: React.FC = () => {
     }
   };
 
+  const getStatusText = (status: GeneratedCharacter['status']) => {
+    if (status === 'completed') return '已完成';
+    if (status === 'failed') return '失败';
+    return '生成中';
+  };
+
+  const configForm = (
+    <div className={styles.paramsGrid}>
+      <div className={styles.paramItem}>
+        <span className={styles.paramLabel}>API平台</span>
+        <Select value={selPlatformId} onChange={setSelPlatformId} placeholder="全部平台" allowClear style={{width:'100%'}} options={providers.filter(p => p.enabled !== false).map(p => ({ label: p.name, value: p.id }))} />
+      </div>
+      <div className={styles.paramItem}>
+        <span className={styles.paramLabel}>文本模型（AI优化）</span>
+        <Select value={selTextModel} onChange={setSelTextModel} placeholder={!selPlatform ? '请先选择API平台' : textModels.length > 0 ? '选择文本模型' : '该平台无文本模型'} allowClear style={{width:'100%'}} options={textModels.map(m => ({ label: m.id, value: m.id }))} disabled={!selPlatform} />
+      </div>
+      <div className={styles.paramItem}>
+        <span className={styles.paramLabel}>图片模型（生成）</span>
+        <Select value={selImageModel} onChange={setSelImageModel} placeholder={!selPlatform ? '请先选择API平台' : imageModels.length > 0 ? '选择图片模型' : '该平台无图片模型'} allowClear style={{width:'100%'}} options={imageModels.map(m => ({ label: m.id, value: m.id }))} disabled={!selPlatform} />
+      </div>
+      <div className={styles.paramItem}>
+        <span className={styles.paramLabel}>优化模板</span>
+        <Select
+          value={templatePreset}
+          onChange={setTemplatePreset}
+          options={characterTemplateOptions}
+          style={{ width: '100%' }}
+        />
+      </div>
+      <div className={styles.paramItem}>
+        <span className={styles.paramLabel}>风格选择</span>
+        <Select
+          value={selectedStyleId}
+          onChange={setSelectedStyleId}
+          placeholder="选择风格（可选）"
+          allowClear
+          style={{ width: '100%' }}
+          options={styleList.map(s => ({ label: s.name, value: s.id }))}
+        />
+      </div>
+      <div className={styles.paramItem}>
+        <span className={styles.paramLabel}>图片比例</span>
+        <Select
+          value={aspectRatio}
+          onChange={setAspectRatio}
+          options={aspectRatioOptions}
+          style={{ width: '100%' }}
+        />
+      </div>
+      {supportsImageSize() && (
+        <div className={styles.paramItem}>
+          <span className={styles.paramLabel}>图片质量</span>
+          <Select
+            value={imageSize}
+            onChange={setImageSize}
+            options={imageSizeOptions}
+            style={{ width: '100%' }}
+          />
+        </div>
+      )}
+      <div className={`${styles.paramItem} ${styles.uploadParam}`}>
+        <span className={styles.paramLabel}>自定义参考图</span>
+        {customImage ? (
+          <div className={styles.customImageWrapper}>
+            <div
+              className={styles.customImageThumb}
+              onClick={() => setPreviewVisible(true)}
+            >
+              <img src={customImage} alt="自定义图片" />
+            </div>
+            <div className={styles.uploadMeta}>
+              <span className={styles.uploadMetaText}>已添加参考图</span>
+              <Button
+                type="text"
+                danger
+                size="small"
+                icon={<CloseOutlined />}
+                onClick={handleRemoveCustomImage}
+                className={styles.removeImageBtn}
+              >
+                移除
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Upload
+            accept="image/*"
+            showUploadList={false}
+            beforeUpload={handleCustomImageUpload}
+          >
+            <Button icon={<PlusOutlined />} className={styles.uploadButton}>
+              上传图片
+            </Button>
+          </Upload>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className={styles.container}>
+      <div className={styles.hero}>
+        <div className={styles.heroMain}>
+          <div className={styles.heroTitleRow}>
+            <h1>AI角色</h1>
+            <span className={styles.heroCount}>{history.length}</span>
+          </div>
+          <p className={styles.heroSubtle}>优化角色提示词并统一管理生成任务与结果</p>
+        </div>
+        <div className={styles.heroStats}>
+          <div className={styles.heroStat}>
+            <span>已完成</span>
+            <strong>{completedCount}</strong>
+          </div>
+          <div className={styles.heroStat}>
+            <span>进行中</span>
+            <strong>{generatingCount}</strong>
+          </div>
+          <div className={styles.heroStat}>
+            <span>失败任务</span>
+            <strong>{failedCount}</strong>
+          </div>
+        </div>
+      </div>
+
       {/* 顶部导航 */}
       <div className={styles.tabBar}>
-        <button className={`${styles.tabBtn} ${activeTab === 'generate' ? styles.tabBtnActive : ''}`} onClick={() => { setActiveTab('generate'); localStorage.setItem('ac_tab', 'generate'); }}>
-          <UserOutlined /> AI角色生成
+        <button
+          type="button"
+          className={`${styles.tabBtn} ${activeTab === 'generate' ? styles.tabBtnActive : ''}`}
+          onClick={() => { setActiveTab('generate'); localStorage.setItem('ac_tab', 'generate'); }}
+        >
+          <span className={styles.tabBtnIcon}><UserOutlined /></span>
+          <span className={styles.tabBtnBody}>
+            <span className={styles.tabBtnTitle}>AI角色生成</span>
+            <span className={styles.tabBtnDesc}>输入设定并生成角色图</span>
+          </span>
         </button>
-        <button className={`${styles.tabBtn} ${activeTab === 'history' ? styles.tabBtnActive : ''}`} onClick={() => { setActiveTab('history'); localStorage.setItem('ac_tab', 'history'); }}>
-          <AppstoreOutlined /> 生成任务列表 {history.length > 0 && <span className={styles.tabBadge}>{history.length}</span>}
+        <button
+          type="button"
+          className={`${styles.tabBtn} ${activeTab === 'history' ? styles.tabBtnActive : ''}`}
+          onClick={() => { setActiveTab('history'); localStorage.setItem('ac_tab', 'history'); }}
+        >
+          <span className={styles.tabBtnIcon}><AppstoreOutlined /></span>
+          <span className={styles.tabBtnBody}>
+            <span className={styles.tabBtnTitle}>
+              生成任务列表
+              {history.length > 0 && <span className={styles.tabBadge}>{history.length}</span>}
+            </span>
+            <span className={styles.tabBtnDesc}>查看历史记录与结果</span>
+          </span>
         </button>
       </div>
 
       {/* Tab 1: 生成 */}
       {activeTab === 'generate' && (
       <div className={styles.generatePanel}>
-        <div className={styles.inputWrapper}>
-          <Input.TextArea
-            className={styles.input}
-            placeholder="描述你想要生成的角色，例如：一位身穿白色长裙的少女，有着银色长发和蓝色眼睛..."
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyPress={handleKeyPress}
-            autoSize={{ minRows: 6, maxRows: 12 }}
-          />
-          <Button
-            type="default"
-            icon={optimizing ? <LoadingOutlined /> : <ThunderboltOutlined />}
-            onClick={handleOptimizePrompt}
-            disabled={optimizing || !prompt.trim()}
-            className={styles.optimizeButton}
-          >
-            {optimizing ? '优化中...' : 'AI优化'}
-          </Button>
-        </div>
-        <div className={styles.paramsGrid}>
-          <div className={styles.paramItem}>
-            <span className={styles.paramLabel}>API平台</span>
-            <Select value={selPlatformId} onChange={setSelPlatformId} placeholder="全部平台" allowClear style={{width:'100%'}} options={providers.filter(p => p.enabled !== false).map(p => ({ label: p.name, value: p.id }))} />
-          </div>
-          <div className={styles.paramItem}>
-            <span className={styles.paramLabel}>文本模型（AI优化）</span>
-            <Select value={selTextModel} onChange={setSelTextModel} placeholder={!selPlatform ? '请先选择API平台' : textModels.length > 0 ? '选择文本模型' : '该平台无文本模型'} allowClear style={{width:'100%'}} options={textModels.map(m => ({ label: m.id, value: m.id }))} disabled={!selPlatform} />
-          </div>
-          <div className={styles.paramItem}>
-            <span className={styles.paramLabel}>图片模型（生成）</span>
-            <Select value={selImageModel} onChange={setSelImageModel} placeholder={!selPlatform ? '请先选择API平台' : imageModels.length > 0 ? '选择图片模型' : '该平台无图片模型'} allowClear style={{width:'100%'}} options={imageModels.map(m => ({ label: m.id, value: m.id }))} disabled={!selPlatform} />
-          </div>
-          <div className={styles.paramItem}>
-            <span className={styles.paramLabel}>风格选择</span>
-            <Select
-              value={selectedStyleId}
-              onChange={setSelectedStyleId}
-              placeholder="选择风格（可选）"
-              allowClear
-              style={{ width: '100%' }}
-              options={styleList.map(s => ({ label: s.name, value: s.id }))}
-            />
-          </div>
-          <div className={styles.paramItem}>
-            <span className={styles.paramLabel}>图片比例</span>
-            <Select
-              value={aspectRatio}
-              onChange={setAspectRatio}
-              options={aspectRatioOptions}
-              style={{ width: '100%' }}
-            />
-          </div>
-          {supportsImageSize() && (
-            <div className={styles.paramItem}>
-              <span className={styles.paramLabel}>图片质量</span>
-              <Select
-                value={imageSize}
-                onChange={setImageSize}
-                options={imageSizeOptions}
-                style={{ width: '100%' }}
+        <div className={styles.generateLayout}>
+          <section className={styles.editorCanvas}>
+            <div className={styles.inputWrapper}>
+              <Input.TextArea
+                className={styles.input}
+                placeholder="描述你想要生成的角色，例如：一位身穿白色长裙的少女，有着银色长发和蓝色眼睛..."
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyPress={handleKeyPress}
+                autoSize={{ minRows: 10, maxRows: 16 }}
               />
             </div>
-          )}
-          <div className={styles.paramItem}>
-            <span className={styles.paramLabel}>自定义参考图</span>
-            {customImage ? (
-              <div className={styles.customImageWrapper}>
-                <div 
-                  className={styles.customImageThumb}
-                  onClick={() => setPreviewVisible(true)}
-                >
-                  <img src={customImage} alt="自定义图片" />
-                </div>
-                <Button
-                  type="text"
-                  danger
-                  size="small"
-                  icon={<CloseOutlined />}
-                  onClick={handleRemoveCustomImage}
-                  className={styles.removeImageBtn}
-                />
-              </div>
-            ) : (
-              <Upload
-                accept="image/*"
-                showUploadList={false}
-                beforeUpload={handleCustomImageUpload}
-              >
-                <Button icon={<PlusOutlined />} className={styles.uploadButton}>
-                  上传图片
-                </Button>
-              </Upload>
-            )}
+          </section>
+        </div>
+        <div className={styles.actionBar}>
+          <div className={styles.actionHint}>
+            当前会直接使用输入框中的最新内容生成角色
+          </div>
+          <div className={styles.actionButtons}>
+            <button
+              type="button"
+              onClick={() => setConfigModalOpen(true)}
+              className={`${styles.actionCardButton} ${styles.configTrigger}`}
+            >
+              <span className={styles.actionCardIcon}><SettingOutlined /></span>
+              <span className={styles.actionCardBody}>
+                <span className={styles.actionCardTitle}>模型与配置</span>
+                <span className={styles.actionCardDesc}>切换模型、模板和参考图</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={handleOptimizePrompt}
+              disabled={optimizing || !prompt.trim()}
+              className={`${styles.actionCardButton} ${styles.optimizeButton}`}
+            >
+              <span className={styles.actionCardIcon}>{optimizing ? <LoadingOutlined /> : <ThunderboltOutlined />}</span>
+              <span className={styles.actionCardBody}>
+                <span className={styles.actionCardTitle}>{optimizing ? '优化中...' : 'AI优化'}</span>
+                <span className={styles.actionCardDesc}>润色当前角色提示词</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              className={`${styles.actionCardButton} ${styles.generateButton}`}
+            >
+              <span className={styles.actionCardIcon}><SendOutlined /></span>
+              <span className={styles.actionCardBody}>
+                <span className={styles.actionCardTitle}>AI生成角色</span>
+                <span className={styles.actionCardDesc}>使用当前内容直接生成</span>
+              </span>
+            </button>
           </div>
         </div>
-        <Button
-          type="primary"
-          icon={<SendOutlined />}
-          onClick={handleGenerate}
-          className={styles.generateButton}
-          block
-        >
-          开始生成
-        </Button>
       </div>
       )}
 
       {/* Tab 2: 任务列表 */}
       {activeTab === 'history' && (
       <div className={styles.historyPanel}>
+        <div className={styles.historyHeader}>
+          <div>
+            <p className={styles.sectionEyebrow}>任务列表</p>
+            <h2 className={styles.sectionTitle}>角色生成记录</h2>
+          </div>
+          <div className={styles.historySummary}>
+            <span>共 {history.length} 条</span>
+          </div>
+        </div>
         <div className={styles.cardGrid}>
           {history.length > 0 ? (
             history.map((character) => (
@@ -723,6 +851,14 @@ const AICharacter: React.FC = () => {
                   )}
                 </div>
                 <div className={styles.cardInfo}>
+                  <div className={styles.cardTopRow}>
+                    <Tag className={`${styles.statusTag} ${styles[`statusTag${character.status}`]}`}>
+                      {getStatusText(character.status)}
+                    </Tag>
+                    <span className={styles.cardTime}>
+                      <ClockCircleOutlined /> {new Date(character.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
                   <p className={styles.cardPrompt}>{character.prompt}</p>
                   <div className={styles.cardActions}>
                     {character.status === 'completed' && (
@@ -764,13 +900,43 @@ const AICharacter: React.FC = () => {
             ))
           ) : (
             <div className={styles.emptyState}>
-              <p>暂无生成任务</p>
-              <p>在左侧输入角色描述开始生成</p>
+              <Empty
+                description="暂无生成任务"
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              >
+                <span className={styles.emptySubtle}>输入角色描述后即可创建新的生成任务</span>
+              </Empty>
             </div>
           )}
         </div>
       </div>
       )}
+
+      <Modal
+        open={configModalOpen}
+        title={null}
+        footer={[
+          <Button key="done" type="primary" onClick={() => setConfigModalOpen(false)}>
+            完成
+          </Button>,
+        ]}
+        onCancel={() => setConfigModalOpen(false)}
+        width={720}
+        centered
+        destroyOnHidden={false}
+        className={styles.configModal}
+      >
+        <div className={styles.configModalHeader}>
+          <ApiOutlined />
+          <div>
+            <div className={styles.configModalTitle}>模型与生成配置</div>
+            <div className={styles.configModalDesc}>通过弹窗切换模型与生成参数，主区域保持完整输入空间。</div>
+          </div>
+        </div>
+        <div className={styles.configModalBody}>
+          {configForm}
+        </div>
+      </Modal>
 
       {/* 自定义图片预览弹窗 */}
       <Modal

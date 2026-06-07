@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { useEffect, useState, useCallback, memo } from 'react';
-import { Card, Button, Modal, Input, Empty, Spin, message, Row, Col, Popconfirm, Upload } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, UploadOutlined, RobotOutlined, EyeOutlined, ThunderboltOutlined, LoadingOutlined } from '@ant-design/icons';
+import { Card, Button, Modal, Input, Empty, Spin, Row, Col, Popconfirm, Upload } from 'antd';
+import { appMessage as message } from '../utils/antdApp';
+import { PlusOutlined, DeleteOutlined, EditOutlined, UploadOutlined, EyeOutlined, ThunderboltOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useRecoilState } from 'recoil';
 import { v4 as uuidv4 } from 'uuid';
 import { characterListState } from '../store/projectStore';
@@ -55,19 +56,37 @@ const CharacterPreviewModal: React.FC = () => {
   return (
     <Modal
       open={visible}
-      footer={null}
+      footer={
+        <div className={styles.previewModalFooter}>
+          <Button onClick={() => setVisible(false)}>关闭</Button>
+        </div>
+      }
       onCancel={() => setVisible(false)}
       centered
-      width="auto"
+      width={760}
       destroyOnHidden
       className={styles.previewModal}
+      title={null}
     >
       {visible && previewUrl && (
-        <img
-          src={previewUrl}
-          alt="预览"
-          style={{ maxWidth: '80vw', maxHeight: '80vh' }}
-        />
+        <div className={styles.previewContent}>
+          <div className={styles.previewHeader}>
+            <div className={styles.modalHeadGroup}>
+              <EyeOutlined className={styles.modalHeadIcon} />
+              <div className={styles.modalHeadText}>
+                <div className={styles.modalHeadTitle}>角色预览</div>
+                <div className={styles.modalHeadSubtitle}>查看角色参考图的大图细节</div>
+              </div>
+            </div>
+          </div>
+          <div className={styles.previewMediaWrap}>
+            <img
+              src={previewUrl}
+              alt="预览"
+              className={styles.previewImage}
+            />
+          </div>
+        </div>
       )}
     </Modal>
   );
@@ -112,6 +131,7 @@ const CharacterCardItem = memo<CharacterCardItemProps>(({ character, onEdit, onD
             style={{ cursor: 'pointer' }}
           >
             {thumb && <img src={thumb} alt={character.name} />}
+            <div className={styles.cardCoverBadge}>角色预览</div>
             <div className={styles.characterName}>{character.name}</div>
           </div>
         }
@@ -127,8 +147,21 @@ const CharacterCardItem = memo<CharacterCardItemProps>(({ character, onEdit, onD
             <DeleteOutlined />
           </Popconfirm>,
         ]}
-        styles={{ body: { display: 'none' } }}
-      />
+      >
+        <div className={styles.characterCardBody}>
+          <div className={styles.characterCardTitleRow}>
+            <div className={styles.characterCardTitle}>{character.name}</div>
+            <span className={styles.characterCardChip}>{character.voiceType ? '已设音色' : '待设音色'}</span>
+          </div>
+          <div className={styles.characterCardDesc}>
+            {character.description || '暂无角色描述'}
+          </div>
+          <div className={styles.characterMetaRow}>
+            <span className={styles.characterMetaItem}>{character.voiceType || '未设置音色'}</span>
+            <span className={styles.characterMetaItem}>角色设定</span>
+          </div>
+        </div>
+      </Card>
     </Col>
   );
 }, (prev, next) => (
@@ -390,112 +423,172 @@ const CharacterLibrary: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h1>角色库</h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-          新建角色
-        </Button>
+      <div className={styles.hero}>
+        <div className={styles.heroMain}>
+          <div className={styles.heroTitleRow}>
+            <h1>角色库</h1>
+            <span className={styles.heroCount}>{characters.length}</span>
+          </div>
+          <p className={styles.heroSubtle}>管理人物设定、音色与角色参考图</p>
+        </div>
+        <div className={styles.heroActions}>
+          <div className={styles.heroStat}>
+            <span>已入库角色</span>
+            <strong>{characters.length}</strong>
+          </div>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+            新建角色
+          </Button>
+        </div>
       </div>
 
       {characters.length === 0 ? (
-        <Empty
-          description="还没有任何角色"
-          className={styles.empty}
-        >
-          <Button type="primary" onClick={openCreateModal}>
-            创建第一个角色
-          </Button>
-        </Empty>
+        <div className={styles.emptyPanel}>
+          <Empty
+            description="还没有任何角色"
+            className={styles.empty}
+          >
+            <Button type="primary" onClick={openCreateModal}>
+              创建第一个角色
+            </Button>
+          </Empty>
+        </div>
       ) : (
-        <Row gutter={[24, 24]}>
-          {characters.map(character => (
-            <CharacterCardItem
-              key={character.id}
-              character={character}
-              onEdit={openEditModal}
-              onDelete={handleDeleteCharacter}
-            />
-          ))}
-        </Row>
+        <div className={styles.sectionPanel}>
+          <Row gutter={[24, 24]} className={styles.gridRow}>
+            {characters.map(character => (
+              <CharacterCardItem
+                key={character.id}
+                character={character}
+                onEdit={openEditModal}
+                onDelete={handleDeleteCharacter}
+              />
+            ))}
+          </Row>
+        </div>
       )}
 
       <Modal
-        className={`premium-modal ${styles.editModal}`}
-        title={editingCharacter ? '编辑角色' : '新建角色'}
+        className={styles.editModal}
+        title={null}
         open={modalVisible}
-        onOk={editingCharacter ? handleUpdateCharacter : handleCreateCharacter}
         onCancel={() => {
           setModalVisible(false);
           resetForm();
         }}
-        okText="确定"
-        cancelText="取消"
-        width={600}
-        confirmLoading={generating}
-        destroyOnHidden
-      >
-        <div className={styles.formItem}>
-          <label>角色名称</label>
-          <Input
-            placeholder="请输入角色名称"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          />
-        </div>
-
-        <div className={styles.formItem}>
-          <label>角色描述</label>
-          <TextArea
-            placeholder="描述角色的外貌特征、性格等..."
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            rows={4}
-          />
-        </div>
-
-        <div className={styles.formItem}>
-          <label>音色</label>
-          <div className={styles.voiceInputWrapper}>
-            <TextArea
-              placeholder="请输入音色描述，例如：温柔女声、成熟男声..."
-              value={formData.voiceType}
-              onChange={(e) => setFormData({ ...formData, voiceType: e.target.value })}
-              rows={4}
-            />
+        footer={
+          <div className={styles.editorModalFooter}>
             <Button
-              type="default"
-              icon={optimizingVoice ? <LoadingOutlined /> : <ThunderboltOutlined />}
-              onClick={handleOptimizeVoice}
-              disabled={optimizingVoice || !formData.description.trim()}
-              className={styles.optimizeVoiceButton}
+              onClick={() => {
+                setModalVisible(false);
+                resetForm();
+              }}
             >
-              {optimizingVoice ? '优化中...' : 'AI优化'}
+              取消
+            </Button>
+            <Button
+              type="primary"
+              loading={generating}
+              onClick={editingCharacter ? handleUpdateCharacter : handleCreateCharacter}
+            >
+              {editingCharacter ? '保存角色' : '创建角色'}
             </Button>
           </div>
-        </div>
-
-        <div className={styles.formItem}>
-          <label>参考图像</label>
-          <div className={styles.imageActions}>
-            <Upload
-              accept="image/*"
-              showUploadList={false}
-              beforeUpload={handleUpload}
-            >
-              <Button icon={<UploadOutlined />}>上传图片</Button>
-            </Upload>
+        }
+        width={920}
+        destroyOnHidden
+      >
+        <div className={styles.editorModalHead}>
+          <EditOutlined className={styles.modalHeadIcon} />
+          <div className={styles.modalHeadText}>
+            <div className={styles.modalHeadTitle}>{editingCharacter ? '编辑角色' : '新建角色'}</div>
+            <div className={styles.modalHeadSubtitle}>维护角色名称、设定、音色与参考图资产</div>
           </div>
-          {formData.referenceImage && (
-            <div 
-              className={styles.imagePreviewSquare}
-              onClick={() => firePreview(formData.referenceImage)}
-            >
-              <img src={formData.referenceImage} alt="预览" />
-              <div className={styles.previewOverlay}>
-                <EyeOutlined />
+        </div>
+        <div className={styles.editorModalBody}>
+          <div className={styles.editorFormGrid}>
+            <div className={`${styles.formCard} ${styles.editorMainCard}`}>
+              <div className={styles.editorSectionHead}>
+                <div>
+                  <div className={styles.editorSectionTitle}>角色信息</div>
+                  <div className={styles.editorSectionHint}>优先整理角色名称、性格与人物设定</div>
+                </div>
+              </div>
+              <div className={styles.formItem}>
+                <label>角色名称</label>
+                <Input
+                  placeholder="请输入角色名称"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+
+              <div className={styles.formItem}>
+                <label>角色描述</label>
+                <TextArea
+                  placeholder="描述角色的外貌特征、性格等..."
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={8}
+                />
+              </div>
+
+              <div className={styles.formItem}>
+                <div className={styles.formLabelRow}>
+                  <label>音色</label>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={optimizingVoice ? <LoadingOutlined /> : <ThunderboltOutlined />}
+                    onClick={handleOptimizeVoice}
+                    disabled={optimizingVoice || !formData.description.trim()}
+                    className={styles.optimizeVoiceButton}
+                  >
+                    {optimizingVoice ? '优化中...' : 'AI优化'}
+                  </Button>
+                </div>
+                <TextArea
+                  placeholder="请输入音色描述，例如：温柔女声、成熟男声..."
+                  value={formData.voiceType}
+                  onChange={(e) => setFormData({ ...formData, voiceType: e.target.value })}
+                  rows={5}
+                />
               </div>
             </div>
-          )}
+
+            <div className={`${styles.formCard} ${styles.editorSideCard}`}>
+              <div className={styles.editorSectionHead}>
+                <div>
+                  <div className={styles.editorSectionTitle}>参考图</div>
+                  <div className={styles.editorSectionHint}>上传角色参考图，用于后续识别与预览</div>
+                </div>
+              </div>
+              <div className={styles.imageActions}>
+                <Upload
+                  accept="image/*"
+                  showUploadList={false}
+                  beforeUpload={handleUpload}
+                >
+                  <Button icon={<UploadOutlined />}>上传图片</Button>
+                </Upload>
+              </div>
+              {formData.referenceImage ? (
+                <div
+                  className={styles.imagePreviewPanel}
+                  onClick={() => firePreview(formData.referenceImage)}
+                >
+                  <img src={formData.referenceImage} alt="预览" />
+                  <div className={styles.previewOverlay}>
+                    <EyeOutlined />
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.emptyPreviewPanel}>
+                  暂无参考图
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </Modal>
 

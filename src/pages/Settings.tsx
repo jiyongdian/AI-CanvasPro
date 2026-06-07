@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Input, Button, message, Modal, Progress, Slider, Tag, Tooltip, Checkbox, Empty, Spin } from 'antd';
+import { Input, Button, Modal, Progress, Slider, Tag, Tooltip, Checkbox, Empty, Spin } from 'antd';
+import { appMessage as message } from '../utils/antdApp';
 import {
   PlusOutlined, DeleteOutlined, ApiOutlined, FolderOpenOutlined,
   CloudDownloadOutlined, ReloadOutlined,
@@ -162,61 +163,78 @@ const Settings: React.FC = () => {
   return (
     <div className={styles.container}>
 
-      {/* ======== 右上角系统设置按钮 ======== */}
-      <Tooltip title="系统设置">
-        <Button
-          shape="circle"
-          icon={<SettingOutlined />}
-          className={styles.sysFloatBtn}
-          onClick={() => setSysOpen(true)}
-        />
-      </Tooltip>
+      <div className={styles.hero}>
+        <div className={styles.heroMain}>
+          <div className={styles.heroTitleRow}>
+            <h1>设置</h1>
+            <span className={styles.heroCount}>{providers.length}</span>
+          </div>
+          <p className={styles.heroSubtle}>集中管理 API 平台、系统参数与下载配置</p>
+        </div>
+        <div className={styles.heroActions}>
+          <div className={styles.heroStat}>
+            <span>已连接平台</span>
+            <strong>{providers.length}</strong>
+          </div>
+          <Tooltip title="系统设置">
+            <Button
+              icon={<SettingOutlined />}
+              className={styles.sysBtn}
+              onClick={() => setSysOpen(true)}
+            >
+              系统设置
+            </Button>
+          </Tooltip>
+        </div>
+      </div>
 
       {/* ======== API 平台 ======== */}
       <div className={styles.apiSection}>
-        <div className={styles.sectionHead}>
-          <div className={styles.sectionHeadL}>
-            <ThunderboltOutlined className={styles.sectionHeadIcon} />
-            <h2 className={styles.sectionTitle}>第三方API平台</h2>
-            {providers.length > 0 && <span className={styles.countBadge}>{providers.length} 个平台</span>}
+        <div className={styles.sectionPanel}>
+          <div className={styles.sectionHead}>
+            <div className={styles.sectionHeadL}>
+              <ThunderboltOutlined className={styles.sectionHeadIcon} />
+              <h2 className={styles.sectionTitle}>第三方API平台</h2>
+              {providers.length > 0 && <span className={styles.countBadge}>{providers.length} 个平台</span>}
+            </div>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openAdd} className={styles.addBtn}>添加API</Button>
           </div>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openAdd} className={styles.addBtn}>添加API</Button>
-        </div>
 
-        {providersLoading ? <div className={styles.loadingWrap}><Spin /></div>
-        : providers.length === 0 ? (
-          <div className={styles.emptyBox}>
-            <div className={styles.emptyIcon}><ApiOutlined style={{fontSize:52}} /></div>
-            <Empty description="暂无API平台配置" />
-            <Button type="primary" icon={<PlusOutlined />} onClick={openAdd} style={{marginTop:16}}>添加第一个API平台</Button>
-          </div>
-        ) : (
-          <div className={styles.cardList}>
-            {providers.map(p => (
-              <div key={p.id} className={styles.apiCard}>
-                <div className={styles.apiCardTop}>
-                  <div className={styles.apiLogo}><ApiOutlined className={styles.apiLogoIcon} /></div>
-                  <div className={styles.apiNameBlock}>
-                    <span className={styles.apiName}>{p.name}</span>
-                    <span className={styles.apiCount}>{p.models.length > 0 ? `${p.models.length} 个模型` : '无模型'}</span>
+          {providersLoading ? <div className={styles.loadingWrap}><Spin /></div>
+          : providers.length === 0 ? (
+            <div className={styles.emptyBox}>
+              <div className={styles.emptyIcon}><ApiOutlined style={{fontSize:52}} /></div>
+              <Empty description="暂无API平台配置" />
+              <Button type="primary" icon={<PlusOutlined />} onClick={openAdd} style={{marginTop:16}}>添加第一个API平台</Button>
+            </div>
+          ) : (
+            <div className={styles.cardList}>
+              {providers.map(p => (
+                <div key={p.id} className={styles.apiCard}>
+                  <div className={styles.apiCardTop}>
+                    <div className={styles.apiLogo}><ApiOutlined className={styles.apiLogoIcon} /></div>
+                    <div className={styles.apiNameBlock}>
+                      <span className={styles.apiName}>{p.name}</span>
+                      <span className={styles.apiCount}>{p.models.length > 0 ? `${p.models.length} 个模型` : '无模型'}</span>
+                    </div>
+                    <div className={styles.apiActions}>
+                      <Tooltip title="编辑"><Button type="text" size="small" icon={<EditOutlined />} onClick={()=>openEdit(p)} className={styles.actBtn} /></Tooltip>
+                      <Tooltip title="删除"><Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={()=>setDeleteTarget(p)} className={styles.actBtn} /></Tooltip>
+                    </div>
                   </div>
-                  <div className={styles.apiActions}>
-                    <Tooltip title="编辑"><Button type="text" size="small" icon={<EditOutlined />} onClick={()=>openEdit(p)} className={styles.actBtn} /></Tooltip>
-                    <Tooltip title="删除"><Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={()=>setDeleteTarget(p)} className={styles.actBtn} /></Tooltip>
+                  <div className={styles.apiCardBody}>
+                    <div className={styles.apiRow}><LinkOutlined className={styles.apiRowIcon} /><span className={styles.apiRowText} title={p.apiUrl}>{maskUrl(p.apiUrl)}</span></div>
+                    <div className={styles.apiRow}><KeyOutlined className={styles.apiRowIcon} /><span className={styles.apiRowText}>{maskKey(p.apiKey)}</span></div>
+                    <div className={styles.apiModels}>
+                      {p.models.length===0 ? <span className={styles.noModels}>尚未选择模型，点击编辑后可拉取</span>
+                      : <div className={styles.tagWrap}>{p.models.slice(0,8).map(m=><Tag key={m.id} color={CAT_COLOR[m.category]} className={styles.modelTag}>{m.id}</Tag>)}{p.models.length>8&&<Tag className={styles.tagMore}>+{p.models.length-8}</Tag>}</div>}
+                    </div>
                   </div>
                 </div>
-                <div className={styles.apiCardBody}>
-                  <div className={styles.apiRow}><LinkOutlined className={styles.apiRowIcon} /><span className={styles.apiRowText} title={p.apiUrl}>{maskUrl(p.apiUrl)}</span></div>
-                  <div className={styles.apiRow}><KeyOutlined className={styles.apiRowIcon} /><span className={styles.apiRowText}>{maskKey(p.apiKey)}</span></div>
-                  <div className={styles.apiModels}>
-                    {p.models.length===0 ? <span className={styles.noModels}>尚未选择模型 — 点击编辑并拉取</span>
-                    : <div className={styles.tagWrap}>{p.models.slice(0,8).map(m=><Tag key={m.id} color={CAT_COLOR[m.category]} className={styles.modelTag}>{m.id}</Tag>)}{p.models.length>8&&<Tag className={styles.tagMore}>+{p.models.length-8}</Tag>}</div>}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ======== 统一系统设置弹窗 ======== */}
@@ -411,8 +429,34 @@ const Settings: React.FC = () => {
       </Modal>
 
       {/* ======== 删除确认 ======== */}
-      <Modal title="确认删除" open={!!deleteTarget} onCancel={()=>setDeleteTarget(null)} onOk={delProvider} okText="删除" cancelText="取消" okButtonProps={{danger:true}} centered width={400} zIndex={1100}>
-        <div className={styles.delBody}>确定要删除API平台 <strong>{deleteTarget?.name}</strong> 吗？<br />删除后，依赖该平台的生成任务将无法正常工作。</div>
+      <Modal
+        title={null}
+        open={!!deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        footer={null}
+        centered
+        width={440}
+        zIndex={1100}
+        className={styles.deleteModal}
+      >
+        <div className={styles.deleteModalWrap}>
+          <div className={styles.deleteModalHead}>
+            <div className={styles.deleteModalIcon}><DeleteOutlined /></div>
+            <div className={styles.deleteModalText}>
+              <div className={styles.deleteModalTitle}>确认删除 API 平台</div>
+              <div className={styles.deleteModalSubtitle}>删除后，依赖该平台的生成任务将无法正常工作</div>
+            </div>
+          </div>
+          <div className={styles.deleteModalBody}>
+            <div className={styles.delBody}>
+              确定要删除 API 平台 <strong>{deleteTarget?.name}</strong> 吗？
+            </div>
+          </div>
+          <div className={styles.deleteModalFooter}>
+            <Button onClick={() => setDeleteTarget(null)}>取消</Button>
+            <Button danger type="primary" onClick={delProvider}>删除</Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

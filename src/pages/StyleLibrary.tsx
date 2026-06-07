@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useEffect, useState, useCallback, memo } from 'react';
-import { Card, Button, Modal, Input, Empty, Spin, message, Row, Col, Popconfirm, Upload } from 'antd';
+import { Card, Button, Modal, Input, Empty, Spin, Row, Col, Popconfirm, Upload } from 'antd';
+import { appMessage as message } from '../utils/antdApp';
 import { PlusOutlined, DeleteOutlined, EditOutlined, UploadOutlined, RobotOutlined, EyeOutlined, FormatPainterOutlined } from '@ant-design/icons';
 import { v4 as uuidv4 } from 'uuid';
 import { getAllStyles, saveStyle, deleteStyle as deleteStyleFromDB } from '../services/database';
@@ -47,6 +48,7 @@ const StyleCardItem = memo<StyleCardItemProps>(({ style: styleItem, onPreview, o
                 <FormatPainterOutlined style={{ fontSize: 36, opacity: 0.3 }} />
               </div>
             )}
+            <div className={styles.cardCoverBadge}>{thumb ? '风格预览' : '风格封面'}</div>
             <div className={styles.styleName}>{styleItem.name}</div>
           </div>
         }
@@ -63,9 +65,17 @@ const StyleCardItem = memo<StyleCardItemProps>(({ style: styleItem, onPreview, o
           </Popconfirm>,
         ]}
       >
-        <Card.Meta
-          description={styleItem.description || '暂无描述'}
-        />
+        <div className={styles.styleCardBody}>
+          <div className={styles.styleCardTitleRow}>
+            <div className={styles.styleCardTitle}>{styleItem.name}</div>
+            <span className={styles.styleCardChip}>{thumb ? '有参考图' : '无参考图'}</span>
+          </div>
+          <div className={styles.styleCardDesc}>{styleItem.description || '暂无描述'}</div>
+          <div className={styles.styleMetaRow}>
+            <span className={styles.styleMetaItem}>{thumb ? '可预览' : '纯文字风格'}</span>
+            <span className={styles.styleMetaItem}>风格设定</span>
+          </div>
+        </div>
       </Card>
     </Col>
   );
@@ -330,128 +340,208 @@ const StyleLibrary: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h1>风格库</h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-          新建风格
-        </Button>
+      <div className={styles.hero}>
+        <div className={styles.heroMain}>
+          <div className={styles.heroTitleRow}>
+            <h1>风格库</h1>
+            <span className={styles.heroCount}>{styleList.length}</span>
+          </div>
+          <p className={styles.heroSubtle}>统一管理画面风格、参考图与描述资产</p>
+        </div>
+        <div className={styles.heroActions}>
+          <div className={styles.heroStat}>
+            <span>已保存风格</span>
+            <strong>{styleList.length}</strong>
+          </div>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+            新建风格
+          </Button>
+        </div>
       </div>
 
       {styleList.length === 0 ? (
-        <Empty
-          description="还没有任何风格"
-          className={styles.empty}
-        >
-          <Button type="primary" onClick={openCreateModal}>
-            创建第一个风格
-          </Button>
-        </Empty>
+        <div className={styles.emptyPanel}>
+          <Empty
+            description="还没有任何风格"
+            className={styles.empty}
+          >
+            <Button type="primary" onClick={openCreateModal}>
+              创建第一个风格
+            </Button>
+          </Empty>
+        </div>
       ) : (
-        <Row gutter={[24, 24]}>
-          {styleList.map(styleItem => (
-            <StyleCardItem
-              key={styleItem.id}
-              style={styleItem}
-              onPreview={handlePreviewImage}
-              onEdit={openEditModal}
-              onDelete={handleDeleteStyle}
-            />
-          ))}
-        </Row>
+        <div className={styles.sectionPanel}>
+          <Row gutter={[24, 24]} className={styles.gridRow}>
+            {styleList.map(styleItem => (
+              <StyleCardItem
+                key={styleItem.id}
+                style={styleItem}
+                onPreview={handlePreviewImage}
+                onEdit={openEditModal}
+                onDelete={handleDeleteStyle}
+              />
+            ))}
+          </Row>
+        </div>
       )}
 
       <Modal
-        className="premium-modal"
-        title={editingStyle ? '编辑风格' : '新建风格'}
+        className={styles.editModal}
+        title={null}
         open={modalVisible}
-        onOk={editingStyle ? handleUpdateStyle : handleCreateStyle}
         onCancel={() => {
           setModalVisible(false);
           resetForm();
         }}
-        okText="确定"
-        cancelText="取消"
-        width={600}
-        confirmLoading={generating}
+        footer={
+          <div className={styles.editorModalFooter}>
+            <Button
+              onClick={() => {
+                setModalVisible(false);
+                resetForm();
+              }}
+            >
+              取消
+            </Button>
+            <Button
+              type="primary"
+              loading={generating}
+              onClick={editingStyle ? handleUpdateStyle : handleCreateStyle}
+            >
+              {editingStyle ? '保存风格' : '创建风格'}
+            </Button>
+          </div>
+        }
+        width={920}
         forceRender
         destroyOnHidden={false}
       >
-        <div className={styles.formItem}>
-          <label>风格名称</label>
-          <Input
-            placeholder="请输入风格名称"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          />
-        </div>
-
-        <div className={styles.formItem}>
-          <label>风格描述</label>
-          <TextArea
-            placeholder="描述风格的特征，例如：赛博朋克风格，霓虹灯光，未来城市..."
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            rows={4}
-          />
-          <Button
-            icon={<RobotOutlined />}
-            size="small"
-            loading={optimizing}
-            onClick={handleOptimizeDescription}
-            style={{ marginTop: 8 }}
-            disabled={!formData.description.trim()}
-          >
-            AI优化描述
-          </Button>
-        </div>
-
-        <div className={styles.formItem}>
-          <label>参考图像（可选）</label>
-          <div className={styles.imageActions}>
-            <Upload
-              accept="image/*"
-              showUploadList={false}
-              beforeUpload={handleUpload}
-            >
-              <Button icon={<UploadOutlined />}>上传图片</Button>
-            </Upload>
-            <Button
-              icon={<RobotOutlined />}
-              onClick={handleGenerateImage}
-              loading={generating}
-            >
-              AI生成
-            </Button>
+        <div className={styles.editorModalHead}>
+          <EditOutlined className={styles.modalHeadIcon} />
+          <div className={styles.modalHeadText}>
+            <div className={styles.modalHeadTitle}>{editingStyle ? '编辑风格' : '新建风格'}</div>
+            <div className={styles.modalHeadSubtitle}>统一维护风格名称、描述与参考图素材</div>
           </div>
-          {formData.referenceImage && (
-            <div 
-              className={styles.imagePreviewSquare}
-              onClick={() => setPreviewVisible(true)}
-            >
-              <img src={formData.referenceImage} alt="预览" />
-              <div className={styles.previewOverlay}>
-                <EyeOutlined />
+        </div>
+        <div className={styles.editorModalBody}>
+          <div className={styles.editorFormGrid}>
+            <div className={`${styles.formCard} ${styles.editorMainCard}`}>
+              <div className={styles.editorSectionHead}>
+                <div>
+                  <div className={styles.editorSectionTitle}>风格信息</div>
+                  <div className={styles.editorSectionHint}>先确定风格名称，再整理描述内容与关键词</div>
+                </div>
+              </div>
+              <div className={styles.formItem}>
+                <label>风格名称</label>
+                <Input
+                  placeholder="请输入风格名称"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+
+              <div className={styles.formItem}>
+                <div className={styles.formLabelRow}>
+                  <label>风格描述</label>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<RobotOutlined />}
+                    loading={optimizing}
+                    onClick={handleOptimizeDescription}
+                    disabled={!formData.description.trim()}
+                    className={styles.optimizeButton}
+                  >
+                    AI优化
+                  </Button>
+                </div>
+                <TextArea
+                  placeholder="描述风格的特征，例如：赛博朋克风格，霓虹灯光，未来城市..."
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={12}
+                />
               </div>
             </div>
-          )}
+
+            <div className={`${styles.formCard} ${styles.editorSideCard}`}>
+              <div className={styles.editorSectionHead}>
+                <div>
+                  <div className={styles.editorSectionTitle}>参考图像</div>
+                  <div className={styles.editorSectionHint}>可上传或 AI 生成风格参考图，作为预览素材</div>
+                </div>
+              </div>
+              <div className={styles.imageActions}>
+                <Upload
+                  accept="image/*"
+                  showUploadList={false}
+                  beforeUpload={handleUpload}
+                >
+                  <Button icon={<UploadOutlined />}>上传图片</Button>
+                </Upload>
+                <Button
+                  icon={<RobotOutlined />}
+                  onClick={handleGenerateImage}
+                  loading={generating}
+                >
+                  AI生成
+                </Button>
+              </div>
+              {formData.referenceImage ? (
+                <div
+                  className={styles.imagePreviewPanel}
+                  onClick={() => setPreviewVisible(true)}
+                >
+                  <img src={formData.referenceImage} alt="预览" />
+                  <div className={styles.previewOverlay}>
+                    <EyeOutlined />
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.emptyPreviewPanel}>
+                  暂无参考图
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </Modal>
 
       <Modal
         open={previewVisible}
-        footer={null}
+        footer={
+          <div className={styles.previewModalFooter}>
+            <Button onClick={() => setPreviewVisible(false)}>关闭</Button>
+          </div>
+        }
         onCancel={() => setPreviewVisible(false)}
         centered
-        width="auto"
+        width={760}
         destroyOnHidden
         className={styles.previewModal}
+        title={null}
       >
         {previewVisible && (
-          <img 
-            src={previewImage || formData.referenceImage} 
-            alt="预览" 
-            style={{ maxWidth: '80vw', maxHeight: '80vh' }}
-          />
+          <div className={styles.previewContent}>
+            <div className={styles.previewHeader}>
+              <div className={styles.modalHeadGroup}>
+                <EyeOutlined className={styles.modalHeadIcon} />
+                <div className={styles.modalHeadText}>
+                  <div className={styles.modalHeadTitle}>风格预览</div>
+                  <div className={styles.modalHeadSubtitle}>查看风格参考图的大图细节</div>
+                </div>
+              </div>
+            </div>
+            <div className={styles.previewMediaWrap}>
+              <img
+                src={previewImage || formData.referenceImage}
+                alt="预览"
+                className={styles.previewImage}
+              />
+            </div>
+          </div>
         )}
       </Modal>
     </div>

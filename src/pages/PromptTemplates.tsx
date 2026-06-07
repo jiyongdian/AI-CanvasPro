@@ -3,8 +3,9 @@
  * 卡片式UI，模仿角色库/风格库设计风格
  */
 import * as React from 'react';
-import { useEffect, useState, useCallback, memo } from 'react';
-import { Card, Button, Modal, Input, Empty, Spin, message, Row, Col, Popconfirm, Select, Tag } from 'antd';
+import { useEffect, useState, useCallback, useMemo, memo } from 'react';
+import { Card, Button, Modal, Input, Empty, Spin, Row, Col, Popconfirm, Select } from 'antd';
+import { appMessage as message } from '../utils/antdApp';
 import { PlusOutlined, DeleteOutlined, EditOutlined, PictureOutlined, VideoCameraOutlined, FundViewOutlined, CopyOutlined, ExpandOutlined } from '@ant-design/icons';
 import { FullscreenPromptEditor } from '../components/common';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,6 +23,7 @@ const TYPE_LABELS: Record<string, string> = {
   image: '图片',
   video: '视频',
   director: '导演',
+  script: '脚本',
 };
 
 // ── 卡片组件 ──
@@ -33,12 +35,35 @@ interface TemplateCardItemProps {
 }
 
 const TemplateCardItem = memo<TemplateCardItemProps>(({ template, onEdit, onDelete, onPreview }) => {
-  const isImage = template.type === 'image';
-  const isDirector = template.type === 'director';
-  const cardTypeClass = isDirector ? styles.cardDirector : (isImage ? styles.cardImage : styles.cardVideo);
-  const coverTypeClass = isDirector ? styles.coverDirector : (isImage ? styles.coverImage : styles.coverVideo);
-  const ringTypeClass = isDirector ? styles.ringDirector : (isImage ? styles.ringImage : styles.ringVideo);
-  const tagColor = isDirector ? 'gold' : (isImage ? 'blue' : 'green');
+  const themeClassMap: Record<PromptTemplate['type'], string> = {
+    image: styles.cardImage,
+    video: styles.cardVideo,
+    director: styles.cardDirector,
+    script: styles.cardScript,
+  };
+  const coverClassMap: Record<PromptTemplate['type'], string> = {
+    image: styles.coverImage,
+    video: styles.coverVideo,
+    director: styles.coverDirector,
+    script: styles.coverScript,
+  };
+  const ringClassMap: Record<PromptTemplate['type'], string> = {
+    image: styles.ringImage,
+    video: styles.ringVideo,
+    director: styles.ringDirector,
+    script: styles.ringScript,
+  };
+  const cardTypeClass = themeClassMap[template.type];
+  const coverTypeClass = coverClassMap[template.type];
+  const ringTypeClass = ringClassMap[template.type];
+  const negativeLength = (template.negative_prompt || '').trim().length;
+  const promptPreview = template.positive_prompt || '暂无正向提示词';
+  const typeHintMap: Record<PromptTemplate['type'], string> = {
+    image: '视觉构图与画面描述',
+    video: '镜头节奏与动态指令',
+    director: '场景调度与导演表达',
+    script: '文本结构与叙事框架',
+  };
   return (
     <Col xs={24} sm={12} md={8} lg={6}>
       <Card
@@ -48,24 +73,35 @@ const TemplateCardItem = memo<TemplateCardItemProps>(({ template, onEdit, onDele
         cover={
           <div className={`${styles.cardCover} ${coverTypeClass}`}>
             <div className={styles.cardCoverBg} />
-            <div className={styles.cardIconWrapper}>
-              <div className={`${styles.cardIconRing} ${ringTypeClass}`}>
-                {isDirector ? (
+            <div className={styles.cardAura} />
+            <div className={styles.cardNoise} />
+            <div className={styles.cardTopMeta}>
+              <span className={styles.cardTopMetaLabel}>PROMPT ATLAS</span>
+              <span className={styles.cardTopMetaValue}>{TYPE_LABELS[template.type]}</span>
+            </div>
+            <div className={styles.cardHero}>
+              <div className={styles.cardIconWrapper}>
+                <div className={`${styles.cardIconRing} ${ringTypeClass}`}>
+                  {template.type === 'director' ? (
                   <FundViewOutlined className={styles.cardIcon} />
-                ) : isImage ? (
+                  ) : template.type === 'image' ? (
                   <PictureOutlined className={styles.cardIcon} />
+                  ) : template.type === 'script' ? (
+                  <CopyOutlined className={styles.cardIcon} />
                 ) : (
                   <VideoCameraOutlined className={styles.cardIcon} />
-                )}
+                  )}
+                </div>
+              </div>
+              <div className={styles.cardHeroText}>
+                <div className={styles.cardName}>{template.name}</div>
+                <div className={styles.cardHint}>{typeHintMap[template.type]}</div>
               </div>
             </div>
-            <div className={styles.cardName}>{template.name}</div>
-            <Tag
-              color={tagColor}
-              className={styles.cardTypeBadge}
-            >
-              {TYPE_LABELS[template.type]}
-            </Tag>
+            <div className={styles.cardStats}>
+              <span className={styles.cardStatChip}>{negativeLength > 0 ? '含负向约束' : '纯正向模板'}</span>
+              <span className={styles.cardStatChip}>点击预览</span>
+            </div>
           </div>
         }
         actions={[
@@ -81,13 +117,13 @@ const TemplateCardItem = memo<TemplateCardItemProps>(({ template, onEdit, onDele
           </Popconfirm>,
         ]}
       >
-        <Card.Meta
-          description={
-            <div className={styles.cardMetaDesc}>
-              {template.positive_prompt || '暂无正向提示词'}
-            </div>
-          }
-        />
+        <div className={styles.cardContent}>
+          <div className={styles.cardMetaDesc}>{promptPreview}</div>
+          <div className={styles.cardContentFooter}>
+            <span className={styles.cardFooterChip}>{negativeLength > 0 ? '含负向约束' : '无负向约束'}</span>
+            <span className={styles.cardFooterChip}>点击查看全文</span>
+          </div>
+        </div>
       </Card>
     </Col>
   );
@@ -115,6 +151,11 @@ const PromptTemplates: React.FC = () => {
     positive_prompt: '',
     negative_prompt: '',
   });
+
+  const typeCount = useMemo(() => {
+    const kinds = new Set(templates.map((template) => template.type));
+    return kinds.size;
+  }, [templates]);
 
   useEffect(() => {
     loadTemplates();
@@ -230,114 +271,161 @@ const PromptTemplates: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h1>提示词库</h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-          新增模板
-        </Button>
+      <div className={styles.hero}>
+        <div className={styles.heroMain}>
+          <div className={styles.heroTitleRow}>
+            <h1>提示词库</h1>
+            <span className={styles.heroCount}>{templates.length}</span>
+          </div>
+          <p className={styles.heroSubtle}>统一管理图片、视频、导演与脚本模板</p>
+        </div>
+        <div className={styles.heroActions}>
+          <div className={styles.heroStat}>
+            <span>模板类型</span>
+            <strong>{typeCount}</strong>
+          </div>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+            新增模板
+          </Button>
+        </div>
       </div>
 
       {templates.length === 0 ? (
-        <Empty
-          description="还没有任何提示词模板"
-          className={styles.empty}
-        >
-          <Button type="primary" onClick={openCreateModal}>
-            创建第一个模板
-          </Button>
-        </Empty>
+        <div className={styles.emptyPanel}>
+          <Empty
+            description="还没有任何提示词模板"
+            className={styles.empty}
+          >
+            <Button type="primary" onClick={openCreateModal}>
+              创建第一个模板
+            </Button>
+          </Empty>
+        </div>
       ) : (
-        <Row gutter={[24, 24]}>
-          {templates.map((template) => (
-            <TemplateCardItem
-              key={template.id}
-              template={template}
-              onEdit={openEditModal}
-              onDelete={handleDelete}
-              onPreview={setPreviewTemplate}
-            />
-          ))}
-        </Row>
+        <div className={styles.sectionPanel}>
+          <Row gutter={[24, 24]} className={styles.gridRow}>
+            {templates.map((template) => (
+              <TemplateCardItem
+                key={template.id}
+                template={template}
+                onEdit={openEditModal}
+                onDelete={handleDelete}
+                onPreview={setPreviewTemplate}
+              />
+            ))}
+          </Row>
+        </div>
       )}
 
       <Modal
-        className="premium-modal"
-        title={editingTemplate ? '编辑模板' : '新增模板'}
+        className={styles.editorModal}
+        title={null}
         open={modalVisible}
-        onOk={handleSave}
         onCancel={() => {
           setModalVisible(false);
           resetForm();
         }}
-        okText="保存"
-        cancelText="取消"
-        width={600}
+        footer={
+          <div className={styles.editorModalFooter}>
+            <Button
+              onClick={() => {
+                setModalVisible(false);
+                resetForm();
+              }}
+            >
+              取消
+            </Button>
+            <Button type="primary" onClick={handleSave}>
+              保存模板
+            </Button>
+          </div>
+        }
+        width={920}
+        centered
         destroyOnHidden
       >
-        <div className={styles.formItem}>
-          <label>模板名称</label>
-          <Input
-            placeholder="请输入模板名称"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          />
-        </div>
-
-        <div className={styles.formItem}>
-          <label>模板类型</label>
-          <Select
-            value={formData.type}
-            onChange={(value) => setFormData({ ...formData, type: value })}
-            options={[
-              { label: '图片', value: 'image' },
-              { label: '视频', value: 'video' },
-              { label: '导演', value: 'director' },
-              { label: '脚本', value: 'script' },
-            ]}
-            style={{ width: '100%' }}
-          />
-        </div>
-
-        <div className={styles.formItem}>
-          <div className={styles.formLabelRow}>
-            <label>正向提示词</label>
-            <Button
-              type="text"
-              size="small"
-              icon={<ExpandOutlined />}
-              onClick={() => setFullscreenField('positive')}
-              className={styles.expandBtn}
-            >
-              放大编辑
-            </Button>
+        <div className={styles.editorModalHead}>
+          <EditOutlined className={styles.modalHeadIcon} />
+          <div className={styles.modalHeadText}>
+            <div className={styles.modalHeadTitle}>{editingTemplate ? '编辑提示词模板' : '新建提示词模板'}</div>
+            <div className={styles.modalHeadSubtitle}>统一维护模板名称、类型与正反向提示词内容</div>
           </div>
-          <TextArea
-            placeholder="请输入正向提示词"
-            value={formData.positive_prompt}
-            onChange={(e) => setFormData({ ...formData, positive_prompt: e.target.value })}
-            rows={4}
-          />
         </div>
-
-        <div className={styles.formItem}>
-          <div className={styles.formLabelRow}>
-            <label>反向提示词</label>
-            <Button
-              type="text"
-              size="small"
-              icon={<ExpandOutlined />}
-              onClick={() => setFullscreenField('negative')}
-              className={styles.expandBtn}
-            >
-              放大编辑
-            </Button>
+        <div className={styles.editorModalBody}>
+          <div className={`${styles.formItem} ${styles.formCard} ${styles.editorMetaCard}`}>
+            <div className={styles.editorSectionHead}>
+              <div className={styles.editorSectionTitle}>基础信息</div>
+              <div className={styles.editorSectionHint}>先确定模板名称与类型，再编辑正反向提示词</div>
+            </div>
+            <div className={styles.formGrid}>
+              <div className={styles.formGridField}>
+                <label>模板名称</label>
+                <Input
+                  placeholder="请输入模板名称"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className={styles.formGridField}>
+                <label>模板类型</label>
+                <Select
+                  value={formData.type}
+                  onChange={(value) => setFormData({ ...formData, type: value })}
+                  options={[
+                    { label: '图片', value: 'image' },
+                    { label: '视频', value: 'video' },
+                    { label: '导演', value: 'director' },
+                    { label: '脚本', value: 'script' },
+                  ]}
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
           </div>
-          <TextArea
-            placeholder="请输入反向提示词（可选）"
-            value={formData.negative_prompt}
-            onChange={(e) => setFormData({ ...formData, negative_prompt: e.target.value })}
-            rows={3}
-          />
+
+          <div className={styles.editorPromptGrid}>
+            <div className={`${styles.formItem} ${styles.formCard} ${styles.promptPrimaryCard}`}>
+              <div className={styles.formLabelRow}>
+                <label>正向提示词</label>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<ExpandOutlined />}
+                  onClick={() => setFullscreenField('positive')}
+                  className={styles.expandBtn}
+                >
+                  放大编辑
+                </Button>
+              </div>
+              <TextArea
+                placeholder="请输入正向提示词"
+                value={formData.positive_prompt}
+                onChange={(e) => setFormData({ ...formData, positive_prompt: e.target.value })}
+                rows={10}
+              />
+            </div>
+
+            <div className={`${styles.formItem} ${styles.formCard} ${styles.promptSecondaryCard}`}>
+              <div className={styles.formLabelRow}>
+                <label>反向提示词</label>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<ExpandOutlined />}
+                  onClick={() => setFullscreenField('negative')}
+                  className={styles.expandBtn}
+                >
+                  放大编辑
+                </Button>
+              </div>
+              <TextArea
+                placeholder="请输入反向提示词（可选）"
+                value={formData.negative_prompt}
+                onChange={(e) => setFormData({ ...formData, negative_prompt: e.target.value })}
+                rows={8}
+              />
+            </div>
+          </div>
         </div>
       </Modal>
 
@@ -361,18 +449,33 @@ const PromptTemplates: React.FC = () => {
       <Modal
         open={previewTemplate !== null}
         onCancel={() => setPreviewTemplate(null)}
-        footer={null}
-        width={640}
+        footer={
+          <div className={styles.previewModalFooter}>
+            <Button onClick={() => setPreviewTemplate(null)}>关闭</Button>
+          </div>
+        }
+        width={760}
         centered
         className={styles.previewModal}
+        title={null}
       >
         {previewTemplate && (
           <div className={styles.previewContent}>
             <div className={styles.previewHeader}>
-              <span className={styles.previewName}>{previewTemplate.name}</span>
-              <Tag color={previewTemplate.type === 'director' ? 'gold' : (previewTemplate.type === 'image' ? 'blue' : 'green')}>
-                {TYPE_LABELS[previewTemplate.type]}
-              </Tag>
+              <div className={styles.modalHeadGroup}>
+                <CopyOutlined className={styles.modalHeadIcon} />
+                <div className={styles.modalHeadText}>
+                  <div className={styles.modalHeadTitle}>{previewTemplate.name}</div>
+                  <div className={styles.modalHeadSubtitle}>模板预览与提示词复制</div>
+                </div>
+              </div>
+              <span className={styles.previewTypeBadge}>{TYPE_LABELS[previewTemplate.type]}</span>
+            </div>
+            <div className={styles.previewMetaRow}>
+              <span className={styles.previewMetaChip}>正向 {previewTemplate.positive_prompt.trim().length}</span>
+              <span className={styles.previewMetaChip}>
+                {previewTemplate.negative_prompt?.trim() ? '含反向提示词' : '无反向提示词'}
+              </span>
             </div>
             <div className={styles.previewSection}>
               <div className={styles.previewLabelRow}>
