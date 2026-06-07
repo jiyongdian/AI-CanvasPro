@@ -250,8 +250,8 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
   return (
     <>
       <Modal title="场景管理" open={visible} onCancel={onClose} footer={null}
-        width="85vw" style={{ top: '5vh' }} bodyStyle={{ height: '72vh', overflow: 'auto' }}
-        forceRender destroyOnClose={false} className={styles.modal}>
+        width="85vw" style={{ top: '5vh' }} styles={{ body: { height: '72vh', overflow: 'auto' } }}
+        forceRender destroyOnHidden={false} className={styles.modal}>
         <div className={styles.headerBar}>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>创建场景</Button>
           <span style={{fontSize:13,color:'var(--text-tertiary)',marginLeft:12}}>{sceneLocations.length} 个场景</span>
@@ -296,7 +296,7 @@ const SceneManagerModal: React.FC<SceneManagerModalProps> = ({
         footer={[
           <Button key="cancel" onClick={() => setCreateOpen(false)}>取消</Button>,
           <Button key="save" type="primary" onClick={handleSaveScene} disabled={!createImage}>保存场景</Button>,
-        ]} width={680} centered forceRender destroyOnClose={false}>
+        ]} width={680} centered forceRender destroyOnHidden={false}>
         <div style={{display:'flex',flexDirection:'column',gap:16}}>
           <div>
             <label style={s.label}>场景描述</label>

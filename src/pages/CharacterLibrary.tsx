@@ -59,7 +59,7 @@ const CharacterPreviewModal: React.FC = () => {
       onCancel={() => setVisible(false)}
       centered
       width="auto"
-      destroyOnClose
+      destroyOnHidden
       className={styles.previewModal}
     >
       {visible && previewUrl && (
@@ -127,7 +127,7 @@ const CharacterCardItem = memo<CharacterCardItemProps>(({ character, onEdit, onD
             <DeleteOutlined />
           </Popconfirm>,
         ]}
-        bodyStyle={{ display: 'none' }}
+        styles={{ body: { display: 'none' } }}
       />
     </Col>
   );
@@ -432,7 +432,7 @@ const CharacterLibrary: React.FC = () => {
         cancelText="取消"
         width={600}
         confirmLoading={generating}
-        destroyOnClose
+        destroyOnHidden
       >
         <div className={styles.formItem}>
           <label>角色名称</label>

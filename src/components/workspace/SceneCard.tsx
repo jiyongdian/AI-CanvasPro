@@ -1383,7 +1383,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
         width="70%"
         centered
         forceRender
-        destroyOnClose={false}
+        destroyOnHidden={false}
         className={styles.tasksModal}
       >
         <div className={styles.tasksHeader}>
@@ -1480,7 +1480,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
         width="55%"
         centered
         forceRender
-        destroyOnClose={false}
+        destroyOnHidden={false}
         className={styles.tasksModal}
       >
         <div className={styles.tasksHeader}>
@@ -1576,7 +1576,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
         width="80%"
         centered
         forceRender
-        destroyOnClose={false}
+        destroyOnHidden={false}
         className={styles.previewModal}
         title={
           <div className={styles.previewModalHeader}>
@@ -1670,7 +1670,7 @@ const SceneCardComponent: React.FC<SceneCardProps> = ({
         width="75%"
         centered
         forceRender
-        destroyOnClose={false}
+        destroyOnHidden={false}
         className={styles.previewModal}
       >
         {selectedVideoIndex !== null && previewItems[selectedVideoIndex] ? (

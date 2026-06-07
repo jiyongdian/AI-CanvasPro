@@ -280,9 +280,9 @@ return (
       onCancel={onClose}
       width="75vw"
       style={{ top: '8vh' }}
-      bodyStyle={{ height: '65vh', overflow: 'auto', padding: '16px' }}
+      styles={{ body: { height: '65vh', overflow: 'auto', padding: '16px' } }}
       forceRender
-      destroyOnClose={false}
+      destroyOnHidden={false}
       footer={[
         <Button key="cancel" onClick={onClose}>取消</Button>,
         <Button 
@@ -393,7 +393,7 @@ return (
           width={700}
           centered
           forceRender
-          destroyOnClose={false}
+          destroyOnHidden={false}
         >
           <div className={styles.namingContainer}>
             <div className={styles.namingInputSection}>
@@ -448,7 +448,7 @@ return (
           width={600}
           centered
           forceRender
-          destroyOnClose={false}
+          destroyOnHidden={false}
         >
           <div className={styles.regenerateContainer}>
             <p className={styles.regenerateHint}>

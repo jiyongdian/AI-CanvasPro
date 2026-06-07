@@ -515,7 +515,7 @@ const ProjectList: React.FC = () => {
         style={{ top: '2.5vh', maxWidth: 1200 }}
         styles={{ body: { height: '85vh', overflow: 'auto' } }}
         forceRender
-        destroyOnClose={false}
+        destroyOnHidden={false}
       >
         <div className={styles.modalForm}>
           <div className={styles.formItem}>
@@ -636,7 +636,7 @@ const ProjectList: React.FC = () => {
         centered
         width={500}
         forceRender
-        destroyOnClose={false}
+        destroyOnHidden={false}
       >
         <div className={styles.generatingLog}>
           {generatingLog.map((log, index) => (

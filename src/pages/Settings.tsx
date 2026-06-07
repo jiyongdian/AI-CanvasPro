@@ -228,7 +228,7 @@ const Settings: React.FC = () => {
         width={480}
         centered
         className={styles.sysModal}
-        forceRender destroyOnClose={false}
+        forceRender destroyOnHidden={false}
       >
         <div className={styles.sysModalWrap}>
           <div className={styles.sysModalBar}>
@@ -301,7 +301,7 @@ const Settings: React.FC = () => {
         width={560}
         centered
         className={styles.editModal}
-        forceRender destroyOnClose={false}
+        forceRender destroyOnHidden={false}
       >
         <div className={styles.editModalWrap}>
           <div className={styles.editModalBar}>
@@ -357,8 +357,8 @@ const Settings: React.FC = () => {
         centered
         zIndex={1050}
         className={styles.modelModal}
-        forceRender destroyOnClose={false}
-        bodyStyle={{ padding: 0, display: 'flex', flexDirection: 'column', maxHeight: '70vh' }}
+        forceRender destroyOnHidden={false}
+        styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', maxHeight: '70vh' } }}
       >
         {/* 顶栏 */}
         <div className={styles.modelTopBar}>

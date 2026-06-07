@@ -272,7 +272,7 @@ const PromptTemplates: React.FC = () => {
         okText="保存"
         cancelText="取消"
         width={600}
-        destroyOnClose
+        destroyOnHidden
       >
         <div className={styles.formItem}>
           <label>模板名称</label>

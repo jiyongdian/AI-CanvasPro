@@ -180,6 +180,38 @@
   font-size:11px; font-weight:600; color:var(--text-label);
   text-transform:uppercase; letter-spacing:0.5px; flex-shrink:0;
 }
+.promptStatus {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:88px; height:24px; padding:0 10px;
+  border-radius:999px; font-size:10px; font-weight:700;
+  letter-spacing:0.2px; text-transform:none;
+  border:1px solid transparent;
+}
+.promptStatusIdle {
+  color:var(--text-secondary);
+  background:var(--input-bg);
+  border-color:var(--panel-border);
+}
+.promptStatusEditing {
+  color:#2563eb;
+  background:rgba(37,99,235,0.10);
+  border-color:rgba(37,99,235,0.22);
+}
+.promptStatusSaved {
+  color:#16a34a;
+  background:rgba(34,197,94,0.10);
+  border-color:rgba(34,197,94,0.20);
+}
+.promptStatusRestored {
+  color:#7c3aed;
+  background:rgba(139,92,246,0.10);
+  border-color:rgba(139,92,246,0.22);
+}
+.promptStatusAi {
+  color:#ea580c;
+  background:rgba(249,115,22,0.10);
+  border-color:rgba(249,115,22,0.22);
+}
 .promptInput {
   position:relative; z-index:1; flex:1; padding:14px 18px;
   background:transparent; border:none; outline:none; resize:none;

@@ -698,7 +698,7 @@ const AICharacter: React.FC = () => {
               <Card
                 key={character.id}
                 className={styles.characterCard}
-                bodyStyle={{ padding: 0 }}
+                styles={{ body: { padding: 0 } }}
               >
                 <div 
                   className={styles.cardImage}
@@ -779,7 +779,7 @@ const AICharacter: React.FC = () => {
         onCancel={() => setPreviewVisible(false)}
         centered
         forceRender
-        destroyOnClose={false}
+        destroyOnHidden={false}
         className={styles.previewModal}
         width="auto"
       >
@@ -802,7 +802,7 @@ const AICharacter: React.FC = () => {
         }}
         centered
         forceRender
-        destroyOnClose={false}
+        destroyOnHidden={false}
         className={styles.cardPreviewModal}
         width={800}
       >

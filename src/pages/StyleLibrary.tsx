@@ -374,7 +374,7 @@ const StyleLibrary: React.FC = () => {
         width={600}
         confirmLoading={generating}
         forceRender
-        destroyOnClose={false}
+        destroyOnHidden={false}
       >
         <div className={styles.formItem}>
           <label>风格名称</label>
@@ -443,7 +443,7 @@ const StyleLibrary: React.FC = () => {
         onCancel={() => setPreviewVisible(false)}
         centered
         width="auto"
-        destroyOnClose
+        destroyOnHidden
         className={styles.previewModal}
       >
         {previewVisible && (

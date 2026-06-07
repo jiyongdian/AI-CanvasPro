@@ -50,7 +50,7 @@ const FullscreenPromptEditor: React.FC<FullscreenPromptEditorProps> = ({
           flexDirection: 'column',
         },
       }}
-      destroyOnClose={false}
+      destroyOnHidden={false}
     >
       <div
         style={{
