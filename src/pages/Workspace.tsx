@@ -643,6 +643,7 @@ const Workspace: React.FC = () => {
   const toTemplateRef = (template?: Pick<PromptTemplate, 'id' | 'type'>) => (
     template ? { id: template.id, type: template.type } : undefined
   );
+  const promptCharCount = useMemo(() => Array.from(promptText || '').length, [promptText]);
   const getSelectedTemplateId = (type: string) => type === 'image' ? selectedImageTemplateId : type === 'video' ? selectedVideoTemplateId : selectedDirectorTemplateId;
   const setSelectedTemplateId = (type: string, id: string | undefined) => { if (type === 'image') setSelectedImageTemplateId(id); else if (type === 'video') setSelectedVideoTemplateId(id); else setSelectedDirectorTemplateId(id); };
   const getRequiredLibraryTemplate = useCallback((type: 'image' | 'video' | 'director') => {
@@ -917,6 +918,8 @@ const Workspace: React.FC = () => {
         inferSceneImagePrompt: inferScene.imagePrompt,
         inferSceneVideoPrompt: inferScene.videoPrompt,
         templateId: template.id,
+        styleId: selectedStyle?.id,
+        styleName: selectedStyle?.name,
         model: selTextModel,
       }, traceId);
       // #endregion
@@ -929,7 +932,8 @@ const Workspace: React.FC = () => {
           if (rafId) cancelAnimationFrame(rafId);
           rafId = requestAnimationFrame(() => setPrompt(chunk));
         },
-        undefined, undefined,
+        selectedStyle ? { name: selectedStyle.name, description: selectedStyle.description } : undefined,
+        undefined,
         toTemplateRef(template),
         (mc as any)?.providerId,
         selTextModel,
@@ -1014,14 +1018,21 @@ const Workspace: React.FC = () => {
         model: selTextModel,
       }, traceId);
       // #endregion
-      const result = await aiService.generatePrompt(
-        dirScene, previewMode, undefined, undefined,
+      const result = await aiService.optimizePromptAsDirector(
+        prompt,
+        previewMode,
+        {
+          actionDescription: activeScene.actionDescription,
+          dialogue: activeScene.dialogue,
+          character: activeScene.character,
+          sceneDescription: activeScene.description,
+        },
+        () => {},
         (text) => {
           accumulated = text; setDirectorResult(text);
           if (rafId2) cancelAnimationFrame(rafId2);
           rafId2 = requestAnimationFrame(() => setDirectorResult(text));
         },
-        undefined, undefined,
         toTemplateRef(selectedDirectorTemplate),
         (mc as any)?.providerId,
         selTextModel,
@@ -1031,12 +1042,12 @@ const Workspace: React.FC = () => {
       postDebugEvent('C', 'Workspace.tsx:handleDirector:after-generatePrompt', 'director after generatePrompt', {
         activeSceneId: activeScene.id,
         accumulatedLength: accumulated.length,
-        resultLength: (result || '').length,
+        resultLength: (result.optimized || '').length,
         accumulatedPreview: accumulated.slice(0, 160),
-        resultPreview: (result || '').slice(0, 160),
+        resultPreview: (result.optimized || '').slice(0, 160),
       }, traceId);
       // #endregion
-      const finalDirectorResult = accumulated || result || '';
+      const finalDirectorResult = accumulated || result.optimized || '';
       const validation = validateGeneratedPromptResult(finalDirectorResult, 'AI导演');
       if (!validation.valid) { setPromptStatus('error'); setDirectorResult(''); message.error(validation.error); return; }
       setDirectorResult(validation.normalized);
@@ -1264,7 +1275,10 @@ const Workspace: React.FC = () => {
                 {promptExpanded ? <DownOutlined /> : <UpOutlined />}
               </button>
               <span className={`${styles.promptStatus} ${getPromptStatusClassName()}`}>{getPromptStatusText()}</span>
-              <span style={{marginLeft:'auto',fontSize:11,color:'var(--text-tertiary)'}}>{activeScene ? `分镜 ${activeIdx + 1}` : '未选择'}</span>
+              <div className={styles.promptMetaInfo}>
+                <span className={styles.promptCount}>{promptCharCount} 字</span>
+                <span className={styles.promptSceneMeta}>{activeScene ? `分镜 ${activeIdx + 1}` : '未选择'}</span>
+              </div>
             </div>
             <textarea ref={promptTextareaRef} className={styles.promptInput} placeholder="输入提示词描述..." value={promptText} onChange={e => { const next = e.target.value; applyPromptRuntimeState(next, 'user'); setPromptStatus('editing'); savePrompt(); }} onBlur={() => savePrompt(true)} />
             <div className={styles.promptActions}>

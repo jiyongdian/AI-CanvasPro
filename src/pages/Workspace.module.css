@@ -267,6 +267,25 @@
   background:rgba(239,68,68,0.10);
   border-color:rgba(239,68,68,0.22);
 }
+.promptMetaInfo {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.promptCount,
+.promptSceneMeta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+}
 .promptInput {
   position:relative; z-index:1; flex:1; padding:16px 18px;
   background:transparent; border:none; outline:none; resize:none;
@@ -794,6 +813,13 @@
   background: #f8fafc;
   border-color: #d7dee9;
   color: #64748b;
+}
+
+:root[data-theme='light'] .promptCount,
+:root[data-theme='light'] .promptSceneMeta {
+  background: #f8fafc !important;
+  border-color: #d7dee9 !important;
+  color: #64748b !important;
 }
 
 :root[data-theme='light'] .historyCardMeta :global(.ant-tag) {

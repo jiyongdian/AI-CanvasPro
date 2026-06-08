@@ -883,8 +883,9 @@ ${novelContent}`;
       [mode],
       `请先从提示词库选择有效的${mode === 'image' ? '图片' : '视频'}提示词模板，再开始生成`,
     );
+    const rawStylePrompt = selectedStyle?.description?.trim() || '';
 
-    // 简化规则：结果提示词只由“当前输入框内容 + 选中的提示词模板”组成
+    // 简化规则：结果提示词由“当前输入框内容 + 选中的提示词模板 + 风格库提示词”组成
     const userInput = (scene.prompt?.trim?.() || '')
       || ((mode === 'image' ? scene.imagePrompt?.trim?.() : scene.videoPrompt?.trim?.()) || '');
     console.log('[generatePrompt] userInput:', (userInput || '').slice(0, 120), 'templateId:', resolvedTemplate.id);
@@ -901,19 +902,20 @@ ${novelContent}`;
     }, traceId);
     // #endregion
 
-    systemPrompt = `你是专业的AI${mode === 'image' ? '图片' : '视频'}提示词生成助手。你只能依据用户从提示词库选择的模板与用户当前输入内容生成最终提示词。
+    systemPrompt = `你是专业的AI${mode === 'image' ? '图片' : '视频'}提示词生成助手。你只能依据用户从提示词库选择的模板、用户当前输入内容${rawStylePrompt ? '与用户从风格库选择的风格提示词' : ''}生成最终提示词。
 
 【生成规则】
-- 最终结果只能基于“用户输入内容 + 提示词模板”
-- 不得引入额外剧情补充、上一分镜衔接、全局上下文、风格扩写或系统默认预设
+- 最终结果只能基于“用户输入内容 + 提示词模板${rawStylePrompt ? ' + 风格库提示词' : ''}”
+- 不得引入额外剧情补充、上一分镜衔接、全局上下文、系统默认预设或未提供的风格描述
 - 必须严格保留用户输入中的关键信息
+- ${rawStylePrompt ? '如果提供了风格库提示词，必须将该段风格提示词原封不动写入最终提示词，不得改写、拆分、省略或同义替换' : '如未提供风格库提示词，不要自行补充风格描述'}
 - 直接输出最终提示词内容，不要输出解释、标题或说明
 
 【提示词模板】
 ${resolvedTemplate.positive_prompt}
-${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.negative_prompt}` : ''}`;
+${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.negative_prompt}` : ''}${rawStylePrompt ? `\n\n【风格库提示词 - 必须原封不动写入】\n${rawStylePrompt}` : ''}`;
 
-    sceneInfo = `【用户输入内容】\n${userInput || '无'}`;
+    sceneInfo = `【用户输入内容】\n${userInput || '无'}${rawStylePrompt ? `\n\n【风格库提示词】\n${rawStylePrompt}` : ''}`;
 
     if (systemPrompt === undefined || sceneInfo === undefined) {
       throw new Error('generatePrompt: systemPrompt or sceneInfo not set');
@@ -991,7 +993,13 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
         fullTextPreview: fullText.slice(0, 300),
       }, traceId);
       // #endregion
-      return fullText;
+      const mergedText = rawStylePrompt && !fullText.includes(rawStylePrompt)
+        ? `${fullText.trim()}\n${rawStylePrompt}`.trim()
+        : fullText;
+      if (mergedText !== fullText) {
+        onChunk(mergedText);
+      }
+      return mergedText;
     }
 
     // 非流式：原有逻辑
@@ -1031,7 +1039,10 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
       resultLength: (data.choices?.[0]?.message?.content || '').length,
     }, traceId);
     // #endregion
-    return data.choices?.[0]?.message?.content || '';
+    const resultText = data.choices?.[0]?.message?.content || '';
+    return rawStylePrompt && !resultText.includes(rawStylePrompt)
+      ? `${resultText.trim()}\n${rawStylePrompt}`.trim()
+      : resultText;
   }
 
   async generateImage(
@@ -1511,10 +1522,16 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
     onAnalysisChunk?: (text: string) => void,
     onOptimizedChunk?: (text: string) => void,
     directorTemplate?: Pick<PromptTemplate, 'id' | 'type'>,
+    providerId?: string,
+    modelOverride?: string,
+    signal?: AbortSignal,
   ): Promise<{ analysis: string; optimized: string }> {
+    const providerConfig = await this.getProviderConfig(providerId);
+    const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
+    const apiKey = providerConfig.apiKey || this.config.apiKey;
     const config = this.getConfig();
-    const apiUrl = this.getApiBaseUrl();
-    const chatModel = config.chatModel || 'gemini-3-flash-preview';
+    const baseUrl = apiUrl.replace(/\/+$/, '');
+    const chatModel = modelOverride || config.chatModel || 'gemini-3-flash-preview';
     const resolvedTemplate = await this.resolveLibraryTemplate(
       directorTemplate,
       ['director'],
@@ -1536,9 +1553,10 @@ ${resolvedTemplate.positive_prompt}`;
 
     // 流式输出 + 双通道分流
     if (onAnalysisChunk && onOptimizedChunk) {
-      const response = await fetch(`${apiUrl}/chat/completions`, {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        signal,
         body: JSON.stringify({
           model: chatModel,
           messages: [
@@ -1616,9 +1634,10 @@ ${resolvedTemplate.positive_prompt}`;
     }
 
     // 非流式回退
-    const response = await fetch(`${apiUrl}/chat/completions`, {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      signal,
       body: JSON.stringify({
         model: chatModel,
         messages: [
