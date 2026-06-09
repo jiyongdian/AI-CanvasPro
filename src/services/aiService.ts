@@ -1048,7 +1048,7 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
   async generateImage(
     scene: Scene, 
     characters?: Character[],
-    options?: { aspectRatio?: string; imageSize?: string; style?: Style; generationMode?: GenerationMode; gridMode?: number; model?: string; providerId?: string }
+    options?: { aspectRatio?: string; imageSize?: string; style?: Style; generationMode?: GenerationMode; gridMode?: number; model?: string; providerId?: string; referenceImages?: string[] }
   ): Promise<string> {
     const providerConfig = await this.getProviderConfig(options?.providerId);
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
@@ -1163,6 +1163,20 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
       } catch (error) {
         console.warn('[AIService] 处理场景背景图失败:', error);
       }
+    }
+
+    // 4. 收集自定义参考图（从 options.referenceImages 直接传入）
+    if (options?.referenceImages && options.referenceImages.length > 0) {
+      for (const refImg of options.referenceImages) {
+        try {
+          if (!refImg || refImg.startsWith('blob:')) continue;
+          const processed = await processReferenceImage(refImg, 1024);
+          referenceImages.push(processed);
+        } catch (error) {
+          console.warn('[AIService] 处理自定义参考图失败:', error);
+        }
+      }
+      console.log('[AIService] 添加自定义参考图数量:', options.referenceImages.length);
     }
     
     console.log('[AIService] 总参考图数量:', referenceImages.length);

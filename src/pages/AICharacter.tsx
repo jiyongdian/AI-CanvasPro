@@ -64,7 +64,8 @@ const AICharacter: React.FC = () => {
   const [history, setHistory] = useState<GeneratedCharacter[]>([]);
   const [characters, setCharacters] = useRecoilState(characterListState);
   const [optimizing, setOptimizing] = useState(false);
-  const [customImage, setCustomImage] = useState<string | null>(null);
+  const [customImages, setCustomImages] = useState<string[]>([]);
+  const [previewImage, setPreviewImage] = useState<string>('');
   const [previewVisible, setPreviewVisible] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
   
@@ -327,7 +328,7 @@ const AICharacter: React.FC = () => {
       const imageUrl = await aiService.generateImage(
         { id: newCharacter.id, order: 0, description: '', prompt: currentPrompt, generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' },
         undefined,
-        { aspectRatio, imageSize: supportsImageSize() ? imageSize : undefined, style: selectedStyle, model: selImageModel, providerId: (mc as any).providerId }
+        { aspectRatio, imageSize: supportsImageSize() ? imageSize : undefined, style: selectedStyle, model: selImageModel, providerId: (mc as any).providerId, referenceImages: customImages.length > 0 ? customImages : undefined }
       );
 
       // 预加载图片到浏览器缓存，带进度回调
@@ -496,19 +497,20 @@ const AICharacter: React.FC = () => {
     }
   };
 
-  // 处理自定义图片上传
+  // 处理自定义图片上传（支持多图）
   const handleCustomImageUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      setCustomImage(e.target?.result as string);
+      const base64 = e.target?.result as string;
+      setCustomImages(prev => [...prev, base64]);
     };
     reader.readAsDataURL(file);
     return false;
   };
 
-  // 删除自定义图片
-  const handleRemoveCustomImage = () => {
-    setCustomImage(null);
+  // 删除指定自定义图片
+  const handleRemoveCustomImage = (index: number) => {
+    setCustomImages(prev => prev.filter((_, i) => i !== index));
   };
 
   // 打开角色卡片预览弹窗
@@ -664,40 +666,38 @@ const AICharacter: React.FC = () => {
         </div>
       )}
       <div className={`${styles.paramItem} ${styles.uploadParam}`}>
-        <span className={styles.paramLabel}>自定义参考图</span>
-        {customImage ? (
-          <div className={styles.customImageWrapper}>
-            <div
-              className={styles.customImageThumb}
-              onClick={() => setPreviewVisible(true)}
-            >
-              <img src={customImage} alt="自定义图片" />
-            </div>
-            <div className={styles.uploadMeta}>
-              <span className={styles.uploadMetaText}>已添加参考图</span>
-              <Button
-                type="text"
-                danger
-                size="small"
-                icon={<CloseOutlined />}
-                onClick={handleRemoveCustomImage}
-                className={styles.removeImageBtn}
-              >
-                移除
-              </Button>
-            </div>
+        <span className={styles.paramLabel}>自定义参考图{customImages.length > 0 ? ` (${customImages.length})` : ''}</span>
+        {customImages.length > 0 && (
+          <div className={styles.customImageGallery}>
+            {customImages.map((img, idx) => (
+              <div key={idx} className={styles.customImageWrapper}>
+                <div
+                  className={styles.customImageThumb}
+                  onClick={() => { setPreviewImage(img); setPreviewVisible(true); }}
+                >
+                  <img src={img} alt={`参考图 ${idx + 1}`} />
+                </div>
+                <Button
+                  type="text"
+                  danger
+                  size="small"
+                  icon={<CloseOutlined />}
+                  onClick={() => handleRemoveCustomImage(idx)}
+                  className={styles.removeImageBtn}
+                />
+              </div>
+            ))}
           </div>
-        ) : (
-          <Upload
-            accept="image/*"
-            showUploadList={false}
-            beforeUpload={handleCustomImageUpload}
-          >
-            <Button icon={<PlusOutlined />} className={styles.uploadButton}>
-              上传图片
-            </Button>
-          </Upload>
         )}
+        <Upload
+          accept="image/*"
+          showUploadList={false}
+          beforeUpload={handleCustomImageUpload}
+        >
+          <Button icon={<PlusOutlined />} className={styles.uploadButton}>
+            {customImages.length > 0 ? '继续添加' : '上传图片'}
+          </Button>
+        </Upload>
       </div>
     </div>
   );
@@ -972,9 +972,9 @@ const AICharacter: React.FC = () => {
         className={styles.previewModal}
         width="auto"
       >
-        {customImage && (
+        {previewImage && (
           <img 
-            src={customImage} 
+            src={previewImage} 
             alt="预览"
             className={styles.previewImage}
           />
