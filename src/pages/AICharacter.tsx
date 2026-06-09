@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import { Input, Button, Card, Spin, Popconfirm, Select, Space, Modal, Upload, Empty, Tag } from 'antd';
 import { appMessage as message } from '../utils/antdApp';
-import { SendOutlined, LoadingOutlined, DeleteOutlined, ImportOutlined, ThunderboltOutlined, PlusOutlined, CloseOutlined, CopyOutlined, DownloadOutlined, UserOutlined, AppstoreOutlined, ClockCircleOutlined, SettingOutlined, ApiOutlined } from '@ant-design/icons';
+import { SendOutlined, LoadingOutlined, DeleteOutlined, ImportOutlined, ThunderboltOutlined, PlusOutlined, CloseOutlined, CopyOutlined, DownloadOutlined, UserOutlined, AppstoreOutlined, ClockCircleOutlined, SettingOutlined, ApiOutlined, ClearOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useRecoilState } from 'recoil';
 import { v4 as uuidv4 } from 'uuid';
 import { aiService, CharacterPromptTemplatePreset } from '../services/aiService';
@@ -72,6 +72,7 @@ const AICharacter: React.FC = () => {
   const [cardPreviewVisible, setCardPreviewVisible] = useState(false);
   const [previewCharacter, setPreviewCharacter] = useState<GeneratedCharacter | null>(null);
   const [activeTab, setActiveTab] = useState<'generate' | 'history'>(() => (localStorage.getItem('ac_tab') as any) || 'generate');
+  const [clearAllModalOpen, setClearAllModalOpen] = useState(false);
   
   // 风格选择状态
   const [styleList, setStyleList] = useState<Style[]>([]);
@@ -375,6 +376,15 @@ const AICharacter: React.FC = () => {
     setHistory(prev => prev.filter(c => c.id !== id));
     deleteFromIndexedDB(id);
     message.success('已删除');
+  };
+
+  const handleClearAll = async () => {
+    for (const item of history) {
+      await deleteFromIndexedDB(item.id);
+    }
+    setHistory([]);
+    setClearAllModalOpen(false);
+    message.success('已清空全部任务');
   };
 
   // 自动重试中断的任务（刷新后自动恢复）
@@ -763,46 +773,46 @@ const AICharacter: React.FC = () => {
               />
             </div>
           </section>
-        </div>
-        <div className={styles.actionBar}>
-          <div className={styles.actionHint}>
-            当前会直接使用输入框中的最新内容生成角色
-          </div>
-          <div className={styles.actionButtons}>
-            <button
-              type="button"
-              onClick={() => setConfigModalOpen(true)}
-              className={`${styles.actionCardButton} ${styles.configTrigger}`}
-            >
-              <span className={styles.actionCardIcon}><SettingOutlined /></span>
-              <span className={styles.actionCardBody}>
-                <span className={styles.actionCardTitle}>模型与配置</span>
-                <span className={styles.actionCardDesc}>切换模型、模板和参考图</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={handleOptimizePrompt}
-              disabled={optimizing || !prompt.trim()}
-              className={`${styles.actionCardButton} ${styles.optimizeButton}`}
-            >
-              <span className={styles.actionCardIcon}>{optimizing ? <LoadingOutlined /> : <ThunderboltOutlined />}</span>
-              <span className={styles.actionCardBody}>
-                <span className={styles.actionCardTitle}>{optimizing ? '优化中...' : 'AI优化'}</span>
-                <span className={styles.actionCardDesc}>润色当前角色提示词</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={handleGenerate}
-              className={`${styles.actionCardButton} ${styles.generateButton}`}
-            >
-              <span className={styles.actionCardIcon}><SendOutlined /></span>
-              <span className={styles.actionCardBody}>
-                <span className={styles.actionCardTitle}>AI生成角色</span>
-                <span className={styles.actionCardDesc}>使用当前内容直接生成</span>
-              </span>
-            </button>
+          <div className={styles.actionBar}>
+            <div className={styles.actionHint}>
+              当前会直接使用输入框中的最新内容生成角色
+            </div>
+            <div className={styles.actionButtons}>
+              <button
+                type="button"
+                onClick={() => setConfigModalOpen(true)}
+                className={`${styles.actionCardButton} ${styles.configTrigger}`}
+              >
+                <span className={styles.actionCardIcon}><SettingOutlined /></span>
+                <span className={styles.actionCardBody}>
+                  <span className={styles.actionCardTitle}>模型与配置</span>
+                  <span className={styles.actionCardDesc}>切换模型、模板和参考图</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOptimizePrompt}
+                disabled={optimizing || !prompt.trim()}
+                className={`${styles.actionCardButton} ${styles.optimizeButton}`}
+              >
+                <span className={styles.actionCardIcon}>{optimizing ? <LoadingOutlined /> : <ThunderboltOutlined />}</span>
+                <span className={styles.actionCardBody}>
+                  <span className={styles.actionCardTitle}>{optimizing ? '优化中...' : 'AI优化'}</span>
+                  <span className={styles.actionCardDesc}>润色当前角色提示词</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerate}
+                className={`${styles.actionCardButton} ${styles.generateButton}`}
+              >
+                <span className={styles.actionCardIcon}><SendOutlined /></span>
+                <span className={styles.actionCardBody}>
+                  <span className={styles.actionCardTitle}>AI生成角色</span>
+                  <span className={styles.actionCardDesc}>使用当前内容直接生成</span>
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -816,8 +826,19 @@ const AICharacter: React.FC = () => {
             <p className={styles.sectionEyebrow}>任务列表</p>
             <h2 className={styles.sectionTitle}>角色生成记录</h2>
           </div>
-          <div className={styles.historySummary}>
-            <span>共 {history.length} 条</span>
+          <div className={styles.historyHeaderRight}>
+            <div className={styles.historySummary}>
+              <span>共 {history.length} 条</span>
+            </div>
+            {history.length > 0 && (
+              <Button
+                icon={<ClearOutlined />}
+                onClick={() => setClearAllModalOpen(true)}
+                className={styles.clearAllBtn}
+              >
+                清空全部
+              </Button>
+            )}
           </div>
         </div>
         <div className={styles.cardGrid}>
@@ -828,7 +849,7 @@ const AICharacter: React.FC = () => {
                 className={styles.characterCard}
                 styles={{ body: { padding: 0 } }}
               >
-                <div 
+                <div
                   className={styles.cardImage}
                   onClick={() => handleOpenCardPreview(character)}
                   style={{ cursor: character.status === 'completed' ? 'pointer' : 'default' }}
@@ -892,7 +913,9 @@ const AICharacter: React.FC = () => {
                         size="small"
                         danger
                         icon={<DeleteOutlined />}
-                      />
+                      >
+                        删除
+                      </Button>
                     </Popconfirm>
                   </div>
                 </div>
@@ -975,8 +998,8 @@ const AICharacter: React.FC = () => {
         {previewCharacter && (
           <div className={styles.cardPreviewContent}>
             <div className={styles.cardPreviewImage}>
-              <img 
-                src={previewCharacter.imageUrl} 
+              <img
+                src={previewCharacter.imageUrl}
                 alt={previewCharacter.prompt}
               />
             </div>
@@ -985,15 +1008,15 @@ const AICharacter: React.FC = () => {
                 <div className={styles.cardPreviewPromptHeader}>
                   <span className={styles.cardPreviewPromptLabel}>提示词</span>
                   <Space>
-                    <Button 
-                      type="primary" 
+                    <Button
+                      type="primary"
                       size="small"
                       icon={<CopyOutlined />}
                       onClick={handleCopyPrompt}
                     >
                       复制提示词
                     </Button>
-                    <Button 
+                    <Button
                       size="small"
                       icon={<DownloadOutlined />}
                       onClick={async () => {
@@ -1003,7 +1026,7 @@ const AICharacter: React.FC = () => {
                             const response = await fetch(previewCharacter.imageUrl);
                             const blob = await response.blob();
                             const fileName = `角色_${Date.now()}.png`;
-                            
+
                             // 尝试使用文件保存对话框
                             if ('showSaveFilePicker' in window) {
                               try {
@@ -1017,13 +1040,13 @@ const AICharacter: React.FC = () => {
                                 const writable = await handle.createWritable();
                                 await writable.write(blob);
                                 await writable.close();
-                                
+
                                 // 保存目录句柄供后续使用
                                 const dirHandle = await handle.getParent?.();
                                 if (dirHandle) {
                                   await saveDirHandle(dirHandle);
                                 }
-                                
+
                                 message.success('图片已保存');
                                 return;
                               } catch (err: any) {
@@ -1033,9 +1056,9 @@ const AICharacter: React.FC = () => {
                                 console.warn('文件保存对话框失败:', err);
                               }
                             }
-                            
+
                             // 回退到默认下载
-                            await downloadToDir(blob, fileName, 
+                            await downloadToDir(blob, fileName,
                               (path) => message.success(`已保存到: ${path}`),
                               () => message.success('开始下载')
                             );
@@ -1061,6 +1084,30 @@ const AICharacter: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* 清空全部任务确认弹窗 */}
+      <Modal
+        open={clearAllModalOpen}
+        footer={null}
+        onCancel={() => setClearAllModalOpen(false)}
+        centered
+        width={420}
+        className={styles.clearAllModal}
+      >
+        <div className={styles.clearAllContent}>
+          <div className={styles.clearAllIcon}>
+            <ExclamationCircleOutlined />
+          </div>
+          <h3 className={styles.clearAllTitle}>清空全部任务</h3>
+          <p className={styles.clearAllDesc}>
+            此操作将删除全部 <strong>{history.length}</strong> 个生成任务记录，且无法恢复。确定要继续吗？
+          </p>
+          <div className={styles.clearAllActions}>
+            <Button onClick={() => setClearAllModalOpen(false)}>取消</Button>
+            <Button danger type="primary" onClick={handleClearAll}>确认清空</Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

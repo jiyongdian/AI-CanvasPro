@@ -226,14 +226,16 @@
 
 .generateLayout {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  gap: 20px;
   flex: 1;
   min-height: 0;
+  align-items: stretch;
 }
 
 .editorCanvas {
   flex: 1;
-  min-height: 0;
+  min-width: 0;
   display: flex;
 }
 
@@ -420,10 +422,10 @@
 
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 20px;
   overflow-y: auto;
-  padding: 4px 2px 2px;
+  padding: 4px 2px 8px;
   flex: 1;
   min-height: 0;
   align-content: start;
@@ -433,10 +435,17 @@
   width: 6px;
 }
 
+.cardGrid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .cardGrid::-webkit-scrollbar-thumb {
-  background: #8b5cf6;
+  background: rgba(139, 92, 246, 0.4);
   border-radius: 3px;
-  color: #ffffff !important;
+}
+
+.cardGrid::-webkit-scrollbar-thumb:hover {
+  background: #8b5cf6;
 }
 
 /* 角色卡片 - 层次感 */
@@ -445,11 +454,17 @@
   border: 1px solid var(--panel-border) !important;
   border-radius: 22px !important;
   overflow: hidden;
-  box-shadow: 
+  box-shadow:
     0 8px 30px var(--shadow-base),
     0 2px 8px var(--shadow-light),
     inset 0 1px 0 var(--glass-border);
   transition: all 0.3s ease;
+  max-width: 360px;
+}
+
+.characterCard :global(.ant-card-body) {
+  background: transparent !important;
+  height: 100%;
 }
 
 .characterCard :global(.ant-card-body) {
@@ -684,36 +699,40 @@
 
 .actionBar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   gap: 16px;
   flex-shrink: 0;
-  padding: 14px 18px;
+  width: 260px;
+  padding: 18px;
   border-radius: 22px;
   border: 1px solid var(--panel-border);
   background: var(--panel-bg-gradient);
   box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.04);
+  overflow-y: auto;
 }
 
 .actionHint {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.6;
+  text-align: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .actionButtons {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  flex-direction: column;
   gap: 10px;
-  flex-wrap: wrap;
 }
 
 .actionCardButton {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 220px;
+  width: 100%;
+  min-width: unset;
   min-height: 72px;
   padding: 14px 16px;
   border-radius: 16px;
@@ -922,6 +941,103 @@
   color: var(--text-secondary);
 }
 
+/* 历史头部右侧区域 */
+.historyHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.clearAllBtn {
+  border-radius: 10px !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.06) !important;
+  transition: all 0.25s ease !important;
+}
+
+.clearAllBtn:hover {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.14) !important;
+  color: #dc2626 !important;
+}
+
+/* 清空全部确认弹窗 */
+.clearAllModal :global(.ant-modal-content) {
+  background: var(--panel-bg-gradient);
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 56px rgba(15, 23, 42, 0.18), 0 8px 20px rgba(15, 23, 42, 0.08);
+  padding: 0;
+}
+
+.clearAllModal :global(.ant-modal-close) {
+  color: var(--text-secondary);
+}
+
+.clearAllModal :global(.ant-modal-close:hover) {
+  color: var(--body-color);
+}
+
+.clearAllContent {
+  padding: 32px 28px 24px;
+  text-align: center;
+}
+
+.clearAllIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  font-size: 26px;
+  margin-bottom: 16px;
+}
+
+.clearAllTitle {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--body-color);
+}
+
+.clearAllDesc {
+  margin: 0 0 24px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.clearAllDesc strong {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.clearAllActions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.clearAllActions :global(.ant-btn) {
+  min-width: 100px;
+  border-radius: 10px;
+}
+
+/* Light/Dark theme overrides for clear-all modal */
+:root[data-theme='light'] .clearAllModal :global(.ant-modal-content) {
+  background: #ffffff !important;
+}
+
+:root[data-theme='dark'] .clearAllModal :global(.ant-modal-content) {
+  background: linear-gradient(180deg, rgba(26, 26, 26, 0.96), rgba(20, 20, 20, 0.96)) !important;
+}
+
 :root[data-theme='light'] .hero,
 :root[data-theme='light'] .historyPanel,
 :root[data-theme='light'] .surfaceCard,
@@ -970,7 +1086,35 @@
   }
 
   .generateLayout {
+    flex-direction: column;
     min-height: auto;
+  }
+
+  .actionBar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 14px;
+  }
+
+  .actionHint {
+    border-bottom: none;
+    padding-bottom: 0;
+    flex: 1;
+    text-align: left;
+  }
+
+  .actionButtons {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .actionCardButton {
+    width: auto;
+    min-width: 140px;
+    flex: 1;
   }
 
   .hero {
@@ -986,7 +1130,6 @@
   .sectionHeader,
   .historyHeader,
   .actionBar {
-    flex-direction: column;
     align-items: stretch;
   }
 
@@ -1035,12 +1178,23 @@
     grid-template-columns: 1fr;
   }
 
+  .characterCard {
+    max-width: 100%;
+  }
+
   .cardImage {
     height: 224px;
   }
 
   .actionBar {
+    width: 100%;
     padding: 12px 14px;
+    flex-direction: column;
+  }
+
+  .actionButtons {
+    width: 100%;
+    flex-direction: column;
   }
 
   .actionCardButton,
@@ -1058,5 +1212,14 @@
   .cardPreviewPromptHeader {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .historyHeader {
+    flex-direction: column;
+  }
+
+  .historyHeaderRight {
+    width: 100%;
+    justify-content: space-between;
   }
 }
