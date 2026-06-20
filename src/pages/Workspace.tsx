@@ -153,6 +153,14 @@ const safeLocalStorageRemove = (key: string) => {
   }
 };
 
+const safeLocalStorageSet = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn(`[workspace-persist] failed to write localStorage key "${key}"`, error);
+  }
+};
+
 const sanitizeOptionalString = (value: unknown): string | undefined => (
   typeof value === 'string' && value.trim() ? value : undefined
 );
@@ -364,7 +372,7 @@ const Workspace: React.FC = () => {
   const promptRef = useRef(promptText);
   const promptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const setPrompt = (v: string) => { promptRef.current = v; setPromptText(v); };
-  const [promptExpanded, setPromptExpanded] = useState(() => sessionStorage.getItem('ws_prompt_expanded') === 'true');
+  const [promptExpanded, setPromptExpanded] = useState(() => safeLocalStorageGet('ws_prompt_expanded') === 'true');
   const [generating, setGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
   const [inferLoading, setInferLoading] = useState(false);
@@ -678,10 +686,10 @@ const Workspace: React.FC = () => {
   }, [projectId]);
 
   // ==================== 加载 ====================
-  useEffect(() => { let c = false; (async () => { if (!projectId) { navigate('/projects'); return; } setLoading(true); try { if (!localStorage.getItem('media_migration_v1')) { try { await migrateOldMediaData(); localStorage.setItem('media_migration_v1', 'done'); } catch {} } const [lp, lc, ls] = await Promise.all([getProject(projectId), getAllCharacters(), getAllStyles()]); if (c) return; if (!lp) { message.error('项目不存在'); navigate('/projects'); return; } setProject(lp); setCharacters(lc); setCharactersLocal(lc); setStyleList(ls); const savedSceneId = sessionStorage.getItem(`ws_active_${projectId}`); const initialScene = savedSceneId ? lp.script.find(s => s.id === savedSceneId) : lp.script[0]; if (initialScene) { setActiveSceneId(initialScene.id); const m = sessionStorage.getItem(`ws_pmode_${initialScene.id}`) as PreviewMode | null; const mode = m || 'image'; const initialPrompt = buildScenePrompt(initialScene, mode); setPreviewMode(mode); applyPromptRuntimeState(initialPrompt, 'system', initialScene.id, mode); } else if (lp.script.length > 0) { setActiveSceneId(lp.script[0].id); const initialPrompt = buildScenePrompt(lp.script[0]); applyPromptRuntimeState(initialPrompt, 'system', lp.script[0].id, 'image'); } try { const p = await loadApiProviders(); if (!c) setProviders(p.filter(x => x.enabled !== false)); } catch {} finally { if (!c) setProvidersLoaded(true); } const items: Array<{type:'character'|'style';ownerId:string}> = [...lc.map(x=>({type:'character' as const,ownerId:x.id})), ...ls.map(x=>({type:'style' as const,ownerId:x.id}))]; if (items.length > 0) preloadMedia(items).catch(()=>{}); setTaskHistory(loadTaskHistory(projectId)); } catch (e) { if (!c) { message.error('加载失败'); navigate('/projects'); } } finally { if (!c) setLoading(false); } })(); return () => { c = true; clearPendingPromptSave(); clearWorkspacePersistTimer(); setProject(null as any); }; }, [projectId, buildScenePrompt, applyPromptRuntimeState, clearPendingPromptSave, clearWorkspacePersistTimer]);
+  useEffect(() => { let c = false; (async () => { if (!projectId) { navigate('/projects'); return; } setLoading(true); try { if (!localStorage.getItem('media_migration_v1')) { try { await migrateOldMediaData(); localStorage.setItem('media_migration_v1', 'done'); } catch {} } const [lp, lc, ls] = await Promise.all([getProject(projectId), getAllCharacters(), getAllStyles()]); if (c) return; if (!lp) { message.error('项目不存在'); navigate('/projects'); return; } setProject(lp); setCharacters(lc); setCharactersLocal(lc); setStyleList(ls); const savedSceneId = safeLocalStorageGet(`ws_active_${projectId}`); const initialScene = savedSceneId ? lp.script.find(s => s.id === savedSceneId) : lp.script[0]; if (initialScene) { setActiveSceneId(initialScene.id); const m = safeLocalStorageGet(`ws_pmode_${initialScene.id}`) as PreviewMode | null; const mode = m || 'image'; const initialPrompt = buildScenePrompt(initialScene, mode); setPreviewMode(mode); applyPromptRuntimeState(initialPrompt, 'system', initialScene.id, mode); } else if (lp.script.length > 0) { setActiveSceneId(lp.script[0].id); const initialPrompt = buildScenePrompt(lp.script[0]); applyPromptRuntimeState(initialPrompt, 'system', lp.script[0].id, 'image'); } try { const p = await loadApiProviders(); if (!c) setProviders(p.filter(x => x.enabled !== false)); } catch {} finally { if (!c) setProvidersLoaded(true); } const items: Array<{type:'character'|'style';ownerId:string}> = [...lc.map(x=>({type:'character' as const,ownerId:x.id})), ...ls.map(x=>({type:'style' as const,ownerId:x.id}))]; if (items.length > 0) preloadMedia(items).catch(()=>{}); setTaskHistory(loadTaskHistory(projectId)); } catch (e) { if (!c) { message.error('加载失败'); navigate('/projects'); } } finally { if (!c) setLoading(false); } })(); return () => { c = true; clearPendingPromptSave(); clearWorkspacePersistTimer(); setProject(null as any); }; }, [projectId, buildScenePrompt, applyPromptRuntimeState, clearPendingPromptSave, clearWorkspacePersistTimer]);
 
-  useEffect(() => { if (!loading && leftListRef.current && projectId) { const s = sessionStorage.getItem(`ws_scroll_${projectId}`); if (s) leftListRef.current.scrollTop = parseInt(s, 10); } }, [loading, projectId]);
-  const handleLeftScroll = useCallback(() => { if (leftListRef.current && projectId) sessionStorage.setItem(`ws_scroll_${projectId}`, String(leftListRef.current.scrollTop)); }, [projectId]);
+  useEffect(() => { if (!loading && leftListRef.current && projectId) { const s = safeLocalStorageGet(`ws_scroll_${projectId}`); if (s) leftListRef.current.scrollTop = parseInt(s, 10); } }, [loading, projectId]);
+  const handleLeftScroll = useCallback(() => { if (leftListRef.current && projectId) safeLocalStorageSet(`ws_scroll_${projectId}`, String(leftListRef.current.scrollTop)); }, [projectId]);
 
   useEffect(() => {
     if (!selPlatformId) return;
@@ -859,14 +867,14 @@ const Workspace: React.FC = () => {
     }
     return { value: nextValue, persisted };
   }, [activeScene, previewMode, handleUpdateScene, syncLatestPromptToState, clearPendingPromptSave, getScenePromptField]);
-  const doAddScene = async () => { if (!project || !activeSceneId) return; await persistPromptSnapshot(undefined, undefined, undefined, { silent: true, suppressStatus: true }); const idx = project.script.findIndex(s => s.id === activeSceneId); const ns: Scene = { id: crypto.randomUUID(), order: idx + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' }; const script = [...project.script.slice(0, idx + 1), ns, ...project.script.slice(idx + 1)].map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); setActiveSceneId(ns.id); applyPromptRuntimeState('', 'system', ns.id, previewMode); setPromptStatus('idle'); sessionStorage.setItem(`ws_active_${projectId}`, ns.id); setAddConfirmOpen(false); };
-  const doDeleteScene = async () => { if (!project || !activeSceneId) return; await persistPromptSnapshot(undefined, undefined, undefined, { silent: true, suppressStatus: true }); if (project.script.length <= 1) { message.warning('至少保留一个分镜'); return; } const script = project.script.filter(s => s.id !== activeSceneId).map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); const nextId = script[0]?.id || null; const nextPrompt = buildScenePrompt(script[0]); setActiveSceneId(nextId); applyPromptRuntimeState(nextPrompt, 'system', nextId, previewMode); setPromptStatus('idle'); if (nextId) sessionStorage.setItem(`ws_active_${projectId}`, nextId); setDeleteConfirmOpen(false); };
-  const selectScene = async (sid: string) => { if (sid === activeSceneId) return; await persistPromptSnapshot(undefined, undefined, undefined, { silent: true, suppressStatus: true }); const s = project?.script.find(x => x.id === sid); const savedMode = sessionStorage.getItem(`ws_pmode_${sid}`) as PreviewMode | null; const mode = savedMode || 'image'; const nextPrompt = mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s)); setActiveSceneId(sid); setPreviewMode(mode); applyPromptRuntimeState(nextPrompt, 'system', sid, mode); setPromptStatus('idle'); sessionStorage.setItem(`ws_active_${projectId}`, sid); };
+  const doAddScene = async () => { if (!project || !activeSceneId) return; await persistPromptSnapshot(undefined, undefined, undefined, { silent: true, suppressStatus: true }); const idx = project.script.findIndex(s => s.id === activeSceneId); const ns: Scene = { id: crypto.randomUUID(), order: idx + 1, description: '', prompt: '', generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' }; const script = [...project.script.slice(0, idx + 1), ns, ...project.script.slice(idx + 1)].map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); setActiveSceneId(ns.id); applyPromptRuntimeState('', 'system', ns.id, previewMode); setPromptStatus('idle'); safeLocalStorageSet(`ws_active_${projectId}`, ns.id); setAddConfirmOpen(false); };
+  const doDeleteScene = async () => { if (!project || !activeSceneId) return; await persistPromptSnapshot(undefined, undefined, undefined, { silent: true, suppressStatus: true }); if (project.script.length <= 1) { message.warning('至少保留一个分镜'); return; } const script = project.script.filter(s => s.id !== activeSceneId).map((s, i) => ({ ...s, order: i })); await handleUpdateProject({ ...project, script }); const nextId = script[0]?.id || null; const nextPrompt = buildScenePrompt(script[0]); setActiveSceneId(nextId); applyPromptRuntimeState(nextPrompt, 'system', nextId, previewMode); setPromptStatus('idle'); if (nextId) safeLocalStorageSet(`ws_active_${projectId}`, nextId); setDeleteConfirmOpen(false); };
+  const selectScene = async (sid: string) => { if (sid === activeSceneId) return; await persistPromptSnapshot(undefined, undefined, undefined, { silent: true, suppressStatus: true }); const s = project?.script.find(x => x.id === sid); const savedMode = safeLocalStorageGet(`ws_pmode_${sid}`) as PreviewMode | null; const mode = savedMode || 'image'; const nextPrompt = mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s)); setActiveSceneId(sid); setPreviewMode(mode); applyPromptRuntimeState(nextPrompt, 'system', sid, mode); setPromptStatus('idle'); safeLocalStorageSet(`ws_active_${projectId}`, sid); };
 
   const switchPreviewMode = (mode: PreviewMode) => {
     void (async () => {
       if (activeScene) await persistPromptSnapshot(activeScene, previewMode, undefined, { silent: true, suppressStatus: true });
-      setPreviewMode(mode); sessionStorage.setItem(`ws_pmode_${activeSceneId}`, mode);
+      setPreviewMode(mode); safeLocalStorageSet(`ws_pmode_${activeSceneId}`, mode);
       const s = projectRef.current?.script.find(x => x.id === activeSceneId);
       const nextPrompt = mode === 'image' ? (s?.imagePrompt || buildScenePrompt(s)) : (s?.videoPrompt || buildScenePrompt(s));
       applyPromptRuntimeState(nextPrompt, 'system', activeSceneId, mode);
@@ -1187,7 +1195,7 @@ const Workspace: React.FC = () => {
   const togglePromptExpand = () => {
     setPromptExpanded(prev => {
       const next = !prev;
-      sessionStorage.setItem('ws_prompt_expanded', String(next));
+      safeLocalStorageSet('ws_prompt_expanded', String(next));
       return next;
     });
   };
