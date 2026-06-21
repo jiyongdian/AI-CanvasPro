@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useEffect } from 'react';
 import { App as AntdApp, ConfigProvider, theme } from 'antd';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useRecoilValue } from 'recoil';
 import { themeState } from './store/themeStore';
 import MainLayout from './components/layout/MainLayout';
@@ -28,6 +28,7 @@ const App: React.FC = () => {
 
 
   const isDark = currentTheme === 'dark';
+  const useHashRouter = import.meta.env.BASE_URL !== '/';
 
   const lightThemeTokens = {
     colorPrimary: '#4f46e5',
@@ -165,6 +166,21 @@ const App: React.FC = () => {
     },
   };
 
+  const routerContent = (
+    <Routes>
+      <Route path="/" element={<MainLayout />}>
+        <Route index element={<Navigate to="/projects" replace />} />
+        <Route path="projects" element={<ProjectList />} />
+        <Route path="ai-character" element={<AICharacter />} />
+        <Route path="characters" element={<CharacterLibrary />} />
+        <Route path="styles" element={<StyleLibrary />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="prompt-templates" element={<PromptTemplates />} />
+      </Route>
+      <Route path="workspace/:projectId" element={<Workspace />} />
+    </Routes>
+  );
+
   return (
     <ConfigProvider
       theme={{
@@ -175,20 +191,11 @@ const App: React.FC = () => {
     >
       <AntdApp>
         <AntdAppBridge />
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
-          <Routes>
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<Navigate to="/projects" replace />} />
-              <Route path="projects" element={<ProjectList />} />
-              <Route path="ai-character" element={<AICharacter />} />
-              <Route path="characters" element={<CharacterLibrary />} />
-              <Route path="styles" element={<StyleLibrary />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="prompt-templates" element={<PromptTemplates />} />
-            </Route>
-            <Route path="workspace/:projectId" element={<Workspace />} />
-          </Routes>
-        </BrowserRouter>
+        {useHashRouter ? (
+          <HashRouter>{routerContent}</HashRouter>
+        ) : (
+          <BrowserRouter basename={import.meta.env.BASE_URL}>{routerContent}</BrowserRouter>
+        )}
       </AntdApp>
     </ConfigProvider>
   );

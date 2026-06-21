@@ -105,6 +105,82 @@ export function categorizeModel(modelId: string): ModelCategory {
   return 'other';
 }
 
+interface ApiProbeFailure {
+  url: string;
+  status: number;
+  statusText: string;
+}
+
+const normalizeApiBaseUrl = (apiUrl: string) => apiUrl.replace(/\/+$/, '');
+
+const getModelEndpoints = (base: string): string[] => {
+  const endpoints = [`${base}/models`];
+  if (!/\/v1$/i.test(base)) endpoints.push(`${base}/v1/models`);
+  return Array.from(new Set(endpoints));
+};
+
+const isCrossOriginRequest = (targetUrl: string): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return new URL(targetUrl, window.location.href).origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+};
+
+const isFetchNetworkFailure = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return error instanceof TypeError
+    || message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('load failed')
+    || message.includes('network request failed');
+};
+
+const formatNetworkProbeError = (error: unknown, targetUrl: string): string => {
+  if (isFetchNetworkFailure(error) && isCrossOriginRequest(targetUrl)) {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '当前网站';
+    return `浏览器已拦截跨域请求，网站版无法直接访问该 API。\n\n这通常不是 API 地址或密钥错误，而是 API 服务端没有允许 ${origin} 跨域访问。请在设置页手动添加模型，或改用支持 CORS 的 API、桌面版/可信后端代理。\n\n⚠️ 不建议使用公共 CORS 代理，以免泄露 API Key。`;
+  }
+
+  const errMsg = error instanceof Error ? error.message : '未知错误';
+  return `网络错误: ${errMsg}\n\n💡 请检查 API 地址格式和网络连接。`;
+};
+
+const extractModelItems = async (response: Response): Promise<any[]> => {
+  try {
+    const data = await response.json();
+    if (data?.data && Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data)) return data;
+    if (data?.models && Array.isArray(data.models)) return data.models;
+  } catch {
+    // 非 JSON 响应不是可识别的模型列表
+  }
+  return [];
+};
+
+const formatModelListFailure = (failures: ApiProbeFailure[]): string => {
+  if (failures.some(f => f.status === 401)) {
+    return '密钥无效（401 Unauthorized）\n请检查密钥是否正确。';
+  }
+  if (failures.some(f => f.status === 403)) {
+    return '权限不足（403 Forbidden）\n该密钥可能没有列出模型的权限。可手动添加模型后继续保存配置。';
+  }
+  if (failures.some(f => f.status === 200)) {
+    return '连接成功，但响应中没有可识别的模型列表。\n\n请手动添加需要使用的模型 ID。';
+  }
+  if (failures.some(f => f.status === 404 || f.status === 405)) {
+    return '未能读取模型列表（404/405）。\n\n该 API 可能不支持 OpenAI 格式的模型列表端点，请手动添加需要使用的模型 ID。';
+  }
+
+  const last = failures[failures.length - 1];
+  if (last) {
+    return `未能读取模型列表。\n\n最后状态码: ${last.status}${last.statusText ? ` ${last.statusText}` : ''}\n请手动添加模型，或检查该 API 是否兼容 OpenAI 模型列表格式。`;
+  }
+
+  return '未能读取模型列表。\n\n请检查 API 地址和密钥，或手动添加模型。';
+};
+
 /**
  * 从 OpenAI 兼容 API 拉取模型列表并自动分类
  * 兼容绝大多数第三方API（OpenAI、DeepSeek、Qwen、Zhipu、Moonshot、SiliconFlow 等）
@@ -113,102 +189,30 @@ export async function fetchModelsFromApi(
   apiUrl: string,
   apiKey: string,
 ): Promise<ProviderModel[]> {
-  // 标准化 URL
-  let base = apiUrl.replace(/\/+$/, '');
-  
-  const headers: Record<string, string> = {
-    'Authorization': `Bearer ${apiKey}`,
-    'Content-Type': 'application/json',
-  };
-
-  let response: Response;
+  const base = normalizeApiBaseUrl(apiUrl);
+  const endpoints = getModelEndpoints(base);
+  const authHeaders: Record<string, string> = { Authorization: `Bearer ${apiKey}` };
+  const apiKeyHeaders: Record<string, string> = { 'x-api-key': apiKey };
+  const failures: ApiProbeFailure[] = [];
   let modelsData: any[] = [];
 
-  // 尝试标准 OpenAI 端点
-  try {
-    response = await fetch(`${base}/models`, { headers });
-    if (response.ok) {
-      const data = await response.json();
-      if (data.data && Array.isArray(data.data)) {
-        modelsData = data.data;
-      } else if (Array.isArray(data)) {
-        modelsData = data;
-      }
-    }
-  } catch {
-    // 继续尝试其他端点
-  }
-
-  // 如果 /models 失败，尝试 /v1/models
-  if (modelsData.length === 0) {
-    try {
-      response = await fetch(`${base}/v1/models`, { headers });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data && Array.isArray(data.data)) {
-          modelsData = data.data;
-        } else if (Array.isArray(data)) {
-          modelsData = data;
+  for (const headers of [authHeaders, apiKeyHeaders]) {
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint, { headers });
+        if (!response.ok) {
+          failures.push({ url: endpoint, status: response.status, statusText: response.statusText });
+          continue;
         }
-      }
-    } catch {
-      // 继续
-    }
-  }
 
-  // 如果还是失败，尝试不带 Authorization header（某些API用其他方式验证）
-  if (modelsData.length === 0) {
-    try {
-      const altHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      };
-      response = await fetch(`${base}/models`, { headers: altHeaders });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data && Array.isArray(data.data)) {
-          modelsData = data.data;
-        } else if (Array.isArray(data)) {
-          modelsData = data;
-        }
+        modelsData = await extractModelItems(response);
+        if (modelsData.length > 0) break;
+        failures.push({ url: endpoint, status: response.status, statusText: response.statusText });
+      } catch (error) {
+        throw new Error(formatNetworkProbeError(error, endpoint));
       }
-    } catch {
-      // 继续
     }
-  }
-
-  // 也尝试直接 chat/completions 端点探测（某些API不暴露 /models）
-  if (modelsData.length === 0) {
-    try {
-      response = await fetch(`${base}/chat/completions`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: 'hi' }],
-          max_tokens: 1,
-        }),
-      });
-      // 即使返回错误，如果状态码不是404说明端点存在
-      if (response.status !== 404 && response.status !== 405) {
-        // 端点存在，但无法列出模型，返回一些常见模型供用户选择
-        modelsData = [
-          { id: 'gpt-4o', owned_by: 'openai' },
-          { id: 'gpt-4o-mini', owned_by: 'openai' },
-          { id: 'gpt-4-turbo', owned_by: 'openai' },
-          { id: 'gpt-3.5-turbo', owned_by: 'openai' },
-          { id: 'deepseek-chat', owned_by: 'deepseek' },
-          { id: 'deepseek-reasoner', owned_by: 'deepseek' },
-          { id: 'qwen-turbo', owned_by: 'qwen' },
-          { id: 'qwen-plus', owned_by: 'qwen' },
-          { id: 'glm-4', owned_by: 'zhipu' },
-          { id: 'moonshot-v1-8k', owned_by: 'moonshot' },
-        ];
-      }
-    } catch {
-      // 完全无法连接
-      throw new Error('无法连接到该API地址，请检查地址和密钥是否正确。\n\n💡 提示：API地址应包含基础路径，如 https://api.openai.com/v1');
-    }
+    if (modelsData.length > 0) break;
   }
 
   // 分类并去重
@@ -216,7 +220,7 @@ export async function fetchModelsFromApi(
   const result: ProviderModel[] = [];
 
   for (const item of modelsData) {
-    const id = typeof item === 'string' ? item : (item.id || '');
+    const id = typeof item === 'string' ? item : (item.id || item.name || '');
     if (!id || seen.has(id)) continue;
     seen.add(id);
 
@@ -229,7 +233,7 @@ export async function fetchModelsFromApi(
   }
 
   if (result.length === 0) {
-    throw new Error('未能获取到任何模型。\n\n💡 该API可能不兼容OpenAI格式，或密钥权限不足。');
+    throw new Error(formatModelListFailure(failures));
   }
 
   return result;
@@ -242,63 +246,41 @@ export async function testApiConnection(
   apiUrl: string,
   apiKey: string,
 ): Promise<{ success: boolean; message: string }> {
-  let base = apiUrl.replace(/\/+$/, '');
-  
-  try {
-    // 仅验证密钥有效性，不调用任何模型
-    // 尝试 GET /models（轻量级，不消耗 token）
-    let response = await fetch(`${base}/models`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
+  const base = normalizeApiBaseUrl(apiUrl);
+  const endpoints = getModelEndpoints(base);
+  const headerVariants: Record<string, string>[] = [
+    { Authorization: `Bearer ${apiKey}` },
+    { 'x-api-key': apiKey },
+  ];
+  const failures: ApiProbeFailure[] = [];
 
-    // fallback: 尝试 /v1/models
-    if (!response.ok) {
-      response = await fetch(`${base}/v1/models`, {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-    }
-
-    if (response.ok) {
-      // 尝试读取模型数量以提供更详细的反馈
+  for (const headers of headerVariants) {
+    for (const endpoint of endpoints) {
       try {
-        const data = await response.json();
-        const count = data.data?.length || 0;
-        return {
-          success: true,
-          message: count > 0
-            ? `连接成功！可用模型数: ${count}`
-            : '连接成功！密钥验证通过',
-        };
-      } catch {
-        return { success: true, message: '连接成功！密钥验证通过' };
+        // 仅验证密钥有效性，不调用任何模型；GET /models 不消耗 token。
+        const response = await fetch(endpoint, { headers });
+
+        if (response.ok) {
+          const models = await extractModelItems(response);
+          return {
+            success: true,
+            message: models.length > 0
+              ? `连接成功！可用模型数: ${models.length}`
+              : '连接成功！但响应中没有可识别的模型列表，可手动添加模型。',
+          };
+        }
+
+        failures.push({ url: endpoint, status: response.status, statusText: response.statusText });
+      } catch (error) {
+        return { success: false, message: formatNetworkProbeError(error, endpoint) };
       }
     }
-
-    // 401 = 密钥无效，403 = 权限不足
-    if (response.status === 401) {
-      return { success: false, message: '密钥无效（401 Unauthorized）\n请检查密钥是否正确' };
-    }
-    if (response.status === 403) {
-      return { success: false, message: '权限不足（403 Forbidden）\n该密钥可能没有列出模型的权限，但可能仍可用于生成' };
-    }
-
-    return {
-      success: false,
-      message: `状态码: ${response.status}\n${response.statusText || '未知错误'}`,
-    };
-  } catch (error) {
-    const errMsg = error instanceof Error ? error.message : '未知错误';
-    return {
-      success: false,
-      message: `网络错误: ${errMsg}\n\n💡 请检查API地址格式是否正确`,
-    };
   }
+
+  return {
+    success: false,
+    message: formatModelListFailure(failures),
+  };
 }
 
 /**

@@ -9,7 +9,7 @@ import {
   CloseCircleOutlined, EyeOutlined, EyeInvisibleOutlined, KeyOutlined,
   SearchOutlined, CheckOutlined, ThunderboltOutlined, SettingOutlined,
 } from '@ant-design/icons';
-import { aiService, fetchModelsFromApi, testApiConnection } from '../services/aiService';
+import { aiService, categorizeModel, fetchModelsFromApi, testApiConnection } from '../services/aiService';
 import { saveDirHandle, getDirHandle, verifyPermission } from '../utils/downloadHelper';
 import { saveApiProviders, loadApiProviders, saveApiConfig } from '../services/secureStorage';
 import { checkForUpdate, downloadAndInstallUpdate, type UpdateStatus } from '../services/updateService';
@@ -18,7 +18,7 @@ import {
 } from '../types';
 import styles from './Settings.module.css';
 
-const { Password } = Input;
+const { Password, TextArea } = Input;
 
 const CAT_ICON: Record<ModelCategory, string> = { text:'💬', image:'🖼️', video:'🎬', audio:'🎵', other:'📦' };
 const CAT_COLOR: Record<ModelCategory, string> = { text:'#3b82f6', image:'#22c55e', video:'#f59e0b', audio:'#a855f7', other:'#6b7280' };
@@ -35,6 +35,7 @@ const Settings: React.FC = () => {
   const [editApiUrl, setEditApiUrl] = useState('');
   const [editApiKey, setEditApiKey] = useState('');
   const [editModels, setEditModels] = useState<ProviderModel[]>([]);
+  const [manualModelText, setManualModelText] = useState('');
   const [editShowKey, setEditShowKey] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
@@ -74,12 +75,12 @@ const Settings: React.FC = () => {
 
   const openAdd = () => {
     setEditingProvider(null); setEditName(''); setEditApiUrl(''); setEditApiKey('');
-    setEditModels([]); setEditShowKey(false); setTestResult({visible:false,success:false,message:''});
+    setEditModels([]); setManualModelText(''); setEditShowKey(false); setTestResult({visible:false,success:false,message:''});
     setEditOpen(true);
   };
   const openEdit = (p: ApiProvider) => {
     setEditingProvider(p); setEditName(p.name); setEditApiUrl(p.apiUrl); setEditApiKey(p.apiKey);
-    setEditModels([...p.models]); setEditShowKey(false); setTestResult({visible:false,success:false,message:''});
+    setEditModels([...p.models]); setManualModelText(''); setEditShowKey(false); setTestResult({visible:false,success:false,message:''});
     setEditOpen(true);
   };
 
@@ -119,8 +120,36 @@ const Settings: React.FC = () => {
   };
 
   const confirmModels = () => {
-    setEditModels(fetchedModels.filter(m=>selectedIds.has(m.id)));
+    const fetchedIds = new Set(fetchedModels.map(m => m.id));
+    const selectedFetched = fetchedModels.filter(m=>selectedIds.has(m.id));
+    const manualOnly = editModels.filter(m => !fetchedIds.has(m.id));
+    setEditModels([...manualOnly, ...selectedFetched]);
     setModelOpen(false);
+  };
+
+  const addManualModels = () => {
+    const ids = manualModelText
+      .split(/[\s,，]+/)
+      .map(id => id.trim())
+      .filter(Boolean);
+    if (ids.length === 0) { message.warning('请输入模型ID'); return; }
+
+    const existing = new Set(editModels.map(m => m.id));
+    const additions: ProviderModel[] = [];
+    ids.forEach(id => {
+      if (existing.has(id)) return;
+      existing.add(id);
+      additions.push({ id, name: id, category: categorizeModel(id) });
+    });
+
+    if (additions.length === 0) {
+      message.info('输入的模型已存在');
+      return;
+    }
+
+    setEditModels(prev => [...prev, ...additions]);
+    setManualModelText('');
+    message.success(`已添加 ${additions.length} 个模型`);
   };
 
   const toggleModel = (id:string, checked:boolean) => setSelectedIds(p=>{const n=new Set(p);checked?n.add(id):n.delete(id);return n});
@@ -344,8 +373,26 @@ const Settings: React.FC = () => {
             <div className={styles.editF}>
               <label className={styles.editL}>模型</label>
               <div className={styles.editModelZone}>
-                {editModels.length===0?<span className={styles.noModels}>暂无模型，点击下方按钮拉取</span>
+                {editModels.length===0?<span className={styles.noModels}>暂无模型，可拉取或手动添加</span>
                 :<div className={styles.tagWrap}>{editModels.map(m=><Tag key={m.id} color={CAT_COLOR[m.category]} closable onClose={()=>setEditModels(p=>p.filter(x=>x.id!==m.id))} className={styles.modelTag}>{m.id}</Tag>)}</div>}
+              </div>
+              <div className={styles.manualModelBox}>
+                <TextArea
+                  value={manualModelText}
+                  onChange={e=>setManualModelText(e.target.value)}
+                  placeholder="手动输入模型ID，支持逗号、空格或换行分隔，如：deepseek-chat, nano-banana-2-4k, sora-2"
+                  autoSize={{ minRows: 2, maxRows: 4 }}
+                  onPressEnter={e=>{
+                    if ((e.ctrlKey || e.metaKey) && manualModelText.trim()) {
+                      e.preventDefault();
+                      addManualModels();
+                    }
+                  }}
+                />
+                <div className={styles.manualModelActions}>
+                  <span className={styles.manualModelHint}>拉取模型受浏览器跨域限制时，可在这里手动添加。</span>
+                  <Button size="small" onClick={addManualModels} disabled={!manualModelText.trim()}>添加模型</Button>
+                </div>
               </div>
             </div>
             <div className={styles.editBtnRow}>
