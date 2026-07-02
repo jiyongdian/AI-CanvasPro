@@ -1231,12 +1231,19 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
 
     console.log('[AIService] 最终提示词:', finalPrompt);
     console.log('[AIService] 发送请求到:', `${baseUrl}/images/generations`);
-    
-    const response = await fetch(`${baseUrl}/images/generations`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/images/generations`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (error) {
+      // 捕获CORS错误或网络错误
+      const targetUrl = `${baseUrl}/images/generations`;
+      throw new Error(formatNetworkProbeError(error, targetUrl));
+    }
 
     console.log('[AIService] 响应状态:', response.status, response.statusText);
 
@@ -1740,7 +1747,7 @@ ${resolvedTemplate.positive_prompt}`;
   }
 
   async generateVideo(
-    scene: Scene & { _originalPrompt?: string }, 
+    scene: Scene & { _originalPrompt?: string },
     characters?: Character[],
     options?: { style?: Style; generationMode?: GenerationMode; duration?: string; enhancePrompt?: boolean; enableUpsample?: boolean }
   ): Promise<{ taskId: string; isVeoTask: boolean }> {
@@ -1823,15 +1830,21 @@ ${resolvedTemplate.positive_prompt}`;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         console.log(`[AIService] 视频生成请求，第 ${attempt} 次尝试`);
-        
+
         const endpoint = `${videoBase}${vcfg.createPath}`;
         console.log(`[AIService] 视频生成请求 URL: ${endpoint}`);
-        
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+
+        let response: Response;
+        try {
+          response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        } catch (fetchError) {
+          // 捕获CORS错误或网络错误
+          throw new Error(formatNetworkProbeError(fetchError, endpoint));
+        }
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
