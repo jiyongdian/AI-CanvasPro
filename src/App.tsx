@@ -1,20 +1,29 @@
 import * as React from 'react';
-import { useEffect } from 'react';
-import { App as AntdApp, ConfigProvider, theme } from 'antd';
+import { useEffect, lazy, Suspense } from 'react';
+import { App as AntdApp, ConfigProvider, theme, Spin } from 'antd';
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useRecoilValue } from 'recoil';
 import { themeState } from './store/themeStore';
 import MainLayout from './components/layout/MainLayout';
 import { checkForUpdate } from './services/updateService';
-import ProjectList from './pages/ProjectList';
-import Workspace from './pages/Workspace';
-import CharacterLibrary from './pages/CharacterLibrary';
-import AICharacter from './pages/AICharacter';
-import Settings from './pages/Settings';
-import StyleLibrary from './pages/StyleLibrary';
-import PromptTemplates from './pages/PromptTemplates';
 import { AntdAppBridge } from './utils/antdApp';
 import 'antd/dist/reset.css';
+
+// 页面级懒加载：每个页面单独打包，按需加载，大幅减小首屏体积
+const ProjectList = lazy(() => import('./pages/ProjectList'));
+const Workspace = lazy(() => import('./pages/Workspace'));
+const CharacterLibrary = lazy(() => import('./pages/CharacterLibrary'));
+const AICharacter = lazy(() => import('./pages/AICharacter'));
+const Settings = lazy(() => import('./pages/Settings'));
+const StyleLibrary = lazy(() => import('./pages/StyleLibrary'));
+const PromptTemplates = lazy(() => import('./pages/PromptTemplates'));
+
+// 懒加载页面切换时的兜底 loading
+const PageFallback: React.FC = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', minHeight: 240 }}>
+    <Spin size="large" />
+  </div>
+);
 
 const App: React.FC = () => {
   const currentTheme = useRecoilValue(themeState);
@@ -177,7 +186,14 @@ const App: React.FC = () => {
         <Route path="settings" element={<Settings />} />
         <Route path="prompt-templates" element={<PromptTemplates />} />
       </Route>
-      <Route path="workspace/:projectId" element={<Workspace />} />
+      <Route
+        path="workspace/:projectId"
+        element={
+          <Suspense fallback={<PageFallback />}>
+            <Workspace />
+          </Suspense>
+        }
+      />
     </Routes>
   );
 

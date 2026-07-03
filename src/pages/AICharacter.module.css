@@ -460,6 +460,9 @@
     inset 0 1px 0 var(--glass-border);
   transition: all 0.3s ease;
   max-width: 360px;
+  /* 视口外卡片跳过渲染，滚动更流畅；contain-intrinsic-size 占位防跳动 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px;
 }
 
 .characterCard :global(.ant-card-body) {

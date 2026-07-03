@@ -7,6 +7,100 @@
 const thumbnailCache = new Map<string, string>();
 const THUMBNAIL_CACHE_MAX = 100;
 
+// 特性检测：是否可用 createImageBitmap + OffscreenCanvas 异步管线
+const supportsBitmapPipeline =
+  typeof createImageBitmap === 'function' &&
+  typeof OffscreenCanvas === 'function';
+
+function cacheThumbnail(cacheKey: string, thumb: string): void {
+  if (thumbnailCache.size >= THUMBNAIL_CACHE_MAX) {
+    const firstKey = thumbnailCache.keys().next().value;
+    if (firstKey !== undefined) thumbnailCache.delete(firstKey);
+  }
+  thumbnailCache.set(cacheKey, thumb);
+}
+
+function blobToDataURL(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * 异步缩略图管线：createImageBitmap 负责“离主线程解码”，
+ * OffscreenCanvas.convertToBlob 是异步编码（替代同步阻塞的 toDataURL）。
+ * 相比旧实现，大幅减少主线程卡顿（尤其列表批量生成缩略图时）。
+ */
+async function createThumbnailBitmap(
+  src: string,
+  maxWidth: number,
+  quality: number,
+  cacheKey: string
+): Promise<string> {
+  // createImageBitmap 接受 Blob；data:/blob:/http(s) 均可通过 fetch 得到 Blob
+  const res = await fetch(src);
+  const srcBlob = await res.blob();
+  const bitmap = await createImageBitmap(srcBlob);
+
+  let w = bitmap.width;
+  let h = bitmap.height;
+  if (w > maxWidth) {
+    h = Math.round(h * (maxWidth / w));
+    w = maxWidth;
+  }
+
+  const canvas = new OffscreenCanvas(w, h);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    bitmap.close();
+    return src;
+  }
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+
+  const outBlob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
+  const dataUrl = await blobToDataURL(outBlob);
+  cacheThumbnail(cacheKey, dataUrl);
+  return dataUrl;
+}
+
+/**
+ * 旧版同步 canvas 管线：作为不支持 OffscreenCanvas/createImageBitmap 时的回退，
+ * 以及异步管线失败（如跨域 fetch 被拦）时的兜底。
+ */
+function createThumbnailLegacy(
+  src: string,
+  maxWidth: number,
+  quality: number,
+  cacheKey: string
+): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      if (w > maxWidth) {
+        h = Math.round(h * (maxWidth / w));
+        w = maxWidth;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(src); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      const thumb = canvas.toDataURL('image/jpeg', quality);
+      cacheThumbnail(cacheKey, thumb);
+      resolve(thumb);
+    };
+    img.onerror = () => resolve(src); // 失败时回退到原图
+    img.src = src;
+  });
+}
+
 /**
  * 为大图生成缩略图（用于卡片网格等场景，避免在DOM中放置完整Base64）
  * @param src 原始图片源（Base64 或 URL）
@@ -24,33 +118,12 @@ export const createThumbnail = (
   const cached = thumbnailCache.get(cacheKey);
   if (cached) return Promise.resolve(cached);
 
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      let w = img.naturalWidth;
-      let h = img.naturalHeight;
-      if (w > maxWidth) {
-        h = Math.round(h * (maxWidth / w));
-        w = maxWidth;
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { resolve(src); return; }
-      ctx.drawImage(img, 0, 0, w, h);
-      const thumb = canvas.toDataURL('image/jpeg', quality);
-      // 存入缓存
-      if (thumbnailCache.size >= THUMBNAIL_CACHE_MAX) {
-        const firstKey = thumbnailCache.keys().next().value;
-        if (firstKey !== undefined) thumbnailCache.delete(firstKey);
-      }
-      thumbnailCache.set(cacheKey, thumb);
-      resolve(thumb);
-    };
-    img.onerror = () => resolve(src); // 失败时回退到原图
-    img.src = src;
-  });
+  // 优先异步管线；失败则回退到旧同步实现，保证健壮性
+  if (supportsBitmapPipeline) {
+    return createThumbnailBitmap(src, maxWidth, quality, cacheKey)
+      .catch(() => createThumbnailLegacy(src, maxWidth, quality, cacheKey));
+  }
+  return createThumbnailLegacy(src, maxWidth, quality, cacheKey);
 };
 
 /**

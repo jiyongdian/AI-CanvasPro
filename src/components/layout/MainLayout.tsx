@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { useMemo } from 'react';
-import { Layout, Menu } from 'antd';
+import { useMemo, Suspense } from 'react';
+import { Layout, Menu, Spin } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useRecoilValue, useRecoilState } from 'recoil';
 import { currentProjectState } from '../../store/projectStore';
@@ -122,7 +122,15 @@ const MainLayout: React.FC = () => {
           </div>
         </Sider>
         <Content className={styles.content}>
-          <Outlet />
+          <Suspense
+            fallback={
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', minHeight: 240 }}>
+                <Spin size="large" />
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </Content>
       </Layout>
     </Layout>

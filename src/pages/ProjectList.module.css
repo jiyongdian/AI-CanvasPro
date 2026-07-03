@@ -148,6 +148,9 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  /* 视口外卡片跳过渲染，滚动更流畅；contain-intrinsic-size 占位防跳动 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 360px;
   border-radius: 22px !important;
   border: 1px solid var(--panel-border) !important;
   background: var(--panel-bg-gradient) !important;

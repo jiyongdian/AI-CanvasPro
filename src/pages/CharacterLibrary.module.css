@@ -166,6 +166,10 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  /* 视口外的卡片跳过渲染（布局/绘制），滚动更流畅；
+     contain-intrinsic-size 提供占位尺寸，避免滚动条跳动 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 380px;
   background: var(--panel-bg-gradient) !important;
   border: 1px solid var(--panel-border) !important;
   border-radius: 22px !important;
