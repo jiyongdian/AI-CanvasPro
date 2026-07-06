@@ -147,6 +147,17 @@ const formatNetworkProbeError = (error: unknown, targetUrl: string): string => {
   return `网络错误: ${errMsg}\n\n💡 请检查 API 地址格式和网络连接。`;
 };
 
+// 安全解析 JSON：先读 text，避免 HTML 错误页导致 SyntaxError
+const safeResponseJson = async (response: Response, label = 'API'): Promise<any> => {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const preview = text.slice(0, 120).replace(/\s+/g, ' ');
+    throw new Error(`${label} 返回了非 JSON 响应（可能是错误页面）：${preview}`);
+  }
+};
+
 const extractModelItems = async (response: Response): Promise<any[]> => {
   try {
     const data = await response.json();
@@ -1322,7 +1333,7 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
       throw new Error(`Image generation error: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await safeResponseJson(response, '图片生成');
     console.log('[AIService] 响应数据:', JSON.stringify(data, null, 2));
 
     // gpt-image-2：自动检测同步/异步响应
@@ -1353,7 +1364,7 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
           const errText = await pollRes.text();
           throw new Error(`Image task poll error: ${errText}`);
         }
-        const pollData = await pollRes.json();
+        const pollData = await safeResponseJson(pollRes, '任务轮询');
         const status: string = pollData?.data?.status || pollData?.status || '';
         console.log('[AIService] 任务状态:', status, '轮询次数:', i + 1);
         if (status === 'FAILURE') throw new Error('Image generation failed on server');
