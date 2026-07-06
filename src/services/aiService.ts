@@ -1214,14 +1214,28 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
     }
     
     // ========== 第三步：构建请求 ==========
-    const payload: Record<string, unknown> = {
-      prompt: finalPrompt,
-      model: imageModel,
-      response_format: 'url',
-      aspect_ratio: options?.aspectRatio || '16:9'
+    const isGptImage2 = imageModel.includes('gpt-image-2');
+    const IMAGE_SIZE_MAP: Record<string, string> = {
+      '1K': '1024x1024',
+      '2K': '2048x2048',
+      '4K': '4096x4096'
     };
 
-    if ((imageModel.includes('nano-banana-2') || imageModel.includes('gpt-image-2')) && options?.imageSize) {
+    const payload: Record<string, unknown> = isGptImage2
+      ? {
+          prompt: finalPrompt,
+          model: imageModel,
+          n: 1,
+          size: IMAGE_SIZE_MAP[options?.imageSize || '2K'] || '2048x2048'
+        }
+      : {
+          prompt: finalPrompt,
+          model: imageModel,
+          response_format: 'url',
+          aspect_ratio: options?.aspectRatio || '16:9'
+        };
+
+    if (!isGptImage2 && imageModel.includes('nano-banana-2') && options?.imageSize) {
       payload.image_size = options.imageSize;
     }
     
@@ -1255,7 +1269,8 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
 
     const data = await response.json();
     console.log('[AIService] 响应数据:', JSON.stringify(data, null, 2));
-    return data.data?.[0]?.url || '';
+    const item = data.data?.[0];
+    return item?.url || (item?.b64_json ? `data:image/png;base64,${item.b64_json}` : '') || '';
   }
 
   async optimizeCharacterPrompt(
