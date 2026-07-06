@@ -1221,7 +1221,7 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
       aspect_ratio: options?.aspectRatio || '16:9'
     };
 
-    if (imageModel.includes('nano-banana-2') && options?.imageSize) {
+    if ((imageModel.includes('nano-banana-2') || imageModel.includes('gpt-image-2')) && options?.imageSize) {
       payload.image_size = options.imageSize;
     }
     

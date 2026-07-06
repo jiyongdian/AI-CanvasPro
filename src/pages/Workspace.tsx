@@ -65,6 +65,11 @@ const VIDEO_QUALITY_OPTIONS = Array.from(new Set([
   ...VIDEO_QUALITIES_ALL,
   ...Object.values(VIDEO_MODEL_PRESETS).flatMap(preset => preset.qualities),
 ]));
+const IMAGE_SIZE_OPTIONS = [
+  { label: '1K 标准', value: '1K' },
+  { label: '2K 高清', value: '2K' },
+  { label: '4K 超清', value: '4K' },
+];
 const getVideoPreset = (modelId: string | undefined) => {
   if (!modelId) return { durations: [5,8,10], qualities: ['720p 高清','1080p 全高清'] };
   for (const [key, preset] of Object.entries(VIDEO_MODEL_PRESETS)) if (modelId.toLowerCase().includes(key)) return preset;
@@ -99,6 +104,7 @@ interface WorkspacePersistedStateData {
   imageRatio: string;
   videoDuration: number;
   videoQuality: string;
+  imageQuality: string;
   platformSelections: Record<string, WorkspacePlatformModelSelection>;
 }
 
@@ -115,6 +121,7 @@ const DEFAULT_WORKSPACE_PERSISTED_STATE: WorkspacePersistedStateData = {
   imageRatio: '16:9 宽屏',
   videoDuration: 5,
   videoQuality: '1080p 全高清',
+  imageQuality: '2K',
   platformSelections: {},
 };
 const LEGACY_WORKSPACE_KEYS = [
@@ -183,6 +190,10 @@ const sanitizeVideoQuality = (value: unknown): string => (
   typeof value === 'string' && VIDEO_QUALITY_OPTIONS.includes(value) ? value : DEFAULT_WORKSPACE_PERSISTED_STATE.videoQuality
 );
 
+const sanitizeImageQuality = (value: unknown): string => (
+  typeof value === 'string' && IMAGE_SIZE_OPTIONS.map(o => o.value).includes(value) ? value : DEFAULT_WORKSPACE_PERSISTED_STATE.imageQuality
+);
+
 const sanitizePlatformSelections = (value: unknown): Record<string, WorkspacePlatformModelSelection> => {
   if (!isRecord(value)) return {};
   const next: Record<string, WorkspacePlatformModelSelection> = {};
@@ -213,6 +224,7 @@ const normalizeWorkspacePersistedState = (value: WorkspacePersistedStateInput | 
   imageRatio: sanitizeImageRatio(value?.imageRatio),
   videoDuration: sanitizeVideoDuration(value?.videoDuration),
   videoQuality: sanitizeVideoQuality(value?.videoQuality),
+  imageQuality: sanitizeImageQuality(value?.imageQuality),
   platformSelections: sanitizePlatformSelections(value?.platformSelections),
 });
 
@@ -406,6 +418,7 @@ const Workspace: React.FC = () => {
   const [imageRatio, setImageRatio] = useState<string>(() => initialWorkspacePersistedState.imageRatio);
   const [videoDuration, setVideoDuration] = useState<number>(() => initialWorkspacePersistedState.videoDuration);
   const [videoQuality, setVideoQuality] = useState<string>(() => initialWorkspacePersistedState.videoQuality);
+  const [imageQuality, setImageQuality] = useState<string>(() => initialWorkspacePersistedState.imageQuality);
   const inferInFlightRef = useRef(false);
   const directorInFlightRef = useRef(false);
   const storyboardInFlightRef = useRef(false);
@@ -552,6 +565,7 @@ const Workspace: React.FC = () => {
     imageRatio,
     videoDuration,
     videoQuality,
+    imageQuality,
     platformSelections,
   }), [
     selectedStyleId,
@@ -567,6 +581,7 @@ const Workspace: React.FC = () => {
     imageRatio,
     videoDuration,
     videoQuality,
+    imageQuality,
     platformSelections,
   ]);
   const latestWorkspacePersistedStateRef = useRef(workspacePersistedState);
@@ -1237,7 +1252,7 @@ const Workspace: React.FC = () => {
         const result = await aiService.generateImage(
           imgScene,
           sceneChars.length > 0 ? sceneChars.map(c => ({ id: c.id, name: c.name, voiceType: c.voiceType || '', referenceImage: c.referenceImage || '' })) as any : undefined,
-          { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0], providerId: (mc as any).providerId }
+          { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0], imageSize: imageQuality, providerId: (mc as any).providerId }
         );
         setGenProgress(100);
         void handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: result }, imagePrompt: prompt || undefined, status: 'completed', imageStatus: 'completed' });
@@ -1465,7 +1480,10 @@ const Workspace: React.FC = () => {
             </div>
             <div className={styles.selectorGroup}><div className={styles.selectorLabel}>图片比例</div><Select size="small" className={styles.inlineSelect} popupClassName={styles.ctrlSelectPopup} value={imageRatio} onChange={setImageRatio} style={{width:'100%'}} options={IMAGE_RATIOS.map(r => ({ label: r, value: r }))} /></div>
             <div className={styles.selectorGroup}><div className={styles.selectorLabel}>视频秒数</div><Select size="small" className={styles.inlineSelect} popupClassName={styles.ctrlSelectPopup} value={videoDuration} onChange={setVideoDuration} style={{width:'100%'}} options={getVideoPreset(selVideoModel).durations.map(d => ({ label: `${d}秒`, value: d }))} /></div>
-            <div className={styles.selectorGroup}><div className={styles.selectorLabel}>清晰度</div><Select size="small" className={styles.inlineSelect} popupClassName={styles.ctrlSelectPopup} value={videoQuality} onChange={setVideoQuality} style={{width:'100%'}} options={getVideoPreset(selVideoModel).qualities.map(q => ({ label: q, value: q }))} /></div>
+            {previewMode === 'image'
+              ? <div className={styles.selectorGroup}><div className={styles.selectorLabel}>图片画质</div><Select size="small" className={styles.inlineSelect} popupClassName={styles.ctrlSelectPopup} value={imageQuality} onChange={setImageQuality} disabled={!(selImageModel || '').includes('gpt-image-2')} style={{width:'100%'}} options={IMAGE_SIZE_OPTIONS} /></div>
+              : <div className={styles.selectorGroup}><div className={styles.selectorLabel}>清晰度</div><Select size="small" className={styles.inlineSelect} popupClassName={styles.ctrlSelectPopup} value={videoQuality} onChange={setVideoQuality} style={{width:'100%'}} options={getVideoPreset(selVideoModel).qualities.map(q => ({ label: q, value: q }))} /></div>
+            }
           </div>
 
           <div className={styles.rightSection}>

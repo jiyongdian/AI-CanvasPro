@@ -167,7 +167,8 @@ const AICharacter: React.FC = () => {
   };
 
   const supportsImageSize = () => {
-    return (selImageModel || '').includes('nano-banana-2');
+    const model = selImageModel || '';
+    return model.includes('nano-banana-2') || model.includes('gpt-image-2');
   };
 
   // 加载风格列表
