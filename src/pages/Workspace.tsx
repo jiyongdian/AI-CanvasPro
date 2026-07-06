@@ -1220,9 +1220,24 @@ const Workspace: React.FC = () => {
         if ((mc as any).error) { message.error((mc as any).error); setGenerating(false); return; }
         setGenProgress(30);
         console.log('[图片生成] 模型:', selImageModel, '提示词:', (prompt || activeScene.prompt).slice(0,50));
+        // 获取出场角色
+        const selIds = activeScene?.selectedCharacterIds || [];
+        const sceneChars = characters.filter(c => selIds.includes(c.id));
+        // 参考图: 优先保留HTTP URL, 仅当完全缺失时才从media store恢复
+        for (const ch of sceneChars) {
+          const isHttp = ch.referenceImage?.startsWith('http');
+          if (!isHttp && (!ch.referenceImage || ch.referenceImage.startsWith('blob:'))) {
+            try { const media = await getMedia('character', ch.id); if (media) ch.referenceImage = media; } catch {}
+          }
+        }
+        console.log('[图片生成] 出场角色:', sceneChars.map(c => ({ name: c.name, hasRef: !!c.referenceImage })));
         // 动态传入当前输入框提示词
         const imgScene = { ...activeScene, prompt };
-        const result = await aiService.generateImage(imgScene, undefined, { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0], providerId: (mc as any).providerId });
+        const result = await aiService.generateImage(
+          imgScene,
+          sceneChars.length > 0 ? sceneChars.map(c => ({ id: c.id, name: c.name, voiceType: c.voiceType || '', referenceImage: c.referenceImage || '' })) as any : undefined,
+          { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0], providerId: (mc as any).providerId }
+        );
         setGenProgress(100);
         void handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: result }, imagePrompt: prompt || undefined, status: 'completed', imageStatus: 'completed' });
         addTaskToHistory({ id: crypto.randomUUID(), type: 'image', url: result, sceneId: activeScene.id, createdAt: new Date().toISOString(), prompt, model: selImageModel });
