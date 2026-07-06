@@ -1218,7 +1218,7 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
     const IMAGE_SIZE_MAP: Record<string, string> = {
       '1K': '1024x1024',
       '2K': '2048x2048',
-      '4K': '3840x3840'
+      '4K': '2880x2880'
     };
 
     const payload: Record<string, unknown> = isGptImage2
