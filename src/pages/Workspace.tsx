@@ -382,9 +382,7 @@ const Workspace: React.FC = () => {
   const [directorLoading, setDirectorLoading] = useState(false);
   const [storyboardLoading, setStoryboardLoading] = useState(false);
   const [directorPreviewOpen, setDirectorPreviewOpen] = useState(false);
-  const [storyboardPreviewOpen, setStoryboardPreviewOpen] = useState(false);
   const [directorResult, setDirectorResult] = useState('');
-  const [storyboardResult, setStoryboardResult] = useState('');
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [templateSelectOpen, setTemplateSelectOpen] = useState(false);
   const [addConfirmOpen, setAddConfirmOpen] = useState(false);
@@ -1112,13 +1110,14 @@ const Workspace: React.FC = () => {
     setDirectorPreviewOpen(false);
   };
 
-  // ==================== 故事板推理 (流式+绑定故事板模板) ====================
+  // ==================== 故事板推理 (generatePrompt，固定写入图片提示词) ====================
   const handleStoryboard = async () => {
     if (!activeScene || !project) return;
     if (storyboardInFlightRef.current) return;
     storyboardInFlightRef.current = true;
-    setStoryboardLoading(true); setStoryboardResult('');
+    setStoryboardLoading(true);
     const abortController = new AbortController();
+    let originalPrompt = '';
     storyboardAbortControllerRef.current = abortController;
     try {
       if (!selectedStoryboardTemplate) {
@@ -1126,47 +1125,44 @@ const Workspace: React.FC = () => {
         return;
       }
       clearPendingPromptSave();
-      const { value: curPrompt, persisted } = await persistPromptSnapshot(activeScene, previewMode);
+      const { value: curPrompt, persisted } = await persistPromptSnapshot(activeScene, 'image');
       if (!persisted) return;
-      const mc = resolveModelConfig(selTextModel);
-      if ((mc as any).error) { message.error((mc as any).error); setStoryboardLoading(false); return; }
       const prompt = (curPrompt?.trim?.() || '')
         || (activeScene.imagePrompt?.trim?.() || '')
-        || (activeScene.videoPrompt?.trim?.() || '')
         || (activeScene.prompt?.trim?.() || '');
       if (!prompt) { message.warning('请输入提示词'); return; }
+      const mc = resolveModelConfig(selTextModel);
+      if ((mc as any).error) { message.error((mc as any).error); setStoryboardLoading(false); return; }
+      const inferScene = { ...activeScene, prompt };
+      originalPrompt = prompt;
       let accumulated = '';
       let rafId = 0;
-      const result = await aiService.optimizePromptAsDirector(
-        prompt,
-        previewMode,
-        {
-          actionDescription: activeScene.actionDescription,
-          dialogue: activeScene.dialogue,
-          character: activeScene.character,
-          sceneDescription: activeScene.description,
-        },
-        () => {},
-        (text) => {
-          accumulated = text;
+      const result = await aiService.generatePrompt(
+        inferScene, 'image', undefined, undefined,
+        (chunk) => {
+          accumulated = chunk;
           if (rafId) cancelAnimationFrame(rafId);
-          rafId = requestAnimationFrame(() => setStoryboardResult(text));
+          rafId = requestAnimationFrame(() => setPrompt(chunk));
         },
+        selectedStyle ? { name: selectedStyle.name, description: selectedStyle.description } : undefined,
+        undefined,
         toTemplateRef(selectedStoryboardTemplate),
         (mc as any)?.providerId,
         selTextModel,
         abortController.signal,
       );
-      const finalResult = accumulated || result.optimized || '';
-      const validation = validateGeneratedPromptResult(finalResult, 'AI导演');
-      if (!validation.valid) { setPromptStatus('error'); setStoryboardResult(''); message.error(validation.error); return; }
-      setStoryboardResult(validation.normalized);
-      setPromptStatus('ai_preview');
-      setStoryboardPreviewOpen(true);
+      const finalPrompt = accumulated || result;
+      const validation = validateGeneratedPromptResult(finalPrompt, '推理');
+      if (!validation.valid) { setPromptStatus('error'); message.error(validation.error); return; }
+      applyPromptRuntimeState(validation.normalized, 'system', activeScene.id, 'image');
+      setPromptStatus('saving');
+      const saved = await handleUpdateScene(activeScene.id, { imagePrompt: validation.normalized } as any);
+      if (!saved) { setPromptStatus('error'); message.error('故事板推理结果保存失败，请重试'); return; }
+      setPromptStatus('saved');
       message.success('故事板推理完成');
     } catch (e: any) {
       if (isAbortError(e)) {
-        setStoryboardResult('');
+        applyPromptRuntimeState(originalPrompt, 'user', activeScene.id, 'image');
         setPromptStatus('idle');
         message.info('已取消故事板推理');
       } else {
@@ -1178,17 +1174,6 @@ const Workspace: React.FC = () => {
       storyboardInFlightRef.current = false;
       setStoryboardLoading(false);
     }
-  };
-  const applyStoryboardResult = async () => {
-    if (!activeScene) return;
-    const validation = validateGeneratedPromptResult(storyboardResult, 'AI导演');
-    if (!validation.valid) { setPromptStatus('error'); message.error(validation.error); return; }
-    applyPromptRuntimeState(validation.normalized, 'system', activeScene.id, previewMode);
-    setPromptStatus('saving');
-    const saved = await handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: validation.normalized } as any);
-    if (!saved) { setPromptStatus('error'); message.error('故事板推理结果保存失败，请重试'); return; }
-    setPromptStatus('saved');
-    setStoryboardPreviewOpen(false);
   };
 
   // ==================== 视频任务轮询 ====================
@@ -1399,7 +1384,6 @@ const Workspace: React.FC = () => {
               {directorResult && <Button size="small" icon={<EyeOutlined />} onClick={() => setDirectorPreviewOpen(true)}>预览</Button>}
               <Button size="small" icon={<FileTextOutlined />} onClick={handleStoryboard} loading={storyboardLoading} disabled={!selectedStoryboardTemplate}>故事板推理</Button>
               {storyboardLoading && <Button size="small" danger icon={<CloseCircleOutlined />} onClick={cancelStoryboard}>取消</Button>}
-              {storyboardResult && !storyboardLoading && <Button size="small" icon={<EyeOutlined />} onClick={() => setStoryboardPreviewOpen(true)}>预览</Button>}
             </div>
           </div>
         </div>
@@ -1524,7 +1508,6 @@ const Workspace: React.FC = () => {
       </Modal>
       <SceneManagerModal visible={sceneManagerVisible} scenes={project.script} selectedStyle={selectedStyle} selectedImageModel={selImageModel} selectedTextModel={selTextModel} imageModelProviderId={selImageModel ? (resolveModelConfig(selImageModel) as any)?.providerId : undefined} textModelProviderId={selTextModel ? (resolveModelConfig(selTextModel) as any)?.providerId : undefined} savedSceneLocations={project.sceneLocations} onClose={() => setSceneManagerVisible(false)} onImportToScene={(ids, url) => { if (ids === '__current__' && activeSceneId) { handleUpdateScene(activeSceneId, { images: { ...(project.script.find(s=>s.id===activeSceneId)?.images || {}), keyFrame: url, storyboard: url } }); return; } const idList = ids.split(',').filter(Boolean); const script = project.script.map(s => idList.includes(s.id) ? { ...s, images: { ...s.images, keyFrame: url, storyboard: url } } : s); handleUpdateProject({ ...project, script }); }} onSaveSceneLocations={locs => handleUpdateProject({ ...project, sceneLocations: locs })} onApplyPromptToScenes={(ids, prompt) => { const script = project.script.map(s => ids.includes(s.id) ? { ...s, jiMengPrompt: `【场景提示词】${prompt}` } : s); handleUpdateProject({ ...project, script }); }} />
       <Modal title={null} open={directorPreviewOpen} onCancel={() => setDirectorPreviewOpen(false)} footer={[<Button key="cancel" onClick={() => setDirectorPreviewOpen(false)}>取消</Button>,<Button key="apply" type="primary" onClick={applyDirectorResult}>应用到提示词</Button>]} width={760} centered className={`${styles.ctrlModal} ${styles.directorModal}`}><div className={styles.ctrlModalHead}><BulbOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>AI导演优化结果</span></div><div className={styles.ctrlModalBody}><pre className={styles.directorResultBox}>{directorResult}</pre></div></Modal>
-      <Modal title={null} open={storyboardPreviewOpen} onCancel={() => setStoryboardPreviewOpen(false)} footer={[<Button key="cancel" onClick={() => setStoryboardPreviewOpen(false)}>取消</Button>,<Button key="apply" type="primary" onClick={applyStoryboardResult}>应用到提示词</Button>]} width={760} centered className={`${styles.ctrlModal} ${styles.directorModal}`}><div className={styles.ctrlModalHead}><FileTextOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>故事板推理结果</span></div><div className={styles.ctrlModalBody}><pre className={styles.directorResultBox}>{storyboardResult}</pre></div></Modal>
 
       {/* 模型设置 + 自定义视频 + 模板弹窗 (保持原样) */}
       <Modal title={null} open={modelSettingsOpen} onCancel={() => setModelSettingsOpen(false)} footer={null} width={560} centered className={styles.tplModal}>
