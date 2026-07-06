@@ -299,6 +299,15 @@
     linear-gradient(135deg, #1d1024 0%, #31143f 48%, #111827 100%);
 }
 
+/* 故事板模板 — 紫色系封面 */
+.coverStoryboard {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(129, 140, 248, 0.24), transparent 26%),
+    radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.34), transparent 32%),
+    radial-gradient(circle at 50% 100%, rgba(167, 139, 250, 0.16), transparent 45%),
+    linear-gradient(135deg, #1a0f2e 0%, #2d1b4e 48%, #111827 100%);
+}
+
 .cardImage {
   --template-accent: #38bdf8;
   --template-accent-soft: rgba(56, 189, 248, 0.18);
@@ -321,6 +330,12 @@
   --template-accent: #ec4899;
   --template-accent-soft: rgba(236, 72, 153, 0.18);
   --template-accent-strong: rgba(168, 85, 247, 0.34);
+}
+
+.cardStoryboard {
+  --template-accent: #818cf8;
+  --template-accent-soft: rgba(129, 140, 248, 0.18);
+  --template-accent-strong: rgba(139, 92, 246, 0.34);
 }
 
 .cardAura,
@@ -396,6 +411,10 @@
   background: linear-gradient(135deg, rgba(244, 114, 182, 0.22), rgba(168, 85, 247, 0.3));
 }
 
+.ringStoryboard {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(139, 92, 246, 0.3));
+}
+
 .cardIcon {
   font-size: 18px;
   opacity: 0.94;
@@ -405,6 +424,7 @@
 .ringVideo .cardIcon { color: #ecfdf5; }
 .ringDirector .cardIcon { color: #fef3c7; }
 .ringScript .cardIcon { color: #fdf2f8; }
+.ringStoryboard .cardIcon { color: #ede9fe; }
 
 .cardHeroText {
   position: relative;
@@ -1027,6 +1047,14 @@
     linear-gradient(135deg, #fff1f8 0%, #f8efff 52%, #fff8fb 100%);
 }
 
+:root[data-theme='light'] .coverStoryboard {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(129, 140, 248, 0.18), transparent 26%),
+    radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.22), transparent 32%),
+    radial-gradient(circle at 50% 100%, rgba(167, 139, 250, 0.12), transparent 45%),
+    linear-gradient(135deg, #f0eeff 0%, #ede9fe 52%, #f5f3ff 100%);
+}
+
 :root[data-theme='light'] .cardAura {
   opacity: 0.72;
   mix-blend-mode: multiply;
@@ -1064,6 +1092,7 @@
 :root[data-theme='light'] .ringVideo .cardIcon { color: #059669; }
 :root[data-theme='light'] .ringDirector .cardIcon { color: #b45309; }
 :root[data-theme='light'] .ringScript .cardIcon { color: #be185d; }
+:root[data-theme='light'] .ringStoryboard .cardIcon { color: #6366f1; }
 
 :root[data-theme='light'] .cardName {
   color: #0f172a;

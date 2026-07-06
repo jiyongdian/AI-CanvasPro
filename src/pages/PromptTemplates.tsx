@@ -6,7 +6,7 @@ import * as React from 'react';
 import { useEffect, useState, useCallback, useMemo, memo } from 'react';
 import { Card, Button, Modal, Input, Empty, Spin, Row, Col, Popconfirm, Select } from 'antd';
 import { appMessage as message } from '../utils/antdApp';
-import { PlusOutlined, DeleteOutlined, EditOutlined, PictureOutlined, VideoCameraOutlined, FundViewOutlined, CopyOutlined, ExpandOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, EditOutlined, PictureOutlined, VideoCameraOutlined, FundViewOutlined, CopyOutlined, ExpandOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { FullscreenPromptEditor } from '../components/common';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -24,6 +24,7 @@ const TYPE_LABELS: Record<string, string> = {
   video: '视频',
   director: '导演',
   script: '脚本',
+  storyboard: '故事板',
 };
 
 // ── 卡片组件 ──
@@ -40,18 +41,21 @@ const TemplateCardItem = memo<TemplateCardItemProps>(({ template, onEdit, onDele
     video: styles.cardVideo,
     director: styles.cardDirector,
     script: styles.cardScript,
+    storyboard: styles.cardStoryboard,
   };
   const coverClassMap: Record<PromptTemplate['type'], string> = {
     image: styles.coverImage,
     video: styles.coverVideo,
     director: styles.coverDirector,
     script: styles.coverScript,
+    storyboard: styles.coverStoryboard,
   };
   const ringClassMap: Record<PromptTemplate['type'], string> = {
     image: styles.ringImage,
     video: styles.ringVideo,
     director: styles.ringDirector,
     script: styles.ringScript,
+    storyboard: styles.ringStoryboard,
   };
   const cardTypeClass = themeClassMap[template.type];
   const coverTypeClass = coverClassMap[template.type];
@@ -63,6 +67,7 @@ const TemplateCardItem = memo<TemplateCardItemProps>(({ template, onEdit, onDele
     video: '镜头节奏与动态指令',
     director: '场景调度与导演表达',
     script: '文本结构与叙事框架',
+    storyboard: '分镜故事板推理提示',
   };
   return (
     <Col xs={24} sm={12} md={8} lg={6}>
@@ -88,6 +93,8 @@ const TemplateCardItem = memo<TemplateCardItemProps>(({ template, onEdit, onDele
                   <PictureOutlined className={styles.cardIcon} />
                   ) : template.type === 'script' ? (
                   <CopyOutlined className={styles.cardIcon} />
+                  ) : template.type === 'storyboard' ? (
+                  <AppstoreOutlined className={styles.cardIcon} />
                 ) : (
                   <VideoCameraOutlined className={styles.cardIcon} />
                   )}
@@ -376,6 +383,7 @@ const PromptTemplates: React.FC = () => {
                     { label: '视频', value: 'video' },
                     { label: '导演', value: 'director' },
                     { label: '脚本', value: 'script' },
+                    { label: '故事板', value: 'storyboard' },
                   ]}
                   style={{ width: '100%' }}
                 />

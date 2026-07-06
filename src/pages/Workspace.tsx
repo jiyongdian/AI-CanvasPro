@@ -47,8 +47,8 @@ interface PreviewDisplayState {
   src?: string;
 }
 
-const TEMPLATE_TYPE_LABELS: Record<string, string> = { image: '图片模板', video: '视频模板', director: '导演模板' };
-const TEMPLATE_TYPE_ICONS: Record<string, React.ReactNode> = { image: <PictureOutlined />, video: <PlayCircleOutlined />, director: <BulbOutlined /> };
+const TEMPLATE_TYPE_LABELS: Record<string, string> = { image: '图片模板', video: '视频模板', director: '导演模板', storyboard: '故事板模板' };
+const TEMPLATE_TYPE_ICONS: Record<string, React.ReactNode> = { image: <PictureOutlined />, video: <PlayCircleOutlined />, director: <BulbOutlined />, storyboard: <FileTextOutlined /> };
 const IMAGE_RATIOS = ['1:1 方形', '3:2 标准', '4:3 经典', '16:9 宽屏', '9:16 竖屏', '2:3 肖像', '3:4', '21:9 超宽'];
 const VIDEO_DURATIONS_ALL = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,20,30,60];
 const VIDEO_QUALITIES_ALL = ['480p 标清','540p','720p 高清','1080p 全高清'];
@@ -91,6 +91,7 @@ interface WorkspacePersistedStateData {
   selectedImageTemplateId?: string;
   selectedVideoTemplateId?: string;
   selectedDirectorTemplateId?: string;
+  selectedStoryboardTemplateId?: string;
   selPlatformId?: string;
   selImageModel?: string;
   selVideoModel?: string;
@@ -204,6 +205,7 @@ const normalizeWorkspacePersistedState = (value: WorkspacePersistedStateInput | 
   selectedImageTemplateId: sanitizeOptionalString(value?.selectedImageTemplateId),
   selectedVideoTemplateId: sanitizeOptionalString(value?.selectedVideoTemplateId),
   selectedDirectorTemplateId: sanitizeOptionalString(value?.selectedDirectorTemplateId),
+  selectedStoryboardTemplateId: sanitizeOptionalString(value?.selectedStoryboardTemplateId),
   selPlatformId: sanitizeOptionalString(value?.selPlatformId),
   selImageModel: sanitizeOptionalString(value?.selImageModel),
   selVideoModel: sanitizeOptionalString(value?.selVideoModel),
@@ -358,6 +360,7 @@ const Workspace: React.FC = () => {
   const [selectedImageTemplateId, setSelectedImageTemplateId] = useState<string | undefined>(() => initialWorkspacePersistedState.selectedImageTemplateId);
   const [selectedVideoTemplateId, setSelectedVideoTemplateId] = useState<string | undefined>(() => initialWorkspacePersistedState.selectedVideoTemplateId);
   const [selectedDirectorTemplateId, setSelectedDirectorTemplateId] = useState<string | undefined>(() => initialWorkspacePersistedState.selectedDirectorTemplateId);
+  const [selectedStoryboardTemplateId, setSelectedStoryboardTemplateId] = useState<string | undefined>(() => initialWorkspacePersistedState.selectedStoryboardTemplateId);
 
   const [characterModalVisible, setCharacterModalVisible] = useState(false);
   const [characters, setCharactersLocal] = useState<Character[]>([]);
@@ -377,8 +380,11 @@ const Workspace: React.FC = () => {
   const [genProgress, setGenProgress] = useState(0);
   const [inferLoading, setInferLoading] = useState(false);
   const [directorLoading, setDirectorLoading] = useState(false);
+  const [storyboardLoading, setStoryboardLoading] = useState(false);
   const [directorPreviewOpen, setDirectorPreviewOpen] = useState(false);
+  const [storyboardPreviewOpen, setStoryboardPreviewOpen] = useState(false);
   const [directorResult, setDirectorResult] = useState('');
+  const [storyboardResult, setStoryboardResult] = useState('');
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [templateSelectOpen, setTemplateSelectOpen] = useState(false);
   const [addConfirmOpen, setAddConfirmOpen] = useState(false);
@@ -403,9 +409,11 @@ const Workspace: React.FC = () => {
   const [videoQuality, setVideoQuality] = useState<string>(() => initialWorkspacePersistedState.videoQuality);
   const inferInFlightRef = useRef(false);
   const directorInFlightRef = useRef(false);
+  const storyboardInFlightRef = useRef(false);
   const generateInFlightRef = useRef(false);
   const inferAbortControllerRef = useRef<AbortController | null>(null);
   const directorAbortControllerRef = useRef<AbortController | null>(null);
+  const storyboardAbortControllerRef = useRef<AbortController | null>(null);
 
   const selPlatform = useMemo(() => providers.find(p => p.id === selPlatformId), [providers, selPlatformId]);
   // 分类模型列表（其它类别在所有选择器中出现）
@@ -537,6 +545,7 @@ const Workspace: React.FC = () => {
     selectedImageTemplateId,
     selectedVideoTemplateId,
     selectedDirectorTemplateId,
+    selectedStoryboardTemplateId,
     selPlatformId,
     selImageModel,
     selVideoModel,
@@ -551,6 +560,7 @@ const Workspace: React.FC = () => {
     selectedImageTemplateId,
     selectedVideoTemplateId,
     selectedDirectorTemplateId,
+    selectedStoryboardTemplateId,
     selPlatformId,
     selImageModel,
     selVideoModel,
@@ -637,8 +647,14 @@ const Workspace: React.FC = () => {
   };
   const cancelInfer = () => { inferAbortControllerRef.current?.abort(); };
   const cancelDirector = () => { directorAbortControllerRef.current?.abort(); };
+  const cancelStoryboard = () => { storyboardAbortControllerRef.current?.abort(); };
   const selectedStyle = useMemo(() => styleList.find(s => s.id === selectedStyleId), [styleList, selectedStyleId]);
-  const templatesByType = useMemo(() => ({ image: promptTemplates.filter(t => t.type === 'image'), video: promptTemplates.filter(t => t.type === 'video'), director: promptTemplates.filter(t => t.type === 'director') }), [promptTemplates]);
+  const templatesByType = useMemo(() => ({
+    image: promptTemplates.filter(t => t.type === 'image'),
+    video: promptTemplates.filter(t => t.type === 'video'),
+    director: promptTemplates.filter(t => t.type === 'director'),
+    storyboard: promptTemplates.filter(t => t.type === 'storyboard'),
+  }), [promptTemplates]);
   const selectedImageTemplate = useMemo(() => (
     selectedImageTemplateId ? templatesByType.image.find(t => t.id === selectedImageTemplateId) : undefined
   ), [templatesByType.image, selectedImageTemplateId]);
@@ -648,12 +664,15 @@ const Workspace: React.FC = () => {
   const selectedDirectorTemplate = useMemo(() => (
     selectedDirectorTemplateId ? templatesByType.director.find(t => t.id === selectedDirectorTemplateId) : undefined
   ), [templatesByType.director, selectedDirectorTemplateId]);
+  const selectedStoryboardTemplate = useMemo(() => (
+    selectedStoryboardTemplateId ? templatesByType.storyboard.find(t => t.id === selectedStoryboardTemplateId) : undefined
+  ), [templatesByType.storyboard, selectedStoryboardTemplateId]);
   const toTemplateRef = (template?: Pick<PromptTemplate, 'id' | 'type'>) => (
     template ? { id: template.id, type: template.type } : undefined
   );
   const promptCharCount = useMemo(() => Array.from(promptText || '').length, [promptText]);
-  const getSelectedTemplateId = (type: string) => type === 'image' ? selectedImageTemplateId : type === 'video' ? selectedVideoTemplateId : selectedDirectorTemplateId;
-  const setSelectedTemplateId = (type: string, id: string | undefined) => { if (type === 'image') setSelectedImageTemplateId(id); else if (type === 'video') setSelectedVideoTemplateId(id); else setSelectedDirectorTemplateId(id); };
+  const getSelectedTemplateId = (type: string) => type === 'image' ? selectedImageTemplateId : type === 'video' ? selectedVideoTemplateId : type === 'storyboard' ? selectedStoryboardTemplateId : selectedDirectorTemplateId;
+  const setSelectedTemplateId = (type: string, id: string | undefined) => { if (type === 'image') setSelectedImageTemplateId(id); else if (type === 'video') setSelectedVideoTemplateId(id); else if (type === 'storyboard') setSelectedStoryboardTemplateId(id); else setSelectedDirectorTemplateId(id); };
   const getRequiredLibraryTemplate = useCallback((type: 'image' | 'video' | 'director') => {
     if (type === 'image') return selectedImageTemplate;
     if (type === 'video') return selectedVideoTemplate;
@@ -726,6 +745,10 @@ const Workspace: React.FC = () => {
     if (!templatesLoaded) return;
     if (selectedDirectorTemplateId && !selectedDirectorTemplate) setSelectedDirectorTemplateId(undefined);
   }, [templatesLoaded, selectedDirectorTemplateId, selectedDirectorTemplate]);
+  useEffect(() => {
+    if (!templatesLoaded) return;
+    if (selectedStoryboardTemplateId && !selectedStoryboardTemplate) setSelectedStoryboardTemplateId(undefined);
+  }, [templatesLoaded, selectedStoryboardTemplateId, selectedStoryboardTemplate]);
   useEffect(() => {
     if (!providersLoaded) return;
     const enabledProviders = providers.filter(p => p.enabled !== false);
@@ -1089,6 +1112,85 @@ const Workspace: React.FC = () => {
     setDirectorPreviewOpen(false);
   };
 
+  // ==================== 故事板推理 (流式+绑定故事板模板) ====================
+  const handleStoryboard = async () => {
+    if (!activeScene || !project) return;
+    if (storyboardInFlightRef.current) return;
+    storyboardInFlightRef.current = true;
+    setStoryboardLoading(true); setStoryboardResult('');
+    const abortController = new AbortController();
+    storyboardAbortControllerRef.current = abortController;
+    try {
+      if (!selectedStoryboardTemplate) {
+        message.warning('请先从提示词库选择有效的故事板模板，未选择时已阻止生成');
+        return;
+      }
+      clearPendingPromptSave();
+      const { value: curPrompt, persisted } = await persistPromptSnapshot(activeScene, previewMode);
+      if (!persisted) return;
+      const mc = resolveModelConfig(selTextModel);
+      if ((mc as any).error) { message.error((mc as any).error); setStoryboardLoading(false); return; }
+      const prompt = (curPrompt?.trim?.() || '')
+        || (activeScene.imagePrompt?.trim?.() || '')
+        || (activeScene.videoPrompt?.trim?.() || '')
+        || (activeScene.prompt?.trim?.() || '');
+      if (!prompt) { message.warning('请输入提示词'); return; }
+      let accumulated = '';
+      let rafId = 0;
+      const result = await aiService.optimizePromptAsDirector(
+        prompt,
+        previewMode,
+        {
+          actionDescription: activeScene.actionDescription,
+          dialogue: activeScene.dialogue,
+          character: activeScene.character,
+          sceneDescription: activeScene.description,
+        },
+        () => {},
+        (text) => {
+          accumulated = text;
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = requestAnimationFrame(() => setStoryboardResult(text));
+        },
+        toTemplateRef(selectedStoryboardTemplate),
+        (mc as any)?.providerId,
+        selTextModel,
+        abortController.signal,
+      );
+      const finalResult = accumulated || result.optimized || '';
+      const validation = validateGeneratedPromptResult(finalResult, 'AI导演');
+      if (!validation.valid) { setPromptStatus('error'); setStoryboardResult(''); message.error(validation.error); return; }
+      setStoryboardResult(validation.normalized);
+      setPromptStatus('ai_preview');
+      setStoryboardPreviewOpen(true);
+      message.success('故事板推理完成');
+    } catch (e: any) {
+      if (isAbortError(e)) {
+        setStoryboardResult('');
+        setPromptStatus('idle');
+        message.info('已取消故事板推理');
+      } else {
+        setPromptStatus('error');
+        message.error(e.message || '故事板推理失败');
+      }
+    } finally {
+      storyboardAbortControllerRef.current = null;
+      storyboardInFlightRef.current = false;
+      setStoryboardLoading(false);
+    }
+  };
+  const applyStoryboardResult = async () => {
+    if (!activeScene) return;
+    const validation = validateGeneratedPromptResult(storyboardResult, 'AI导演');
+    if (!validation.valid) { setPromptStatus('error'); message.error(validation.error); return; }
+    applyPromptRuntimeState(validation.normalized, 'system', activeScene.id, previewMode);
+    setPromptStatus('saving');
+    const saved = await handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: validation.normalized } as any);
+    if (!saved) { setPromptStatus('error'); message.error('故事板推理结果保存失败，请重试'); return; }
+    setPromptStatus('saved');
+    setStoryboardPreviewOpen(false);
+  };
+
   // ==================== 视频任务轮询 ====================
   const pollVideoTask = async (taskId: string, isVeo: boolean, sceneId: string, providerId?: string, model?: string) => {
     console.log(`[轮询] 开始: ${taskId}, provider: ${providerId}`);
@@ -1295,6 +1397,9 @@ const Workspace: React.FC = () => {
               <Button size="small" icon={<BulbOutlined />} onClick={handleDirector} loading={directorLoading} disabled={!selectedDirectorTemplate}>AI导演</Button>
               {directorLoading && <Button size="small" danger icon={<CloseCircleOutlined />} onClick={cancelDirector}>取消AI导演</Button>}
               {directorResult && <Button size="small" icon={<EyeOutlined />} onClick={() => setDirectorPreviewOpen(true)}>预览</Button>}
+              <Button size="small" icon={<FileTextOutlined />} onClick={handleStoryboard} loading={storyboardLoading} disabled={!selectedStoryboardTemplate}>故事板推理</Button>
+              {storyboardLoading && <Button size="small" danger icon={<CloseCircleOutlined />} onClick={cancelStoryboard}>取消</Button>}
+              {storyboardResult && !storyboardLoading && <Button size="small" icon={<EyeOutlined />} onClick={() => setStoryboardPreviewOpen(true)}>预览</Button>}
             </div>
           </div>
         </div>
@@ -1352,6 +1457,7 @@ const Workspace: React.FC = () => {
               <div className={styles.selectorStat}><span>图片模型</span><strong>{selImageModel || '未配置'}</strong></div>
               <div className={styles.selectorStat}><span>视频模型</span><strong>{selVideoModel || '未配置'}</strong></div>
               <div className={styles.selectorStat}><span>导演模板</span><strong>{selectedDirectorTemplate?.name || '未选择'}</strong></div>
+              <div className={styles.selectorStat}><span>故事板模板</span><strong>{selectedStoryboardTemplate?.name || '未选择'}</strong></div>
             </div>
           </div>
         </div>)}
@@ -1418,6 +1524,7 @@ const Workspace: React.FC = () => {
       </Modal>
       <SceneManagerModal visible={sceneManagerVisible} scenes={project.script} selectedStyle={selectedStyle} selectedImageModel={selImageModel} selectedTextModel={selTextModel} imageModelProviderId={selImageModel ? (resolveModelConfig(selImageModel) as any)?.providerId : undefined} textModelProviderId={selTextModel ? (resolveModelConfig(selTextModel) as any)?.providerId : undefined} savedSceneLocations={project.sceneLocations} onClose={() => setSceneManagerVisible(false)} onImportToScene={(ids, url) => { if (ids === '__current__' && activeSceneId) { handleUpdateScene(activeSceneId, { images: { ...(project.script.find(s=>s.id===activeSceneId)?.images || {}), keyFrame: url, storyboard: url } }); return; } const idList = ids.split(',').filter(Boolean); const script = project.script.map(s => idList.includes(s.id) ? { ...s, images: { ...s.images, keyFrame: url, storyboard: url } } : s); handleUpdateProject({ ...project, script }); }} onSaveSceneLocations={locs => handleUpdateProject({ ...project, sceneLocations: locs })} onApplyPromptToScenes={(ids, prompt) => { const script = project.script.map(s => ids.includes(s.id) ? { ...s, jiMengPrompt: `【场景提示词】${prompt}` } : s); handleUpdateProject({ ...project, script }); }} />
       <Modal title={null} open={directorPreviewOpen} onCancel={() => setDirectorPreviewOpen(false)} footer={[<Button key="cancel" onClick={() => setDirectorPreviewOpen(false)}>取消</Button>,<Button key="apply" type="primary" onClick={applyDirectorResult}>应用到提示词</Button>]} width={760} centered className={`${styles.ctrlModal} ${styles.directorModal}`}><div className={styles.ctrlModalHead}><BulbOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>AI导演优化结果</span></div><div className={styles.ctrlModalBody}><pre className={styles.directorResultBox}>{directorResult}</pre></div></Modal>
+      <Modal title={null} open={storyboardPreviewOpen} onCancel={() => setStoryboardPreviewOpen(false)} footer={[<Button key="cancel" onClick={() => setStoryboardPreviewOpen(false)}>取消</Button>,<Button key="apply" type="primary" onClick={applyStoryboardResult}>应用到提示词</Button>]} width={760} centered className={`${styles.ctrlModal} ${styles.directorModal}`}><div className={styles.ctrlModalHead}><FileTextOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>故事板推理结果</span></div><div className={styles.ctrlModalBody}><pre className={styles.directorResultBox}>{storyboardResult}</pre></div></Modal>
 
       {/* 模型设置 + 自定义视频 + 模板弹窗 (保持原样) */}
       <Modal title={null} open={modelSettingsOpen} onCancel={() => setModelSettingsOpen(false)} footer={null} width={560} centered className={styles.tplModal}>
@@ -1431,7 +1538,7 @@ const Workspace: React.FC = () => {
         <div className={styles.tplModalFooter}><Button type="primary" onClick={() => setModelSettingsOpen(false)}>完成</Button></div>
       </Modal>
 
-      <Modal title={null} open={templateSelectOpen} onCancel={() => setTemplateSelectOpen(false)} footer={null} width={500} centered className={styles.tplModal}><div className={styles.tplModalHead}><FileTextOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>提示词模板</span></div><div className={styles.tplModalBody}>{(['image','video','director'] as const).map(type => { const templates = templatesByType[type]; const selId = getSelectedTemplateId(type); return (<div key={type} className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}>{TEMPLATE_TYPE_ICONS[type]}</span>{TEMPLATE_TYPE_LABELS[type]}</div>{templates.length === 0 ? <div className={styles.tplEmpty}>暂无{type==='image'?'图片':type==='video'?'视频':'导演'}模板</div> : <Select size="small" className={styles.modalSelect} popupClassName={styles.ctrlSelectPopup} value={selId} onChange={(v) => setSelectedTemplateId(type, v)} placeholder={`选择${TEMPLATE_TYPE_LABELS[type]}`} allowClear style={{width:'100%'}} options={templates.map(t => ({ label: t.name, value: t.id }))} />}</div>); })}</div><div className={styles.tplModalFooter}><Button onClick={() => setTemplateSelectOpen(false)}>完成</Button></div></Modal>
+      <Modal title={null} open={templateSelectOpen} onCancel={() => setTemplateSelectOpen(false)} footer={null} width={500} centered className={styles.tplModal}><div className={styles.tplModalHead}><FileTextOutlined style={{fontSize:16,color:'#8b5cf6'}} /><span>提示词模板</span></div><div className={styles.tplModalBody}>{(['image','video','director','storyboard'] as const).map(type => { const templates = templatesByType[type]; const selId = getSelectedTemplateId(type); return (<div key={type} className={styles.tplGroup}><div className={styles.tplGroupTitle}><span className={styles.tplGroupIcon}>{TEMPLATE_TYPE_ICONS[type]}</span>{TEMPLATE_TYPE_LABELS[type]}</div>{templates.length === 0 ? <div className={styles.tplEmpty}>暂无{type==='image'?'图片':type==='video'?'视频':type==='storyboard'?'故事板':'导演'}模板</div> : <Select size="small" className={styles.modalSelect} popupClassName={styles.ctrlSelectPopup} value={selId} onChange={(v) => setSelectedTemplateId(type, v)} placeholder={`选择${TEMPLATE_TYPE_LABELS[type]}`} allowClear style={{width:'100%'}} options={templates.map(t => ({ label: t.name, value: t.id }))} />}</div>); })}</div><div className={styles.tplModalFooter}><Button onClick={() => setTemplateSelectOpen(false)}>完成</Button></div></Modal>
     </div>
   );
 };
