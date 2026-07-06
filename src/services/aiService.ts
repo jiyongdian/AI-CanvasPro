@@ -1030,7 +1030,7 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
   async generateImage(
     scene: Scene, 
     characters?: Character[],
-    options?: { aspectRatio?: string; imageSize?: string; style?: Style; generationMode?: GenerationMode; gridMode?: number; model?: string; providerId?: string; referenceImages?: string[] }
+    options?: { aspectRatio?: string; imageSize?: string; quality?: string; style?: Style; generationMode?: GenerationMode; gridMode?: number; model?: string; providerId?: string; referenceImages?: string[] }
   ): Promise<string> {
     const providerConfig = await this.getProviderConfig(options?.providerId);
     const apiUrl = providerConfig.apiUrl || this.getApiBaseUrl();
@@ -1215,52 +1215,107 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
     
     // ========== 第三步：构建请求 ==========
     const isGptImage2 = imageModel.includes('gpt-image-2');
-    const IMAGE_SIZE_MAP: Record<string, string> = {
-      '1K': '1024x1024',
-      '2K': '2048x2048',
-      '4K': '2880x2880'
+
+    // gpt-image-2 尺寸：根据画质+宽高比动态选最优尺寸
+    const resolveGptImage2Size = (quality: string | undefined, aspectRatio: string | undefined): string => {
+      const ar = (aspectRatio || '1:1').split(' ')[0];
+      const isLandscape = ar === '16:9' || ar === '3:2' || ar === '4:3';
+      const isPortrait = ar === '9:16' || ar === '2:3' || ar === '3:4';
+      const q = quality || '2K';
+      if (q === '4K') {
+        if (isLandscape) return '3840x2160';
+        if (isPortrait) return '2160x3840';
+        return '2880x2880';
+      }
+      if (q === '2K') {
+        if (isLandscape) return '2048x1152';
+        if (isPortrait) return '1152x2048';
+        return '2048x2048';
+      }
+      // 1K
+      return '1024x1024';
     };
 
-    const payload: Record<string, unknown> = isGptImage2
-      ? {
-          prompt: finalPrompt,
-          model: imageModel,
-          n: 1,
-          size: IMAGE_SIZE_MAP[options?.imageSize || '2K'] || '2048x2048'
-        }
-      : {
-          prompt: finalPrompt,
-          model: imageModel,
-          response_format: 'url',
-          aspect_ratio: options?.aspectRatio || '16:9'
-        };
-
-    if (!isGptImage2 && imageModel.includes('nano-banana-2') && options?.imageSize) {
-      payload.image_size = options.imageSize;
-    }
-    
-    if (referenceImages.length > 0) {
-      payload.image = referenceImages;
-    }
+    const resolvedSize = isGptImage2
+      ? resolveGptImage2Size(options?.imageSize, options?.aspectRatio)
+      : undefined;
 
     console.log('[AIService] 最终提示词:', finalPrompt);
-    console.log('[AIService] 发送请求到:', `${baseUrl}/images/generations`);
 
     let response: Response;
-    try {
-      response = await fetch(`${baseUrl}/images/generations`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+    if (isGptImage2 && referenceImages.length > 0) {
+      // 有参考图 → /v1/images/edits (multipart/form-data) + 异步模式
+      const endpoint = `${baseUrl}/images/edits?async=true`;
+      console.log('[AIService] 发送请求到 (edits async):', endpoint);
+      const form = new FormData();
+      form.append('model', imageModel);
+      form.append('prompt', finalPrompt);
+      form.append('size', resolvedSize!);
+      if (options?.quality) form.append('quality', options.quality);
+      referenceImages.forEach((img, i) => {
+        const byteStr = atob(img.split(',')[1] || img);
+        const arr = new Uint8Array(byteStr.length);
+        for (let i = 0; i < byteStr.length; i++) arr[i] = byteStr.charCodeAt(i);
+        const blob = new Blob([arr], { type: 'image/png' });
+        form.append('image', blob, `ref_${i}.png`);
       });
-    } catch (error) {
-      // 捕获CORS错误或网络错误
-      const targetUrl = `${baseUrl}/images/generations`;
-      throw new Error(formatNetworkProbeError(error, targetUrl));
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}` },
+          body: form
+        });
+      } catch (error) {
+        throw new Error(formatNetworkProbeError(error, endpoint));
+      }
+    } else if (isGptImage2) {
+      // 无参考图 → /v1/images/generations (JSON) + 异步模式
+      const endpoint = `${baseUrl}/images/generations?async=true`;
+      console.log('[AIService] 发送请求到 (generations async):', endpoint);
+      const payload: Record<string, unknown> = {
+        prompt: finalPrompt,
+        model: imageModel,
+        n: 1,
+        size: resolvedSize,
+        ...(options?.quality ? { quality: options.quality } : {})
+      };
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (error) {
+        throw new Error(formatNetworkProbeError(error, endpoint));
+      }
+    } else {
+      // 非 gpt-image-2 → 原逻辑
+      const endpoint = `${baseUrl}/images/generations`;
+      console.log('[AIService] 发送请求到:', endpoint);
+      const payload: Record<string, unknown> = {
+        prompt: finalPrompt,
+        model: imageModel,
+        response_format: 'url',
+        aspect_ratio: options?.aspectRatio || '16:9'
+      };
+      if (imageModel.includes('nano-banana-2') && options?.imageSize) {
+        payload.image_size = options.imageSize;
+      }
+      if (referenceImages.length > 0) {
+        payload.image = referenceImages;
+      }
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (error) {
+        throw new Error(formatNetworkProbeError(error, endpoint));
+      }
     }
 
     console.log('[AIService] 响应状态:', response.status, response.statusText);
-
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[AIService] 请求失败:', errorText);
@@ -1269,6 +1324,41 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
 
     const data = await response.json();
     console.log('[AIService] 响应数据:', JSON.stringify(data, null, 2));
+
+    // gpt-image-2 异步模式：轮询任务直到完成
+    if (isGptImage2) {
+      const taskId: string = data?.data;
+      if (!taskId) throw new Error('Image generation error: no task_id returned');
+      console.log('[AIService] 异步任务ID:', taskId);
+      const pollUrl = `${baseUrl}/images/tasks/${taskId}`;
+      const MAX_POLLS = 120; // 最多等 120 × 3s = 6 分钟
+      for (let i = 0; i < MAX_POLLS; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        let pollRes: Response;
+        try {
+          pollRes = await fetch(pollUrl, {
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          throw new Error(formatNetworkProbeError(error, pollUrl));
+        }
+        if (!pollRes.ok) {
+          const errText = await pollRes.text();
+          throw new Error(`Image task poll error: ${errText}`);
+        }
+        const pollData = await pollRes.json();
+        const status: string = pollData?.data?.status || pollData?.status || '';
+        console.log('[AIService] 任务状态:', status, '轮询次数:', i + 1);
+        if (status === 'FAILURE') throw new Error('Image generation failed on server');
+        if (status === 'SUCCESS') {
+          const inner = pollData?.data?.data?.data?.[0] || pollData?.data?.data?.[0] || pollData?.data?.[0];
+          return inner?.url || (inner?.b64_json ? `data:image/png;base64,${inner.b64_json}` : '') || '';
+        }
+      }
+      throw new Error('Image generation timeout: task did not complete in time');
+    }
+
+    // 非异步模式直接返回
     const item = data.data?.[0];
     return item?.url || (item?.b64_json ? `data:image/png;base64,${item.b64_json}` : '') || '';
   }

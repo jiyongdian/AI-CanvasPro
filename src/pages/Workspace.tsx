@@ -70,6 +70,12 @@ const IMAGE_SIZE_OPTIONS = [
   { label: '2K 高清', value: '2K' },
   { label: '4K 超清', value: '4K' },
 ];
+const IMAGE_QUALITY_LEVEL_OPTIONS = [
+  { label: 'auto 自动', value: 'auto' },
+  { label: 'low 低质量', value: 'low' },
+  { label: 'medium 标准', value: 'medium' },
+  { label: 'high 高质量', value: 'high' },
+];
 const getVideoPreset = (modelId: string | undefined) => {
   if (!modelId) return { durations: [5,8,10], qualities: ['720p 高清','1080p 全高清'] };
   for (const [key, preset] of Object.entries(VIDEO_MODEL_PRESETS)) if (modelId.toLowerCase().includes(key)) return preset;
@@ -105,6 +111,7 @@ interface WorkspacePersistedStateData {
   videoDuration: number;
   videoQuality: string;
   imageQuality: string;
+  imageQualityLevel: string;
   platformSelections: Record<string, WorkspacePlatformModelSelection>;
 }
 
@@ -122,6 +129,7 @@ const DEFAULT_WORKSPACE_PERSISTED_STATE: WorkspacePersistedStateData = {
   videoDuration: 5,
   videoQuality: '1080p 全高清',
   imageQuality: '2K',
+  imageQualityLevel: 'auto',
   platformSelections: {},
 };
 const LEGACY_WORKSPACE_KEYS = [
@@ -194,6 +202,10 @@ const sanitizeImageQuality = (value: unknown): string => (
   typeof value === 'string' && IMAGE_SIZE_OPTIONS.map(o => o.value).includes(value) ? value : DEFAULT_WORKSPACE_PERSISTED_STATE.imageQuality
 );
 
+const sanitizeImageQualityLevel = (value: unknown): string => (
+  typeof value === 'string' && IMAGE_QUALITY_LEVEL_OPTIONS.map(o => o.value).includes(value) ? value : DEFAULT_WORKSPACE_PERSISTED_STATE.imageQualityLevel!
+);
+
 const sanitizePlatformSelections = (value: unknown): Record<string, WorkspacePlatformModelSelection> => {
   if (!isRecord(value)) return {};
   const next: Record<string, WorkspacePlatformModelSelection> = {};
@@ -225,6 +237,7 @@ const normalizeWorkspacePersistedState = (value: WorkspacePersistedStateInput | 
   videoDuration: sanitizeVideoDuration(value?.videoDuration),
   videoQuality: sanitizeVideoQuality(value?.videoQuality),
   imageQuality: sanitizeImageQuality(value?.imageQuality),
+  imageQualityLevel: sanitizeImageQualityLevel(value?.imageQualityLevel),
   platformSelections: sanitizePlatformSelections(value?.platformSelections),
 });
 
@@ -419,6 +432,7 @@ const Workspace: React.FC = () => {
   const [videoDuration, setVideoDuration] = useState<number>(() => initialWorkspacePersistedState.videoDuration);
   const [videoQuality, setVideoQuality] = useState<string>(() => initialWorkspacePersistedState.videoQuality);
   const [imageQuality, setImageQuality] = useState<string>(() => initialWorkspacePersistedState.imageQuality);
+  const [imageQualityLevel, setImageQualityLevel] = useState<string>(() => initialWorkspacePersistedState.imageQualityLevel!);
   const inferInFlightRef = useRef(false);
   const directorInFlightRef = useRef(false);
   const storyboardInFlightRef = useRef(false);
@@ -566,6 +580,7 @@ const Workspace: React.FC = () => {
     videoDuration,
     videoQuality,
     imageQuality,
+    imageQualityLevel,
     platformSelections,
   }), [
     selectedStyleId,
@@ -582,6 +597,7 @@ const Workspace: React.FC = () => {
     videoDuration,
     videoQuality,
     imageQuality,
+    imageQualityLevel,
     platformSelections,
   ]);
   const latestWorkspacePersistedStateRef = useRef(workspacePersistedState);
@@ -1252,7 +1268,7 @@ const Workspace: React.FC = () => {
         const result = await aiService.generateImage(
           imgScene,
           sceneChars.length > 0 ? sceneChars.map(c => ({ id: c.id, name: c.name, voiceType: c.voiceType || '', referenceImage: c.referenceImage || '' })) as any : undefined,
-          { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0], imageSize: imageQuality, providerId: (mc as any).providerId }
+          { style: selectedStyle, generationMode, model: selImageModel, aspectRatio: imageRatio.split(' ')[0], imageSize: imageQuality, quality: (selImageModel || '').includes('gpt-image-2') ? imageQualityLevel : undefined, providerId: (mc as any).providerId }
         );
         setGenProgress(100);
         void handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: result }, imagePrompt: prompt || undefined, status: 'completed', imageStatus: 'completed' });
@@ -1481,7 +1497,8 @@ const Workspace: React.FC = () => {
             <div className={styles.selectorGroup}><div className={styles.selectorLabel}>图片比例</div><Select size="small" className={styles.inlineSelect} popupClassName={styles.ctrlSelectPopup} value={imageRatio} onChange={setImageRatio} style={{width:'100%'}} options={IMAGE_RATIOS.map(r => ({ label: r, value: r }))} /></div>
             <div className={styles.selectorGroup}><div className={styles.selectorLabel}>视频秒数</div><Select size="small" className={styles.inlineSelect} popupClassName={styles.ctrlSelectPopup} value={videoDuration} onChange={setVideoDuration} style={{width:'100%'}} options={getVideoPreset(selVideoModel).durations.map(d => ({ label: `${d}秒`, value: d }))} /></div>
             {previewMode === 'image'
-              ? <div className={styles.selectorGroup}><div className={styles.selectorLabel}>图片画质</div><Select size="small" className={styles.inlineSelect} popupClassName={styles.ctrlSelectPopup} value={imageQuality} onChange={setImageQuality} disabled={!(selImageModel || '').includes('gpt-image-2')} style={{width:'100%'}} options={IMAGE_SIZE_OPTIONS} /></div>
+              ? <><div className={styles.selectorGroup}><div className={styles.selectorLabel}>图片画质</div><Select size="small" className={styles.inlineSelect} popupClassName={styles.ctrlSelectPopup} value={imageQuality} onChange={setImageQuality} disabled={!(selImageModel || '').includes('gpt-image-2')} style={{width:'100%'}} options={IMAGE_SIZE_OPTIONS} /></div>
+              <div className={styles.selectorGroup}><div className={styles.selectorLabel}>质量等级</div><Select size="small" className={styles.inlineSelect} popupClassName={styles.ctrlSelectPopup} value={imageQualityLevel} onChange={setImageQualityLevel} disabled={!(selImageModel || '').includes('gpt-image-2')} style={{width:'100%'}} options={IMAGE_QUALITY_LEVEL_OPTIONS} /></div></>
               : <div className={styles.selectorGroup}><div className={styles.selectorLabel}>清晰度</div><Select size="small" className={styles.inlineSelect} popupClassName={styles.ctrlSelectPopup} value={videoQuality} onChange={setVideoQuality} style={{width:'100%'}} options={getVideoPreset(selVideoModel).qualities.map(q => ({ label: q, value: q }))} /></div>
             }
           </div>

@@ -39,9 +39,17 @@ const imageSizeOptions = [
   { label: '4K 超清', value: '4K' },
 ];
 
+const imageQualityOptions = [
+  { label: 'auto 自动', value: 'auto' },
+  { label: 'low 低质量', value: 'low' },
+  { label: 'medium 标准', value: 'medium' },
+  { label: 'high 高质量', value: 'high' },
+];
+
 const PROMPT_STORAGE_KEY = 'ai_character_prompt';
 const ASPECT_RATIO_STORAGE_KEY = 'ai_character_aspect_ratio';
 const IMAGE_SIZE_STORAGE_KEY = 'ai_character_image_size';
+const IMAGE_QUALITY_STORAGE_KEY = 'ai_character_image_quality';
 const STYLE_STORAGE_KEY = 'ai_character_style';
 const TEMPLATE_PRESET_STORAGE_KEY = 'ai_character_template_preset';
 
@@ -60,6 +68,9 @@ const AICharacter: React.FC = () => {
   });
   const [imageSize, setImageSize] = useState(() => {
     return localStorage.getItem(IMAGE_SIZE_STORAGE_KEY) || '4K';
+  });
+  const [imageQuality, setImageQuality] = useState(() => {
+    return localStorage.getItem(IMAGE_QUALITY_STORAGE_KEY) || 'auto';
   });
   const [history, setHistory] = useState<GeneratedCharacter[]>([]);
   const [characters, setCharacters] = useRecoilState(characterListState);
@@ -276,6 +287,11 @@ const AICharacter: React.FC = () => {
     localStorage.setItem(IMAGE_SIZE_STORAGE_KEY, imageSize);
   }, [imageSize]);
 
+  // 图片质量等级持久化保存
+  useEffect(() => {
+    localStorage.setItem(IMAGE_QUALITY_STORAGE_KEY, imageQuality);
+  }, [imageQuality]);
+
   // 保存单个记录到IndexedDB
   const saveToIndexedDB = async (character: GeneratedCharacter) => {
     try {
@@ -329,7 +345,7 @@ const AICharacter: React.FC = () => {
       const imageUrl = await aiService.generateImage(
         { id: newCharacter.id, order: 0, description: '', prompt: currentPrompt, generationMode: 'text-to-image', images: {}, videos: [], status: 'pending' },
         undefined,
-        { aspectRatio, imageSize: supportsImageSize() ? imageSize : undefined, style: selectedStyle, model: selImageModel, providerId: (mc as any).providerId, referenceImages: customImages.length > 0 ? customImages : undefined }
+        { aspectRatio, imageSize: supportsImageSize() ? imageSize : undefined, quality: supportsImageSize() ? imageQuality : undefined, style: selectedStyle, model: selImageModel, providerId: (mc as any).providerId, referenceImages: customImages.length > 0 ? customImages : undefined }
       );
 
       // 预加载图片到浏览器缓存，带进度回调
@@ -662,6 +678,17 @@ const AICharacter: React.FC = () => {
             value={imageSize}
             onChange={setImageSize}
             options={imageSizeOptions}
+            style={{ width: '100%' }}
+          />
+        </div>
+      )}
+      {supportsImageSize() && (
+        <div className={styles.paramItem}>
+          <span className={styles.paramLabel}>质量等级</span>
+          <Select
+            value={imageQuality}
+            onChange={setImageQuality}
+            options={imageQualityOptions}
             style={{ width: '100%' }}
           />
         </div>
