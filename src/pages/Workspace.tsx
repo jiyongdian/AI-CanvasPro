@@ -1125,10 +1125,11 @@ const Workspace: React.FC = () => {
         return;
       }
       clearPendingPromptSave();
-      const { value: curPrompt, persisted } = await persistPromptSnapshot(activeScene, 'image');
+      const { value: curPrompt, persisted } = await persistPromptSnapshot(activeScene, previewMode);
       if (!persisted) return;
       const prompt = (curPrompt?.trim?.() || '')
         || (activeScene.imagePrompt?.trim?.() || '')
+        || (activeScene.videoPrompt?.trim?.() || '')
         || (activeScene.prompt?.trim?.() || '');
       if (!prompt) { message.warning('请输入提示词'); return; }
       const mc = resolveModelConfig(selTextModel);
@@ -1138,7 +1139,7 @@ const Workspace: React.FC = () => {
       let accumulated = '';
       let rafId = 0;
       const result = await aiService.generatePrompt(
-        inferScene, 'image', undefined, undefined,
+        inferScene, previewMode, undefined, undefined,
         (chunk) => {
           accumulated = chunk;
           if (rafId) cancelAnimationFrame(rafId);
@@ -1154,15 +1155,15 @@ const Workspace: React.FC = () => {
       const finalPrompt = accumulated || result;
       const validation = validateGeneratedPromptResult(finalPrompt, '推理');
       if (!validation.valid) { setPromptStatus('error'); message.error(validation.error); return; }
-      applyPromptRuntimeState(validation.normalized, 'system', activeScene.id, 'image');
+      applyPromptRuntimeState(validation.normalized, 'system', activeScene.id, previewMode);
       setPromptStatus('saving');
-      const saved = await handleUpdateScene(activeScene.id, { imagePrompt: validation.normalized } as any);
+      const saved = await handleUpdateScene(activeScene.id, { [previewMode === 'image' ? 'imagePrompt' : 'videoPrompt']: validation.normalized } as any);
       if (!saved) { setPromptStatus('error'); message.error('故事板推理结果保存失败，请重试'); return; }
       setPromptStatus('saved');
       message.success('故事板推理完成');
     } catch (e: any) {
       if (isAbortError(e)) {
-        applyPromptRuntimeState(originalPrompt, 'user', activeScene.id, 'image');
+        applyPromptRuntimeState(originalPrompt, 'user', activeScene.id, previewMode);
         setPromptStatus('idle');
         message.info('已取消故事板推理');
       } else {
