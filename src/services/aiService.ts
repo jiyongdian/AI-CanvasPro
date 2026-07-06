@@ -862,7 +862,7 @@ ${novelContent}`;
     let sceneInfo: string;
     const resolvedTemplate = await this.resolveLibraryTemplate(
       promptTemplate,
-      [mode],
+      [mode, 'storyboard'],
       `请先从提示词库选择有效的${mode === 'image' ? '图片' : '视频'}提示词模板，再开始生成`,
     );
     const rawStylePrompt = selectedStyle?.description?.trim() || '';
