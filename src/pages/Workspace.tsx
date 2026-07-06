@@ -387,6 +387,7 @@ const Workspace: React.FC = () => {
   const [templateSelectOpen, setTemplateSelectOpen] = useState(false);
   const [addConfirmOpen, setAddConfirmOpen] = useState(false);
   const [previewImportOpen, setPreviewImportOpen] = useState(false);
+  const [imageFullPreviewOpen, setImageFullPreviewOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [promptStatus, setPromptStatus] = useState<'idle' | 'editing' | 'saving' | 'saved' | 'ai_preview' | 'error'>('idle');
@@ -1360,11 +1361,59 @@ const Workspace: React.FC = () => {
             </div>
           </div>
 
-          <div className={`${styles.previewArea} ${activeScene ? styles.previewActive : ''}`} onClick={() => activeScene && setPreviewImportOpen(true)} style={{ flex: promptExpanded ? '0 0 0' : 1, overflow: 'hidden', transition: 'flex 0.35s cubic-bezier(0.22,1,0.36,1)' }}>
+          <div className={`${styles.previewArea} ${activeScene ? styles.previewActive : ''}`} style={{ flex: promptExpanded ? '0 0 0' : 1, overflow: 'hidden', transition: 'flex 0.35s cubic-bezier(0.22,1,0.36,1)' }}>
             {generating ? <div className={styles.previewLoading}><Spin size="large" /><Progress percent={genProgress} size="small" style={{width:200}} /></div>
-            : desiredPreview.kind === 'image' && desiredPreview.src ? <img src={desiredPreview.src} className={styles.previewImage} alt="" />
+            : desiredPreview.kind === 'image' && desiredPreview.src ? (
+              <img
+                src={desiredPreview.src}
+                className={`${styles.previewImage} ${styles.previewImageClickable}`}
+                alt=""
+                onClick={() => setImageFullPreviewOpen(true)}
+                title="点击预览大图"
+              />
+            )
             : desiredPreview.kind === 'video' && desiredPreview.src ? <video src={desiredPreview.src} className={styles.previewVideo} controls preload="metadata" />
             : <div className={styles.previewEmpty}><span className={styles.previewEmptyIconWrap}>{previewMode === 'image' ? <PictureOutlined className={styles.previewEmptyIcon} /> : <PlayCircleOutlined className={styles.previewEmptyIcon} />}</span><span>{previewMode === 'image' ? '选择分镜并生成图片' : '选择分镜并生成视频'}</span></div>}
+            {/* 左下角：上传 / 清空按钮组 */}
+            {activeScene && (
+              <div className={styles.previewCtrlBtns}>
+                <button
+                  className={styles.previewCtrlBtn}
+                  title="导入图片"
+                  onClick={() => {
+                    const inp = document.createElement('input');
+                    inp.type = 'file';
+                    inp.accept = 'image/*';
+                    inp.onchange = async () => {
+                      const f = inp.files?.[0];
+                      if (!f) return;
+                      try {
+                        const b64 = await new Promise<string>((resolve, reject) => {
+                          const r = new FileReader();
+                          r.onload = () => resolve(r.result as string);
+                          r.onerror = reject;
+                          r.readAsDataURL(f);
+                        });
+                        handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: b64 } });
+                        message.success('图片已导入');
+                      } catch { message.error('导入失败'); }
+                    };
+                    inp.click();
+                  }}
+                >
+                  <UploadOutlined />
+                </button>
+                {desiredPreview.kind === 'image' && desiredPreview.src && (
+                  <button
+                    className={`${styles.previewCtrlBtn} ${styles.previewCtrlBtnDanger}`}
+                    title="清空图片"
+                    onClick={() => handleUpdateScene(activeScene.id, { images: { ...activeScene.images, keyFrame: undefined } })}
+                  >
+                    <DeleteOutlined />
+                  </button>
+                )}
+              </div>
+            )}
             {/* 任务历史按钮 */}
             <Button type="text" size="small" icon={<HistoryOutlined />} className={styles.historyBtn} onClick={(e) => { e.stopPropagation(); setHistoryOpen(true); }} title="任务历史" />
           </div>
@@ -1462,6 +1511,24 @@ const Workspace: React.FC = () => {
           </div>
         </div>)}
       </div>
+
+      {/* 图片全屏预览弹窗 */}
+      <Modal
+        open={imageFullPreviewOpen}
+        onCancel={() => setImageFullPreviewOpen(false)}
+        footer={null}
+        width="85vw"
+        centered
+        className={styles.fullPreviewModal}
+        closable
+        destroyOnHidden
+      >
+        {previewImg && (
+          <div className={styles.fullPreviewContent}>
+            <img src={previewImg} className={styles.fullPreviewImg} alt="预览大图" />
+          </div>
+        )}
+      </Modal>
 
       {/* 预览导入弹窗 */}
       <Modal title={null} open={previewImportOpen} onCancel={() => setPreviewImportOpen(false)} footer={null} width={520} centered className={styles.ctrlModal}>

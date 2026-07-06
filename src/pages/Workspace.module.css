@@ -183,7 +183,7 @@
 
 /* ===== 预览区 + 呼吸光 ===== */
 .previewArea {
-  flex:1; overflow:hidden; position:relative; cursor:pointer;
+  flex:1; overflow:hidden; position:relative; cursor:default;
   display:flex; align-items:center; justify-content:center;
   background:
     radial-gradient(circle at top center, rgba(99,102,241,0.10), transparent 30%),
@@ -409,6 +409,85 @@
 .historyBtn:hover {
   color:#8b5cf6 !important; border-color:rgba(139,92,246,0.3) !important;
   box-shadow:0 4px 16px rgba(139,92,246,0.15) !important;
+}
+
+/* 图片可点击放大 */
+.previewImageClickable {
+  cursor: zoom-in;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.previewImageClickable:hover {
+  transform: translateZ(0) scale(1.012);
+  box-shadow: 0 24px 48px rgba(15,23,42,0.22);
+}
+
+/* 预览框左下角控制按钮组 */
+.previewCtrlBtns {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+}
+.previewCtrlBtn {
+  width: 38px; height: 38px;
+  border-radius: 12px;
+  background: rgba(15,23,42,0.18);
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 10px 24px rgba(15,23,42,0.12);
+  color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.25s;
+  outline: none;
+}
+.previewCtrlBtn:hover {
+  color: #8b5cf6;
+  border-color: rgba(139,92,246,0.3);
+  box-shadow: 0 4px 16px rgba(139,92,246,0.15);
+}
+.previewCtrlBtnDanger:hover {
+  color: #ef4444;
+  border-color: rgba(239,68,68,0.3);
+  box-shadow: 0 4px 16px rgba(239,68,68,0.15);
+}
+
+/* 全屏大图预览弹窗 */
+.fullPreviewModal :global(.ant-modal-content) {
+  background: rgba(9,12,22,0.96);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 0;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+  max-height: 85vh;
+  overflow: hidden;
+}
+.fullPreviewModal :global(.ant-modal-close) {
+  color: rgba(255,255,255,0.5);
+  top: 14px; right: 16px;
+}
+.fullPreviewModal :global(.ant-modal-close:hover) {
+  color: #fff;
+  background: rgba(255,255,255,0.08);
+  border-radius: 8px;
+}
+.fullPreviewContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  max-height: 85vh;
+  overflow: auto;
+}
+.fullPreviewImg {
+  max-width: 100%;
+  max-height: calc(85vh - 48px);
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+  display: block;
 }
 
 @media (max-width: 1400px) {
@@ -749,7 +828,8 @@
 :root[data-theme='light'] .topIconBtn,
 :root[data-theme='light'] .leftActionBtn,
 :root[data-theme='light'] .expandBtn,
-:root[data-theme='light'] .historyBtn {
+:root[data-theme='light'] .historyBtn,
+:root[data-theme='light'] .previewCtrlBtn {
   background: #f8fafc !important;
   border-color: #d7dee9 !important;
   color: #475569 !important;
@@ -760,7 +840,8 @@
 :root[data-theme='light'] .leftActionBtn:hover,
 :root[data-theme='light'] .historyBtn:hover,
 :root[data-theme='light'] .expandBtn:hover,
-:root[data-theme='light'] .backBtn:hover {
+:root[data-theme='light'] .backBtn:hover,
+:root[data-theme='light'] .previewCtrlBtn:hover {
   background: #f1f5f9 !important;
 }
 
