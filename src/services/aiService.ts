@@ -1244,9 +1244,9 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
 
     let response: Response;
     if (isGptImage2 && referenceImages.length > 0) {
-      // 有参考图 → /v1/images/edits (multipart/form-data) + 异步模式
-      const endpoint = `${baseUrl}/images/edits?async=true`;
-      console.log('[AIService] 发送请求到 (edits async):', endpoint);
+      // 有参考图 → /v1/images/edits (multipart/form-data)
+      const endpoint = `${baseUrl}/images/edits`;
+      console.log('[AIService] 发送请求到 (edits):', endpoint);
       const form = new FormData();
       form.append('model', imageModel);
       form.append('prompt', finalPrompt);
@@ -1269,9 +1269,9 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
         throw new Error(formatNetworkProbeError(error, endpoint));
       }
     } else if (isGptImage2) {
-      // 无参考图 → /v1/images/generations (JSON) + 异步模式
-      const endpoint = `${baseUrl}/images/generations?async=true`;
-      console.log('[AIService] 发送请求到 (generations async):', endpoint);
+      // 无参考图 → /v1/images/generations (JSON)
+      const endpoint = `${baseUrl}/images/generations`;
+      console.log('[AIService] 发送请求到 (generations):', endpoint);
       const payload: Record<string, unknown> = {
         prompt: finalPrompt,
         model: imageModel,
@@ -1325,13 +1325,20 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
     const data = await response.json();
     console.log('[AIService] 响应数据:', JSON.stringify(data, null, 2));
 
-    // gpt-image-2 异步模式：轮询任务直到完成
+    // gpt-image-2：自动检测同步/异步响应
     if (isGptImage2) {
-      const taskId: string = data?.data;
-      if (!taskId) throw new Error('Image generation error: no task_id returned');
+      // 同步响应：data 是数组，直接包含图片
+      const syncItem = Array.isArray(data?.data) ? data.data[0] : null;
+      if (syncItem?.url || syncItem?.b64_json) {
+        console.log('[AIService] 同步响应，直接返回图片');
+        return syncItem.url || `data:image/png;base64,${syncItem.b64_json}`;
+      }
+      // 异步响应：data 是 task_id 字符串
+      const taskId: string = typeof data?.data === 'string' ? data.data : data?.task_id || data?.id || '';
+      if (!taskId) throw new Error('Image generation error: unexpected response format');
       console.log('[AIService] 异步任务ID:', taskId);
       const pollUrl = `${baseUrl}/images/tasks/${taskId}`;
-      const MAX_POLLS = 120; // 最多等 120 × 3s = 6 分钟
+      const MAX_POLLS = 120;
       for (let i = 0; i < MAX_POLLS; i++) {
         await new Promise(r => setTimeout(r, 3000));
         let pollRes: Response;
@@ -1358,7 +1365,7 @@ ${resolvedTemplate.negative_prompt ? `\n【禁止事项】\n${resolvedTemplate.n
       throw new Error('Image generation timeout: task did not complete in time');
     }
 
-    // 非异步模式直接返回
+    // 非 gpt-image-2 直接返回
     const item = data.data?.[0];
     return item?.url || (item?.b64_json ? `data:image/png;base64,${item.b64_json}` : '') || '';
   }
